@@ -1,198 +1,39 @@
 <!DOCTYPE html>
-<html lang="pl">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Budzet</title>
-<style>
-  :root { --bg:#f3f1ec; --ink:#1c1915; --muted:#7a736a; --card:#fffdf9; --line:#e6e0d6; --soft:#e7f6ee; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:radial-gradient(900px 280px at 0 0,#efe6d6,transparent 60%),var(--bg); color:var(--ink); font:14px/1.4 "Segoe UI",sans-serif; }
-  .app { max-width:1080px; margin:0 auto; padding:22px 16px 40px; }
-  header { display:flex; justify-content:space-between; gap:12px; align-items:end; flex-wrap:wrap; }
-  h1 { margin:0; font-size:28px; letter-spacing:-.04em; }
-  .sub { color:var(--muted); margin-top:4px; }
-  .months { display:flex; gap:8px; overflow:auto; padding:16px 0 8px; }
-  button, select { border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 12px; cursor:pointer; font:inherit; color:var(--ink); }
-  .months button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
-  .period { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; color:var(--muted); }
-  .stats { display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:12px; }
-  .stat { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px 18px; }
-  .stat span { color:var(--muted); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
-  .stat strong { display:block; margin-top:6px; font-size:30px; letter-spacing:-.04em; }
-  .stat.bal { background:#1c1915; color:#f6f1e8; }
-  .stat.bal span { color:#c8bba8; }
-  .grid { display:grid; grid-template-columns:1fr 1.4fr; gap:12px; margin-top:12px; }
-  section { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:14px; }
-  section h2 { margin:0 0 10px; font-size:16px; }
-  .row { display:grid; grid-template-columns:1fr 110px auto; gap:8px; align-items:center; padding:7px 0; border-top:1px solid #f0ebe3; }
-  .row.cost { grid-template-columns:130px 88px 64px 110px 1fr auto; }
-  input { border:1px solid transparent; background:#f7f4ee; border-radius:10px; padding:8px 10px; font:inherit; width:100%; color:var(--ink); }
-  input.amt { text-align:right; }
-  .row.paid { background:var(--soft); border-radius:12px; padding:7px; }
-  .row.paid input { background:#fff; }
-  details { position:relative; }
-  summary { list-style:none; color:#b3aa9f; cursor:pointer; padding:6px; }
-  summary::-webkit-details-marker { display:none; }
-  details div { position:absolute; right:0; z-index:3; background:#fff; border:1px solid var(--line); border-radius:10px; padding:4px; display:flex; flex-direction:column; min-width:120px; }
-  details button { border:0; background:#fff; text-align:left; padding:6px 8px; border-radius:8px; }
-  .bar { display:flex; gap:8px; flex-wrap:wrap; }
-  #preview { display:none; margin-top:12px; }
-  #preview.open { display:block; }
-  .plist { display:grid; grid-template-columns:1fr 1fr; gap:8px 18px; }
-  .plist div { display:flex; justify-content:space-between; border-bottom:1px solid #f0ebe3; padding:6px 0; }
-  @media (max-width:800px) { .stats,.grid,.plist { grid-template-columns:1fr; } .stat strong { font-size:24px; } }
-</style>
-</head>
-<body>
-<div class="app">
-  <header>
-    <div><h1>Budzet</h1><div class="sub">Miesiac, saldo i zbiorczy podglad okresu.</div></div>
-    <div class="bar">
-      <button id="addMonth" type="button">Nowy miesiac</button>
-      <button id="cloneMonth" type="button">Klonuj na nastepny</button>
-      <button id="delMonth" type="button">Usun miesiac</button>
-      <button id="addIn" type="button">Przychod</button>
-      <button id="addEx" type="button">Koszt</button>
-    </div>
-  </header>
-  <div class="months" id="months"></div>
-  <div class="period">
-    <span>Okres</span>
-    <select id="from"></select>
-    <span>do</span>
-    <select id="to"></select>
-    <button id="showPeriod" type="button">Podglad zbiorczy</button>
-  </div>
-  <div class="stats">
-    <div class="stat bal"><span id="balLabel">Zostaje</span><strong id="bal">0 zl</strong></div>
-    <div class="stat"><span>Przychod</span><strong id="inc">0 zl</strong></div>
-    <div class="stat"><span>Wydatki</span><strong id="out">0 zl</strong></div>
-  </div>
-  <section id="preview"><h2 id="previewTitle">Podglad</h2>
-    <button id="hidePeriod" type="button">Zamknij podglad</button><div class="plist" id="previewList"></div></section>
-  <div class="grid">
-    <section><h2>Wplywy</h2><div id="inList"></div></section>
-    <section><h2>Koszty</h2><div id="exList"></div></section>
-  </div>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dashboard</title><link rel="stylesheet" href="base.css"></head>
+<body><div class="app">
+<nav class="topnav"><a href="index.html" class="on">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a></nav>
+<header><div><h1>Dashboard</h1><div class="sub" id="date"></div></div></header>
+<div class="tiles" id="tiles"></div>
+<section id="data" style="margin-top:18px"><h2 style="margin:0 0 4px;font-size:16px">Dane i kopie zapasowe</h2>
+<p class="note" style="margin:0 0 10px">Excel zawiera budzet, kredyty i gielde. Kopia JSON zapisuje wszystkie dane konta i pozwala je przywrocic.</p>
+<div class="form"><button id="xa" type="button">Excel - wszystko</button><button id="xb" type="button">Excel - budzet</button><button id="xg" type="button">Excel - gielda</button><button id="kb" class="dark" type="button">Kopia JSON</button><button id="ki" type="button">Import JSON</button></div></section>
 </div>
-<script>
-const KEY = "budzet-app-v3";
-const seed = () => ({
-  month: 0,
-  incomes: ["przychod","Bit","Daga","lokal","SIM"],
-  expenses: ["vat","ppe","zus","wyd. specjalny","oplaty","daga","nju","revolut","czynsz","hipoteczny","nadplata hipo","mbank","nadplata mbank","XTB Daga","XTB Marcin","Dom","ula"],
-  rows: [
-    {data:"lip-24", przychod:30000, vat:6149, ppe:2185, zus:1212, "wyd. specjalny":0, oplaty:950, daga:100, nju:200, mbank:5500, "nadplata mbank":0, "XTB Daga":5000, "XTB Marcin":1000, paid:{}},
-    {data:"sie-24", przychod:24817, vat:4491, ppe:1610, zus:1212, "wyd. specjalny":1099, oplaty:950, daga:100, nju:200, mbank:3000, "nadplata mbank":0, "XTB Daga":2500, "XTB Marcin":1000, paid:{}},
-    {data:"wrze-24", przychod:24317, vat:4547, ppe:1634, zus:800, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:1500, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":1000, paid:{}},
-    {data:"paz-24", przychod:24731, vat:4547, ppe:1634, zus:800, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:1500, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":2000, paid:{}},
-    {data:"list-24", przychod:24317, vat:4547, ppe:1634, zus:800, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:1500, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":2000, paid:{}},
-    {data:"gru-24", przychod:24317, vat:4547, ppe:1634, zus:800, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:2500, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":2000, paid:{}},
-    {data:"sty-25", przychod:24317, vat:5432, ppe:2081, zus:769, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:7000, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":1000, paid:{}},
-    {data:"lut-25", przychod:24317, vat:5296, ppe:1945, zus:498, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:7000, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":1000, paid:{}}
-  ]
-});
-let state = JSON.parse(localStorage.getItem(KEY) || "null") || seed();
-const zl = n => new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN",maximumFractionDigits:0}).format(n||0);
-const num = v => { const n = Number(String(v??"").replace(/\s/g,"").replace(",",".")); return Number.isFinite(n)?n:0; };
-const save = () => localStorage.setItem(KEY, JSON.stringify(state));
-const row = () => state.rows[state.month] || state.rows[0];
-const spent = r => state.expenses.reduce((a,k)=>a+num(r[k]),0);
-function rename(list,i,next){ const prev=list[i]; if(!next||next===prev||list.includes(next)) return; list[i]=next; state.rows.forEach(r=>{ if(prev in r){ r[next]=r[prev]; delete r[prev]; } if(r.paid&&prev in r.paid){ r.paid[next]=r.paid[prev]; delete r.paid[prev]; } }); }
-function menu(items){ const d=document.createElement("details"); const s=document.createElement("summary"); s.textContent="···"; d.append(s); const box=document.createElement("div"); items.forEach(([t,fn])=>{ const b=document.createElement("button"); b.textContent=t; b.onclick=e=>{ e.preventDefault(); d.open=false; fn(); }; box.append(b); }); d.append(box); return d; }
-function line(list, kind, i){
-  const key=list[i], r=row(); r.paid=r.paid||{};
-  state.loans=state.loans||{};
-  const el=document.createElement("div"); el.className="row"+(kind==="ex"?" cost":"")+(r.paid[key]?" paid":"");
-  const name=document.createElement("input"); name.className="name"; name.value=key;
-  name.onchange=()=>{ rename(list,i,name.value.trim()); save(); render(); };
-  const amt=document.createElement("input"); amt.className="amt"; amt.placeholder="rata"; amt.value=r[key]??"";
-  amt.onchange=()=>{ r[key]=amt.value; save(); render(); };
-  const items=[["zaplacone",()=>{ r.paid[key]=!r.paid[key]; save(); render(); }]];
-  if(i>0) items.push(["wyzej",()=>{ [list[i-1],list[i]]=[list[i],list[i-1]]; save(); render(); }]);
-  if(i<list.length-1) items.push(["nizej",()=>{ [list[i+1],list[i]]=[list[i],list[i+1]]; save(); render(); }]);
-  if(!(kind==="in"&&key==="przychod")) items.push(["usun",()=>{ list.splice(i,1); state.rows.forEach(rr=>{ delete rr[key]; if(rr.paid) delete rr.paid[key]; }); delete state.loans[key]; save(); render(); }]);
-  el.append(name, amt);
-  if(kind==="ex"){
-    const loan=state.loans[key]||{raty:"",calosc:"",uwaga:""};
-    const raty=document.createElement("input"); raty.placeholder="raty"; raty.value=loan.raty||"";
-    const calosc=document.createElement("input"); calosc.placeholder="zostalo"; calosc.value=loan.calosc||"";
-    const uwaga=document.createElement("input"); uwaga.placeholder="uwaga"; uwaga.value=loan.uwaga||"";
-    const keep=()=>{ state.loans[key]={raty:raty.value,calosc:calosc.value,uwaga:uwaga.value}; save(); };
-    raty.onchange=keep; calosc.onchange=keep; uwaga.onchange=keep;
-    el.append(raty, calosc, uwaga);
-  }
-  el.append(menu(items)); return el;
-}
-function fillSelect(id){
-  const sel=document.getElementById(id); const cur=sel.value; sel.innerHTML="";
-  state.rows.forEach((item,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=item.data||("miesiac "+(i+1)); sel.append(o); });
-  if (cur!=="" && state.rows[cur]) sel.value=cur;
-}
-function render(){
-  if(!state.rows.length) state.rows.push({data:"nowy", paid:{}});
-  if(state.month>=state.rows.length) state.month=state.rows.length-1;
-  const r=row();
-  document.getElementById("balLabel").textContent="Zostaje · "+(r.data||"");
-  document.getElementById("bal").textContent=zl(num(r.przychod)-spent(r));
-  document.getElementById("inc").textContent=zl(num(r.przychod));
-  document.getElementById("out").textContent=zl(spent(r));
-  const months=document.getElementById("months"); months.innerHTML="";
-  state.rows.forEach((item,i)=>{ const b=document.createElement("button"); b.textContent=item.data||"miesiac"; if(i===state.month) b.className="on"; b.onclick=()=>{ state.month=i; save(); render(); }; months.append(b); });
-  fillSelect("from"); fillSelect("to");
-  document.getElementById("inList").innerHTML="";
-  state.incomes.forEach((_,i)=>document.getElementById("inList").append(line(state.incomes,"in",i)));
-  document.getElementById("exList").innerHTML="";
-  state.expenses.forEach((_,i)=>document.getElementById("exList").append(line(state.expenses,"ex",i)));
-}
-function showPeriod(){
-  let a=+document.getElementById("from").value, b=+document.getElementById("to").value;
-  if(a>b) [a,b]=[b,a];
-  const slice=state.rows.slice(a,b+1);
-  const sumKey=k=>slice.reduce((s,r)=>s+num(r[k]),0);
-  const inn=sumKey("przychod"), out=state.expenses.reduce((s,k)=>s+sumKey(k),0);
-  document.getElementById("preview").className="open";
-  document.getElementById("previewTitle").textContent="Okres "+(state.rows[a].data||"")+" – "+(state.rows[b].data||"")+" · "+slice.length+" mies.";
-  const host=document.getElementById("previewList"); host.innerHTML="";
-  const add=(name,val)=>{ const d=document.createElement("div"); d.innerHTML="<span>"+name+"</span><strong>"+zl(val)+"</strong>"; host.append(d); };
-  add("Przychod", inn); add("Wydatki", out); add("Zostaje", inn-out);
-  state.expenses.forEach(k=>add(k, sumKey(k)));
-}
-document.getElementById("addMonth").onclick=()=>{ const n=prompt("Nazwa miesiaca","mar-25"); if(!n) return; state.rows.push({data:n,paid:{}}); state.month=state.rows.length-1; save(); render(); };
-document.getElementById("cloneMonth").onclick=()=>{
-  const src=row();
-  const copy=JSON.parse(JSON.stringify(src));
-  copy.paid={};
-  copy.data=nextName(src.data||"");
-  state.rows.splice(state.month+1,0,copy);
-  state.month+=1;
-  save(); render();
-};
-function nextName(name){
-  const text=String(name).trim();
-  const numeric=text.match(/^(\d{1,2})[-./](\d{4})$/);
-  if(numeric){
-    let m=+numeric[1], y=+numeric[2];
-    m+=1; if(m>12){ m=1; y+=1; }
-    return String(m).padStart(2,"0")+"-"+y;
-  }
-  const months=["sty","lut","mar","kwi","maj","cze","lip","sie","wrz","paz","lis","gru"];
-  const aliases={wrze:"wrz",list:"lis"};
-  const word=text.toLowerCase().match(/^([a-z]+)-(\d{2})$/);
-  if(word){
-    const key=aliases[word[1]]||word[1];
-    let i=months.indexOf(key), y=+word[2];
-    if(i>=0){ i+=1; if(i>11){ i=0; y+=1; } const out=i===8?"wrze":i===9?"paz":i===10?"list":months[i]; return out+"-"+String(y).padStart(2,"0"); }
-  }
-  return text;
-}
-document.getElementById("delMonth").onclick=()=>{ const r=row(); if(!confirm("Usunac miesiac "+(r.data||"")+"?")) return; state.rows.splice(state.month,1); state.month=Math.max(0,state.month-1); save(); render(); };
-document.getElementById("addIn").onclick=()=>{ const n=prompt("Nazwa przychodu"); if(!n) return; state.incomes.push(n); save(); render(); };
-document.getElementById("addEx").onclick=()=>{ const n=prompt("Nazwa kosztu"); if(!n) return; state.expenses.push(n); save(); render(); };
-document.getElementById("showPeriod").onclick=showPeriod;
-document.getElementById("hidePeriod").onclick=()=>document.getElementById("preview").className="";
-render();
-</script>
-</body>
-</html>
+<script src="auth.js"></script>
+<script type="text/x-after-auth" src="gcore.js"></script>
+<script type="text/x-after-auth" src="io.js"></script>
+<script type="text/x-after-auth">
+;(function(){
+const zl=n=>new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN",maximumFractionDigits:0}).format(n||0);
+const num=v=>{const n=Number(String(v??"").replace(/\s/g,"").replace(",","."));return Number.isFinite(n)?n:0};
+const ld=k=>{try{return JSON.parse(localStorage.getItem(k)||"null")}catch{return null}};
+// Nowy kafelek = nowy wpis: {title, href, val: () => [wartosc, podpis, klasa?]}
+const TILES=[
+{title:"Budzet",href:"budzet.html",val(){
+ const s=ld("budzet-app-v3"); if(!s||!s.rows||!s.rows.length) return ["–","brak danych"];
+ const r=s.rows[s.month]||s.rows[0];
+ const inc=s.incomes.reduce((a,k)=>a+num(r[k]),0), out=s.expenses.reduce((a,k)=>a+num(r[k]),0);
+ return [zl(inc-out),(r.data||"")+" · zostaje"];}},
+{title:"Gielda",href:"gielda.html",val(){
+ const s=G.summary(G.S.ps); if(!s.rows.length&&!s.dPln) return ["–","dodaj pierwszy walor"];
+ return [G.money(s.vUsd,"USD"),G.pct(s.profPct)+" · wplaty netto "+zl(s.dPln),G.cls(s.profUsd)];}}
+];
+const host=document.getElementById("tiles");
+TILES.forEach(t=>{const [v,s,c]=t.val();const a=document.createElement("a");a.className="tile";a.href=t.href;
+ const l=document.createElement("span");l.textContent=t.title;const b=document.createElement("strong");b.textContent=v;
+ const m=document.createElement("small");m.textContent=s;if(c)m.className=c;a.append(l,b,m);host.append(a);});
+document.getElementById("date").textContent=new Date().toLocaleDateString("pl-PL",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+
+document.getElementById("xa").onclick=()=>IO.excel("all");document.getElementById("xb").onclick=()=>IO.excel("budzet");document.getElementById("xg").onclick=()=>IO.excel("gielda");
+document.getElementById("kb").onclick=IO.backup;document.getElementById("ki").onclick=IO.pick;
+})();
+</script></body></html>

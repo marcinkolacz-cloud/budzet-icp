@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Budzet</title>
+<style>
+  :root { --bg:#f3f1ec; --ink:#1c1915; --muted:#7a736a; --card:#fffdf9; --line:#e6e0d6; --soft:#e7f6ee; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:radial-gradient(900px 280px at 0 0,#efe6d6,transparent 60%),var(--bg); color:var(--ink); font:14px/1.4 "Segoe UI",sans-serif; }
+  .app { max-width:1080px; margin:0 auto; padding:22px 16px 40px; }
+  header { display:flex; justify-content:space-between; gap:12px; align-items:end; flex-wrap:wrap; }
+  h1 { margin:0; font-size:28px; letter-spacing:-.04em; }
+  .sub { color:var(--muted); margin-top:4px; }
+  .months { display:flex; gap:8px; overflow:auto; padding:16px 0 8px; }
+  button, select { border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 12px; cursor:pointer; font:inherit; color:var(--ink); }
+  .months button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .period { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; color:var(--muted); }
+  .stats { display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:12px; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px 18px; }
+  .stat span { color:var(--muted); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+  .stat strong { display:block; margin-top:6px; font-size:30px; letter-spacing:-.04em; }
+  .stat.bal { background:#1c1915; color:#f6f1e8; }
+  .stat.bal span { color:#c8bba8; }
+  .grid { display:grid; grid-template-columns:1fr 1.4fr; gap:12px; margin-top:12px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:14px; }
+  section h2 { margin:0 0 10px; font-size:16px; }
+  .row { display:grid; grid-template-columns:1fr 110px auto; gap:8px; align-items:center; padding:7px 0; border-top:1px solid #f0ebe3; }
+  .row.cost { grid-template-columns:130px 88px 64px 110px 1fr auto; }
+  input { border:1px solid transparent; background:#f7f4ee; border-radius:10px; padding:8px 10px; font:inherit; width:100%; color:var(--ink); }
+  input.amt { text-align:right; }
+  .row.paid { background:var(--soft); border-radius:12px; padding:7px; }
+  .row.paid input { background:#fff; }
+  details { position:relative; }
+  summary { list-style:none; color:#b3aa9f; cursor:pointer; padding:6px; }
+  summary::-webkit-details-marker { display:none; }
+  details div { position:absolute; right:0; z-index:3; background:#fff; border:1px solid var(--line); border-radius:10px; padding:4px; display:flex; flex-direction:column; min-width:120px; }
+  details button { border:0; background:#fff; text-align:left; padding:6px 8px; border-radius:8px; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; }
+  #preview { display:none; margin-top:12px; }
+  #preview.open { display:block; }
+  .plist { display:grid; grid-template-columns:1fr 1fr; gap:8px 18px; }
+  .plist div { display:flex; justify-content:space-between; border-bottom:1px solid #f0ebe3; padding:6px 0; }
+  [hidden]{display:none!important}
+  .topnav{display:flex;gap:6px;margin:0 0 14px;padding-right:230px}
+  .topnav a{padding:6px 14px;border:1px solid var(--line);border-radius:999px;color:var(--ink);text-decoration:none;background:#fff}
+  .topnav a.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  @media (max-width:640px){.topnav{padding-right:0;margin-top:34px}}
+  
+  .tabs{display:flex;gap:6px;margin:14px 0 0}
+  .tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .filt{display:flex;gap:6px;margin:0 0 6px}
+  .filt select{padding:6px 10px}
+  .note{color:var(--muted);font-size:12px;margin:0 0 6px}
+  .row.cost .span3{grid-column:3 / 6;display:flex}
+  .row.cost .span3 button{padding:5px 12px}
+  input[readonly]{color:var(--muted);background:transparent;border-color:var(--line)}
+  .credit{margin-top:12px}
+  .credit .head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:start}
+  .credit h2{margin:0}
+  .meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 14px;margin:12px 0}
+  .meta span{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase;display:block}
+  .meta b{font-size:15px}
+  .sch{max-height:340px;overflow:auto;border-top:1px solid var(--line)}
+  table{width:100%;border-collapse:collapse}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;text-align:right;padding:6px;position:sticky;top:0;background:var(--card)}
+  td{padding:6px;border-top:1px solid #f0ebe3;text-align:right;white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  tr.past td{color:var(--muted)}
+  tr.cur td{background:var(--soft);font-weight:600}
+  tfoot td{font-weight:700;border-top:2px solid var(--line)}
+  @media (max-width:800px) { .stats,.grid,.plist { grid-template-columns:1fr; } .stat strong { font-size:24px; } }
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html" class="on">Budzet</a><a href="gielda.html">Gielda</a></nav>
+  <header>
+    <div><h1>Budzet</h1><div class="sub">Miesiac, saldo i zbiorczy podglad okresu.</div></div>
+    <div class="bar">
+      <button id="addMonth" type="button">Nowy miesiac</button>
+      <button id="cloneMonth" type="button">Klonuj na nastepny</button>
+      <button id="delMonth" type="button">Usun miesiac</button>
+      <button id="addIn" type="button">Przychod</button>
+      <button id="addEx" type="button">Koszt</button>
+      <button id="xlB" type="button" title="Eksport budzetu i kredytow do Excela">Excel</button>
+      <button id="bkB" type="button" title="Kopia zapasowa budzetu i gieldy (JSON)">Kopia JSON</button>
+      <button id="imB" type="button" title="Przywroc z kopii JSON">Import JSON</button>
+    </div>
+  </header>
+  <div class="tabs"><button id="tB" class="on" type="button">Budzet</button><button id="tK" type="button">Kredyty</button></div>
+<div id="viewB">
+  <div class="months" id="months"></div>
+  <div class="period">
+    <span>Okres</span>
+    <select id="from"></select>
+    <span>do</span>
+    <select id="to"></select>
+    <button id="showPeriod" type="button">Podglad zbiorczy</button>
+  </div>
+  <div class="stats">
+    <div class="stat bal"><span id="balLabel">Zostaje</span><strong id="bal">0 zl</strong></div>
+    <div class="stat"><span>Przychod</span><strong id="inc">0 zl</strong></div>
+    <div class="stat"><span>Wydatki</span><strong id="out">0 zl</strong></div>
+  </div>
+  <section id="preview"><h2 id="previewTitle">Podglad</h2>
+    <button id="hidePeriod" type="button">Zamknij podglad</button><div class="plist" id="previewList"></div></section>
+  <div class="grid">
+    <section><h2 id="hIn">Wplywy</h2>
+      <div class="filt"><input id="qIn" placeholder="Szukaj..." /><select id="mIn"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option></select></div>
+      <div class="note" id="sIn"></div><div id="inList"></div></section>
+    <section><h2 id="hEx">Koszty</h2>
+      <div class="filt"><input id="qEx" placeholder="Szukaj..." /><select id="mEx"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option><option value="paid">Oplacone</option><option value="unpaid">Nieoplacone</option></select></div>
+      <div class="note" id="sEx"></div><div id="exList"></div></section>
+  </div>
+</div>
+<div id="viewK" hidden>
+  <div class="bar" style="margin-top:14px"><button id="addCredit" type="button">Dodaj kredyt (import CSV)</button></div>
+  <p class="note" style="margin-top:8px">Kazdy kredyt ma wlasna tabele. Rata trafia do kosztow w budzecie jako „Kredyt N”. Po nadplacie wpisz kwote w „Kredyt N nadplata” i zaimportuj nowy harmonogram z banku (ten sam format CSV).</p>
+  <div id="kList"></div>
+  <input id="kFile" type="file" accept=".csv,.txt" hidden />
+</div>
+<script src="auth.js"></script>
+<script type="text/x-after-auth" src="io.js"></script>
+<script type="text/x-after-auth">
+const KEY = "budzet-app-v3";
+const seed = () => ({
+  month: 0,
+  incomes: ["przychod","Bit","Daga","lokal","SIM"],
+  expenses: ["vat","ppe","zus","wyd. specjalny","oplaty","daga","nju","revolut","czynsz","hipoteczny","nadplata hipo","mbank","nadplata mbank","XTB Daga","XTB Marcin","Dom","ula"],
+  rows: [
+    {data:"lip-24", przychod:30000, vat:6149, ppe:2185, zus:1212, "wyd. specjalny":0, oplaty:950, daga:100, nju:200, mbank:5500, "nadplata mbank":0, "XTB Daga":5000, "XTB Marcin":1000, paid:{}},
+    {data:"sie-24", przychod:24817, vat:4491, ppe:1610, zus:1212, "wyd. specjalny":1099, oplaty:950, daga:100, nju:200, mbank:3000, "nadplata mbank":0, "XTB Daga":2500, "XTB Marcin":1000, paid:{}},
+    {data:"wrze-24", przychod:24317, vat:4547, ppe:1634, zus:800, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:1500, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":1000, paid:{}},
+    {data:"paz-24", przychod:24731, vat:4547, ppe:1634, zus:800, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:1500, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":2000, paid:{}},
+    {data:"list-24", przychod:24317, vat:4547, ppe:1634, zus:800, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:1500, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":2000, paid:{}},
+    {data:"gru-24", przychod:24317, vat:4547, ppe:1634, zus:800, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:2500, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":2000, paid:{}},
+    {data:"sty-25", przychod:24317, vat:5432, ppe:2081, zus:769, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:7000, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":1000, paid:{}},
+    {data:"lut-25", przychod:24317, vat:5296, ppe:1945, zus:498, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:7000, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":1000, paid:{}}
+  ]
+});
+let state = JSON.parse(localStorage.getItem(KEY) || "null") || seed();
+const zl = n => new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN",maximumFractionDigits:0}).format(n||0);
+const num = v => { const n = Number(String(v??"").replace(/\s/g,"").replace(",",".")); return Number.isFinite(n)?n:0; };
+const save = () => localStorage.setItem(KEY, JSON.stringify(state));
+state.credits = state.credits || [];
+const $ = id => document.getElementById(id);
+const zl2 = n => new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN"}).format(n||0);
+const ASC = t => String(t??"").toLowerCase().replace(/ł/g,"l").normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+const MON = ["sty","lut","mar","kwi","maj","cze","lip","sie","wrz","paz","lis","gru"];
+const todayIso = () => new Date().toLocaleDateString("sv");
+const dmy = iso => iso.split("-").reverse().join("-");
+function ymOf(name){
+  const t=ASC(String(name||"").trim());
+  let m=t.match(/^(\d{1,2})[-./ ](\d{4})$/);
+  if(m&&+m[1]>=1&&+m[1]<=12) return m[2]+"-"+m[1].padStart(2,"0");
+  m=t.match(/^([a-z]+)[-./ ](\d{2}|\d{4})$/); if(!m) return null;
+  const i=MON.indexOf(m[1].slice(0,3)); if(i<0) return null;
+  return (m[2].length===2?2000+ +m[2]:+m[2])+"-"+String(i+1).padStart(2,"0");
+}
+const overKey = c => c.name+" nadpłata";
+const creditByKey = k => state.credits.find(c=>c.name===k);
+const creditByOver = k => state.credits.find(c=>overKey(c)===k);
+const entriesFor = (c,ym) => c.schedule.filter(x=>x.date.slice(0,7)===ym);
+// Rata z harmonogramu -> tabela glowna (tylko miesiace objete harmonogramem)
+function syncCredits(){
+  let ch=false;
+  state.credits.forEach(c=>{
+    [c.name,overKey(c)].forEach(k=>{ if(!state.expenses.includes(k)){ state.expenses.push(k); ch=true; } });
+    state.rows.forEach(r=>{
+      const ym=ymOf(r.data); if(!ym) return;
+      const e=entriesFor(c,ym); if(!e.length) return;
+      const v=Math.round(e.reduce((a,x)=>a+x.rata,0)*100)/100;
+      if(r[c.name]!==v){ r[c.name]=v; ch=true; }
+    });
+  });
+  return ch;
+}
+// --- import harmonogramu (CSV mBank: cp1250, separator ;)
+function decode(buf){ try{ return new TextDecoder("utf-8",{fatal:true}).decode(buf); }catch{ return new TextDecoder("windows-1250").decode(buf); } }
+function splitLine(l){ const o=[]; let cur="",q=false; for(let i=0;i<l.length;i++){ const ch=l[i]; if(ch==='"'){ if(q&&l[i+1]==='"'){cur+='"';i++;} else q=!q; } else if(ch===";"&&!q){ o.push(cur); cur=""; } else cur+=ch; } o.push(cur); return o.map(x=>x.trim()); }
+const pnum = x => Number(String(x).replace(/[\s\u00a0]/g,"").replace(",","."));
+function parseSchedule(text){
+  const lines=text.replace(/^\uFEFF/,"").split(/\r?\n/).map(splitLine);
+  const meta={}, sch=[]; let label=null;
+  const map=[["umowy kredytowej","umowa"],["z dnia","data"],["typ kredytu","typ"],["kwota kredytu","kwota"],["oprocentowanie","oproc"],["okres kredytowania","okres"],["waluta","waluta"]];
+  for(const f of lines){
+    while(f.length&&f[f.length-1]==="") f.pop();
+    const first=f[0]||"";
+    if(f.length>=6&&/^\d+$/.test(first)&&/^\d{2}-\d{2}-\d{4}$/.test(f[1])){
+      const [d,m,y]=f[1].split("-"), v=f.slice(2,6).map(pnum);
+      if(v.some(x=>!Number.isFinite(x))) throw new Error("Nieprawidlowa liczba w racie "+first);
+      if(Math.abs(v[0]+v[1]-v[2])>0.02) throw new Error("Rata "+first+": kapital + odsetki nie rowna sie racie");
+      sch.push({nr:+first,date:y+"-"+m+"-"+d,kap:v[0],ods:v[1],rata:v[2],saldo:v[3]}); label=null; continue;
+    }
+    if(f.length===1&&first){
+      if(first.startsWith("#")){ const l=ASC(first); const h=map.find(([k])=>l.includes(k)); label=h?h[1]:null; continue; }
+      if(label&&!(label in meta)){ meta[label]=first; label=null; }
+    }
+  }
+  if(!sch.length) throw new Error("Nie znaleziono rat - to nie jest harmonogram w formacie banku");
+  sch.sort((a,b)=>a.date<b.date?-1:1);
+  return {meta,sch};
+}
+function applyImport(c,p){
+  const first=p.sch[0].date.slice(0,7);
+  if(c){
+    if(c.meta.umowa&&p.meta.umowa&&c.meta.umowa!==p.meta.umowa&&!confirm("Numer umowy w pliku ("+p.meta.umowa+") rozni sie od zapisanego ("+c.meta.umowa+"). Zaimportowac mimo to?")) return;
+    if(!confirm("Zastapic harmonogram "+c.name+" ("+c.schedule.length+" rat) nowym ("+p.sch.length+" rat od "+dmy(p.sch[0].date)+")?\nRaty z miesiecy przed "+first+" w budzecie zostaja bez zmian.")) return;
+    c.meta=p.meta; c.schedule=p.sch; c.imported=todayIso();
+  } else {
+    const n=Math.max(0,...state.credits.map(x=>+((x.name.match(/^Kredyt (\d+)$/)||[])[1]||0)))+1;
+    c={id:Date.now(),name:"Kredyt "+n,meta:p.meta,schedule:p.sch,imported:todayIso()}; state.credits.push(c);
+  }
+  state.rows.forEach(r=>{ const ym=ymOf(r.data); if(ym&&ym>=first&&!entriesFor(c,ym).length) r[c.name]=0; });
+  syncCredits(); save(); render();
+}
+function removeCredit(c){
+  if(!confirm("Usunac "+c.name+" razem z harmonogramem i wartosciami w budzecie (rata i nadplata)?")) return;
+  const keys=[c.name,overKey(c)];
+  state.credits=state.credits.filter(x=>x!==c);
+  state.expenses=state.expenses.filter(k=>!keys.includes(k));
+  state.rows.forEach(r=>keys.forEach(k=>{ delete r[k]; if(r.paid) delete r.paid[k]; }));
+  state.loans=state.loans||{}; keys.forEach(k=>delete state.loans[k]);
+  save(); render();
+}
+let pendingCredit=null;
+function pickFile(c){ pendingCredit=c; $("kFile").value=""; $("kFile").click(); }
+$("kFile").onchange=async()=>{ const f=$("kFile").files[0]; if(!f) return;
+  try{ applyImport(pendingCredit, parseSchedule(decode(await f.arrayBuffer()))); }catch(e){ alert(e.message); } };
+$("addCredit").onclick=()=>pickFile(null);
+// --- filtry
+const flt={in:{q:"",m:""},ex:{q:"",m:""}};
+function passes(kind,key,r){
+  if(r.del&&r.del[key]) return false;
+  const f=flt[kind]; if(f.q&&!ASC(key).includes(ASC(f.q))) return false;
+  const v=num(r[key]);
+  return f.m===""||(f.m==="val"&&v!==0)||(f.m==="zero"&&v===0)||(f.m==="paid"&&!!(r.paid&&r.paid[key]))||(f.m==="unpaid"&&v!==0&&!(r.paid&&r.paid[key]));
+}
+[["in","qIn","mIn"],["ex","qEx","mEx"]].forEach(([k,q,m])=>{ $(q).oninput=()=>{ flt[k].q=$(q).value; render(); }; $(m).onchange=()=>{ flt[k].m=$(m).value; render(); }; });
+const row = () => state.rows[state.month] || state.rows[0];
+const earned = r => state.incomes.reduce((a,k)=>a+num(r[k]),0);
+const spent = r => state.expenses.reduce((a,k)=>a+num(r[k]),0);
+function rename(list,i,next){ const prev=list[i]; if(!next||next===prev||list.includes(next)) return; list[i]=next; state.rows.forEach(r=>{ if(prev in r){ r[next]=r[prev]; delete r[prev]; } if(r.paid&&prev in r.paid){ r.paid[next]=r.paid[prev]; delete r.paid[prev]; } if(r.del&&prev in r.del){ r.del[next]=r.del[prev]; delete r.del[prev]; } }); }
+function menu(items){ const d=document.createElement("details"); const s=document.createElement("summary"); s.textContent="···"; d.append(s); const box=document.createElement("div"); items.forEach(([t,fn])=>{ const b=document.createElement("button"); b.textContent=t; b.onclick=e=>{ e.preventDefault(); d.open=false; fn(); }; box.append(b); }); d.append(box); return d; }
+function line(list, kind, i){
+  const key=list[i], r=row(); r.paid=r.paid||{};
+  state.loans=state.loans||{};
+  const el=document.createElement("div"); el.className="row"+(kind==="ex"?" cost":"")+(r.paid[key]?" paid":"");
+  const cr=kind==="ex"?creditByKey(key):null, ov=kind==="ex"?creditByOver(key):null;
+  const name=document.createElement("input"); name.className="name"; name.value=key; if(cr||ov){ name.readOnly=true; name.title="Powiazane z zakladka Kredyty"; }
+  name.onchange=()=>{ rename(list,i,name.value.trim()); save(); render(); };
+  const amt=document.createElement("input"); amt.className="amt"; amt.placeholder="rata"; amt.value=r[key]??""; if(cr){ amt.readOnly=true; amt.title="z harmonogramu"; }
+  amt.onchange=()=>{ r[key]=amt.value; save(); render(); };
+  const items=[["zaplacone",()=>{ r.paid[key]=!r.paid[key]; save(); render(); }]];
+  if(i>0) items.push(["wyzej",()=>{ [list[i-1],list[i]]=[list[i],list[i-1]]; save(); render(); }]);
+  if(i<list.length-1) items.push(["nizej",()=>{ [list[i+1],list[i]]=[list[i],list[i+1]]; save(); render(); }]);
+  if(!cr&&!ov&&!(kind==="in"&&key==="przychod")) items.push(["usun",()=>{
+    if(!confirm("Usunac „"+key+"” od miesiaca "+(r.data||"")+"? Wczesniejsze miesiace zostaja bez zmian.")) return;
+    state.rows.forEach((rr,ix)=>{ if(ix>=state.month){ rr.del=rr.del||{}; rr.del[key]=true; delete rr[key]; if(rr.paid) delete rr.paid[key]; } });
+    if(!state.rows.some(rr=>num(rr[key])!==0)){ list.splice(list.indexOf(key),1); state.rows.forEach(rr=>{ delete rr[key]; if(rr.paid) delete rr.paid[key]; if(rr.del) delete rr.del[key]; }); delete state.loans[key]; }
+    save(); render(); }]);
+  el.append(name, amt);
+  if(ov){
+    const sp=document.createElement("div"); sp.className="span3";
+    if(num(r[key])>0){ const b=document.createElement("button"); b.type="button"; b.textContent="Import nowego harmonogramu"; b.onclick=()=>pickFile(ov); sp.append(b); }
+    el.append(sp);
+  } else if(kind==="ex"){
+    const loan=state.loans[key]||{raty:"",calosc:"",uwaga:""};
+    const raty=document.createElement("input"); raty.placeholder="raty"; raty.value=loan.raty||"";
+    const calosc=document.createElement("input"); calosc.placeholder="zostalo"; calosc.value=loan.calosc||"";
+    const uwaga=document.createElement("input"); uwaga.placeholder="uwaga"; uwaga.value=loan.uwaga||"";
+    if(cr){ const e=entriesFor(cr,ymOf(r.data)||"")[0]; raty.value=e?e.nr+"/"+cr.schedule.length:""; calosc.value=e?e.saldo:""; raty.readOnly=calosc.readOnly=true; raty.title="rata / wszystkich"; calosc.title="saldo po racie"; }
+    const keep=()=>{ state.loans[key]=cr?{raty:"",calosc:"",uwaga:uwaga.value}:{raty:raty.value,calosc:calosc.value,uwaga:uwaga.value}; save(); };
+    raty.onchange=keep; calosc.onchange=keep; uwaga.onchange=keep;
+    el.append(raty, calosc, uwaga);
+  }
+  el.append(menu(items)); return el;
+}
+function fillSelect(id){
+  const sel=document.getElementById(id); const cur=sel.value; sel.innerHTML="";
+  state.rows.forEach((item,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=item.data||("miesiac "+(i+1)); sel.append(o); });
+  if (cur!=="" && state.rows[cur]) sel.value=cur;
+}
+function render(){
+  if(!state.rows.length) state.rows.push({data:"nowy", paid:{}});
+  if(syncCredits()) save();
+  if(state.month>=state.rows.length) state.month=state.rows.length-1;
+  const r=row();
+  document.getElementById("balLabel").textContent="Zostaje · "+(r.data||"");
+  document.getElementById("bal").textContent=zl(earned(r)-spent(r));
+  document.getElementById("inc").textContent=zl(earned(r));
+  document.getElementById("out").textContent=zl(spent(r));
+  const months=document.getElementById("months"); months.innerHTML="";
+  state.rows.forEach((item,i)=>{ const b=document.createElement("button"); b.textContent=item.data||"miesiac"; if(i===state.month) b.className="on"; b.onclick=()=>{ state.month=i; save(); render(); }; months.append(b); });
+  fillSelect("from"); fillSelect("to");
+  document.getElementById("inList").innerHTML="";
+  const shown={in:0,ex:0}, sums={in:0,ex:0};
+  state.incomes.forEach((k,i)=>{ if(!passes("in",k,r)) return; shown.in++; sums.in+=num(r[k]); document.getElementById("inList").append(line(state.incomes,"in",i)); });
+  document.getElementById("exList").innerHTML="";
+  state.expenses.forEach((k,i)=>{ if(!passes("ex",k,r)) return; shown.ex++; sums.ex+=num(r[k]); document.getElementById("exList").append(line(state.expenses,"ex",i)); });
+  $("hIn").textContent="Wplywy ("+shown.in+"/"+state.incomes.length+")"; $("hEx").textContent="Koszty ("+shown.ex+"/"+state.expenses.length+")";
+  const act=k=>flt[k].q||flt[k].m;
+  $("sIn").textContent=act("in")?"Suma widocznych: "+zl(sums.in):""; $("sEx").textContent=act("ex")?"Suma widocznych: "+zl(sums.ex):"";
+  renderK();
+}
+function renderK(){
+  const host=$("kList"); host.innerHTML="";
+  if(!state.credits.length){ const p=document.createElement("p"); p.className="note"; p.textContent="Brak kredytow - zaimportuj harmonogram (CSV z banku)."; host.append(p); return; }
+  const T=todayIso(), mk=(tag,txt,cls)=>{ const e=document.createElement(tag); if(txt!=null) e.textContent=txt; if(cls) e.className=cls; return e; };
+  state.credits.forEach(c=>{
+    const sec=mk("section",null,"credit"), head=mk("div",null,"head");
+    head.append(mk("h2",c.name+(c.meta.typ?" · "+c.meta.typ:"")));
+    const bar=mk("div",null,"bar"), ib=mk("button","Import nowego harmonogramu"), db=mk("button","Usun kredyt");
+    ib.type=db.type="button"; ib.onclick=()=>pickFile(c); db.onclick=()=>removeCredit(c); bar.append(ib,db); head.append(bar); sec.append(head);
+    const past=c.schedule.filter(x=>x.date<T), fut=c.schedule.filter(x=>x.date>=T), next=fut[0];
+    const left=past.length?past[past.length-1].saldo:(c.schedule[0].saldo+c.schedule[0].kap);
+    const m=mk("div",null,"meta");
+    [["Nr umowy",c.meta.umowa||"–"],["Kwota kredytu",c.meta.kwota||"–"],["Oprocentowanie",c.meta.oproc||"–"],["Okres",c.meta.okres||"–"],["Harmonogram z dnia",c.meta.data||"–"],
+     ["Nastepna rata",next?dmy(next.date)+" · "+zl2(next.rata):"splacony"],["Zostalo do splaty (kapital)",zl2(left)],["Pozostale odsetki",zl2(fut.reduce((a,x)=>a+x.ods,0))],["Raty",past.length+" / "+c.schedule.length]]
+     .forEach(([a,b])=>{ const d=mk("div"); d.append(mk("span",a),mk("b",b)); m.append(d); });
+    sec.append(m);
+    const wrap=mk("div",null,"sch"), t=mk("table"), th=mk("thead"), htr=mk("tr");
+    ["Nr","Termin","Kapital","Odsetki","Rata","Saldo po racie"].forEach(h=>htr.append(mk("th",h))); th.append(htr); t.append(th);
+    const tb=mk("tbody");
+    c.schedule.forEach(x=>{ const tr=mk("tr",null,x.date<T?"past":(x===next?"cur":""));
+      [x.nr,dmy(x.date),zl2(x.kap),zl2(x.ods),zl2(x.rata),zl2(x.saldo)].forEach(v=>tr.append(mk("td",v))); tb.append(tr); });
+    t.append(tb);
+    const tf=mk("tfoot"), ftr=mk("tr"), sm=k=>c.schedule.reduce((a,x)=>a+x[k],0);
+    ["Suma","",zl2(sm("kap")),zl2(sm("ods")),zl2(sm("rata")),""].forEach(v=>ftr.append(mk("td",v))); tf.append(ftr); t.append(tf);
+    wrap.append(t); sec.append(wrap); host.append(sec);
+  });
+}
+function setTab(k){ $("viewB").hidden=k!=="K"?false:true; $("viewK").hidden=k!=="K"; document.querySelector("header .bar").hidden=k==="K";
+  $("tB").className=k==="K"?"":"on"; $("tK").className=k==="K"?"on":""; try{ history.replaceState(null,"",k==="K"?"#kredyty":"#"); }catch{} }
+$("tB").onclick=()=>setTab("B"); $("tK").onclick=()=>setTab("K");
+function showPeriod(){
+  let a=+document.getElementById("from").value, b=+document.getElementById("to").value;
+  if(a>b) [a,b]=[b,a];
+  const slice=state.rows.slice(a,b+1);
+  const sumKey=k=>slice.reduce((s,r)=>s+num(r[k]),0);
+  const inn=state.incomes.reduce((s,k)=>s+sumKey(k),0), out=state.expenses.reduce((s,k)=>s+sumKey(k),0);
+  document.getElementById("preview").className="open";
+  document.getElementById("previewTitle").textContent="Okres "+(state.rows[a].data||"")+" – "+(state.rows[b].data||"")+" · "+slice.length+" mies.";
+  const host=document.getElementById("previewList"); host.innerHTML="";
+  const add=(name,val)=>{ const d=document.createElement("div"); d.innerHTML="<span>"+name+"</span><strong>"+zl(val)+"</strong>"; host.append(d); };
+  add("Przychod", inn); add("Wydatki", out); add("Zostaje", inn-out);
+  state.expenses.forEach(k=>add(k, sumKey(k)));
+}
+document.getElementById("addMonth").onclick=()=>{ const n=prompt("Nazwa miesiaca","mar-25"); if(!n) return; const prevRow=state.rows[state.rows.length-1]; state.rows.push({data:n,paid:{},del:prevRow&&prevRow.del?{...prevRow.del}:{}}); state.month=state.rows.length-1; save(); render(); };
+document.getElementById("cloneMonth").onclick=()=>{
+  const src=row();
+  const copy=JSON.parse(JSON.stringify(src));
+  copy.paid={};
+  copy.data=nextName(src.data||"");
+  state.rows.splice(state.month+1,0,copy);
+  state.month+=1;
+  save(); render();
+};
+function nextName(name){
+  const text=String(name).trim();
+  const numeric=text.match(/^(\d{1,2})[-./](\d{4})$/);
+  if(numeric){
+    let m=+numeric[1], y=+numeric[2];
+    m+=1; if(m>12){ m=1; y+=1; }
+    return String(m).padStart(2,"0")+"-"+y;
+  }
+  const months=["sty","lut","mar","kwi","maj","cze","lip","sie","wrz","paz","lis","gru"];
+  const aliases={wrze:"wrz",list:"lis"};
+  const word=text.toLowerCase().match(/^([a-z]+)-(\d{2})$/);
+  if(word){
+    const key=aliases[word[1]]||word[1];
+    let i=months.indexOf(key), y=+word[2];
+    if(i>=0){ i+=1; if(i>11){ i=0; y+=1; } const out=i===8?"wrze":i===9?"paz":i===10?"list":months[i]; return out+"-"+String(y).padStart(2,"0"); }
+  }
+  return text;
+}
+document.getElementById("delMonth").onclick=()=>{ const r=row(); if(!confirm("Usunac miesiac "+(r.data||"")+"?")) return; state.rows.splice(state.month,1); state.month=Math.max(0,state.month-1); save(); render(); };
+function addItem(list,n){ n=n.trim(); if(!n) return; if(list.includes(n)){ state.rows.forEach((rr,ix)=>{ if(ix>=state.month&&rr.del) delete rr.del[n]; }); } else list.push(n); save(); render(); }
+document.getElementById("addIn").onclick=()=>{ const n=prompt("Nazwa przychodu"); if(n) addItem(state.incomes,n); };
+document.getElementById("addEx").onclick=()=>{ const n=prompt("Nazwa kosztu"); if(n) addItem(state.expenses,n); };
+document.getElementById("showPeriod").onclick=showPeriod;
+document.getElementById("hidePeriod").onclick=()=>document.getElementById("preview").className="";
+$("xlB").onclick=()=>IO.excel("budzet"); $("bkB").onclick=IO.backup; $("imB").onclick=IO.pick;
+render();
+if(location.hash==="#kredyty") setTab("K");
+
+</script>
+</body>
+</html>

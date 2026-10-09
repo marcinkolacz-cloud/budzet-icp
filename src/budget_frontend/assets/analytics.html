@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Analityka</title><link rel="stylesheet" href="base.css"></head>
+<body><div class="app">
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html" class="on">Gielda</a></nav>
+<header><div><h1>Analityka</h1><div class="sub" id="st"></div>
+<div class="nav"><a href="gielda.html">Portfel</a><a class="on" href="analytics.html">Analityka</a></div></div>
+<div class="form"><select id="ps"></select><button id="rf" type="button">Odswiez ceny i kurs</button></div></header>
+<p class="note neg" id="warn"></p>
+<p class="note" id="diag"></p>
+<div class="stats">
+<div class="stat"><span>Wplacono netto</span><strong id="a1">0</strong><small id="a1s"></small></div>
+<div class="stat"><span>Wartosc portfela</span><strong id="a2">0</strong><small id="a2s"></small></div>
+<div class="stat"><span>Wynik calkowity</span><strong id="a3">0</strong><small id="a3s"></small></div>
+<div class="stat"><span>Sr. kurs zakupu USD</span><strong id="a4">–</strong><small id="a4s"></small></div></div>
+<section><h2>Rozbicie wyniku</h2><table><tbody id="bd"></tbody></table>
+<p class="note">Wynik z aktywow = wartosc portfela (pozycje + wolna gotowka) minus wplaty netto, w USD po kursach z dni wplat. Wplyw kursu = zmiana wartosci wplaconego kapitalu w PLN miedzy dniem wplaty a dzis. Sr. kurs zakupu USD = suma PLN wymienionych na USD / otrzymane USD.</p></section>
+<section><h2>Wplaty a wartosc aktywow</h2>
+<div class="form" id="pb2"></div>
+<div class="form" style="margin:8px 0"><input id="f1" type="date" style="width:150px"><input id="f2" type="date" style="width:150px"><select id="cc"><option>PLN</option><option>EUR</option><option>USD</option></select></div>
+<div class="legend"><span><i style="background:#1c1915"></i>Wplaty narastajaco</span><span><i style="background:#1a8a4a"></i>Wartosc portfela</span></div><div id="ch"></div>
+<h2 style="margin:14px 0 8px;font-size:15px" id="rh">Zwrot w okresie</h2>
+<table><thead><tr><th>Waluta</th><th>Wartosc na poczatku</th><th>Wplaty netto w okresie</th><th>Wartosc na koncu</th><th>Zysk</th><th>Zwrot %</th></tr></thead><tbody id="rt"></tbody></table>
+<p class="note" id="rnote"></p>
+<p class="note">Zwrot % = zysk / (wartosc poczatkowa + wplaty wazone czasem) - metoda Modified Dietz. Wartosc portfela zapisuje sie raz dziennie przy odswiezeniu cen; przed pierwszym zapisem przyjmowana jest wartosc rowna wplatom.</p></section>
+<section id="pfs"><h2>Portfele (suma = widok zbiorczy)</h2><table><thead><tr><th>Portfel</th><th>Wplaty netto</th><th>Wartosc</th><th>Wolna gotowka</th><th>Wynik z aktywow</th><th>Wynik calkowity</th></tr></thead><tbody id="pb"></tbody><tfoot id="pt"></tfoot></table></section>
+<section><h2>Pozycje i wyniki (takze zamkniete)</h2><table><thead><tr><th>Ticker</th><th id="ph">Portfel</th><th>Ilosc</th><th>Sr. cena</th><th>Cena</th><th>Wartosc</th><th>Niezrealizowany</th><th>Zrealizowany</th></tr></thead><tbody id="rows"></tbody><tfoot id="tf"></tfoot></table></section>
+</div>
+<script>addEventListener("error",e=>{const t=e.target&&e.target.src?"Nie zaladowano "+e.target.src:(e.message||"blad")+(e.lineno?" (linia "+e.lineno+")":"");let b=document.getElementById("errbox");if(!b){b=document.createElement("pre");b.id="errbox";b.style.cssText="position:fixed;left:8px;bottom:8px;right:8px;z-index:10003;margin:0;background:#fff0f0;color:#c23b3b;border:1px solid #c23b3b;border-radius:10px;padding:8px 12px;font:12px monospace;white-space:pre-wrap";document.body.append(b);}b.textContent+="Blad strony: "+t+"\n";},true);</script>
+<script src="auth.js"></script>
+<script type="text/x-after-auth" src="gcore.js"></script>
+<script type="text/x-after-auth">
+;(function(){
+const $=id=>document.getElementById(id),{money,pct,cls}=G,usd=n=>money(n,"USD"),pln=n=>money(n,"PLN"),T=G.today();
+const wl=w=>G.CUR.map(c=>c+" "+(+w[c].toFixed(2))).join(" · ");
+function td(n,t,c){const e=document.createElement("td");e.textContent=t;if(c)e.className=c;n.append(e);return e;}
+const PRE=[["1M","1M"],["3M","3M"],["6M","6M"],["YTD","YTD"],["1R","1R"],["ALL","Calosc"]];
+let R={p:"ALL",from:"",to:""};
+const back=m=>{const x=new Date();x.setMonth(x.getMonth()-m);return x.toLocaleDateString("sv");};
+function range(){
+ let a,b=T;
+ if(R.p==="CUSTOM"){a=R.from||T;b=R.to||T;}
+ else if(R.p==="1M")a=back(1);else if(R.p==="3M")a=back(3);else if(R.p==="6M")a=back(6);else if(R.p==="1R")a=back(12);else if(R.p==="YTD")a=T.slice(0,4)+"-01-01";
+ else{const ps=G.sel(),ds=[...G.flows(ps).map(f=>f.d),...G.points(ps).map(p=>p.d)].sort();a=ds[0]?new Date(+new Date(ds[0])-864e5).toISOString().slice(0,10):T;}
+ if(b>T)b=T;if(a>b)[a,b]=[b,a];return [a,b];
+}
+function chart(ps,cur,from,to){
+ const F=G.flows(ps),k=cur.toLowerCase(),pts=G.points(ps);
+ if(!F.length&&!pts.length)return '<p class="note">Brak danych - zaksieguj wplate i odswiez ceny.</p>';
+ const cum=d=>F.filter(f=>f.d<=d).reduce((a,f)=>a+f[k],0),inR=F.filter(f=>f.d>from&&f.d<=to),ex={};pts.forEach(h=>ex[h.d]=h);
+ const dates=[...new Set([from,to,...inR.map(f=>f.d),...pts.filter(h=>h.d>from&&h.d<to).map(h=>h.d)])].sort();
+ const dep=dates.map(cum),val=dates.map(d=>(d===from||d===to)?G.valueIn(G.ptAt(pts,d),cur):(ex[d]?G.valueIn(ex[d],cur):null));
+ const W=800,H=320,L=64,Rr=16,Tt=16,B=32,t0=+new Date(from),t1=+new Date(to);
+ const X=d=>L+(t1===t0?(W-L-Rr)/2:(new Date(d)-t0)/(t1-t0)*(W-L-Rr));
+ const all=[...dep,...val.filter(v=>v!=null)],mx=Math.max(1,...all)*1.1,mn=Math.min(0,...all);
+ const Y=v=>Tt+(1-(v-mn)/(mx-mn))*(H-Tt-B),cf=new Intl.NumberFormat("pl-PL",{notation:"compact",maximumFractionDigits:1});
+ let s=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Wykres wplat i wartosci portfela">`;
+ for(let i=0;i<=4;i++){const v=mn+(mx-mn)*i/4,y=Y(v);s+=`<line x1="${L}" x2="${W-Rr}" y1="${y}" y2="${y}" stroke="#e6e0d6"/><text x="${L-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#7a736a">${cf.format(v)}</text>`;}
+ s+=`<text x="${L}" y="${H-8}" font-size="11" fill="#7a736a">${from}</text><text x="${W-Rr}" y="${H-8}" text-anchor="end" font-size="11" fill="#7a736a">${to}</text>`;
+ let p="M"+X(dates[0])+" "+Y(dep[0]);for(let i=1;i<dates.length;i++)p+=" L"+X(dates[i])+" "+Y(dep[i-1])+" L"+X(dates[i])+" "+Y(dep[i]);
+ s+=`<path d="${p}" fill="none" stroke="#1c1915" stroke-width="2"/>`;
+ const vp=dates.map((d,i)=>val[i]==null?null:[X(d),Y(val[i]),d,val[i]]).filter(Boolean);
+ if(vp.length>1)s+=`<polyline points="${vp.map(q=>q[0]+","+q[1]).join(" ")}" fill="none" stroke="#1a8a4a" stroke-width="2.5"/>`;
+ vp.forEach(q=>{s+=`<circle cx="${q[0]}" cy="${q[1]}" r="4" fill="#1a8a4a"><title>${q[2]}: wartosc ${money(q[3],cur)}</title></circle>`;});
+ inR.forEach(e=>{const c=cum(e.d);s+=`<circle cx="${X(e.d)}" cy="${Y(c)}" r="5" fill="#fffdf9" stroke="#1c1915" stroke-width="2"><title>${e.d}: ${e[k]>=0?"wplata":"wyplata"} ${money(Math.abs(e[k]),cur)} (razem ${money(c,cur)})</title></circle>`;});
+ return s+"</svg>";
+}
+function returns(ps,from,to){
+ const r=G.periodReturn(ps,from,to),B=$("rt");B.innerHTML="";$("rh").textContent="Zwrot w okresie "+from+" → "+to;
+ if(!r){$("rnote").textContent="Brak zapisanej wartosci portfela w tym okresie - odswiez ceny (wartosc zapisuje sie raz dziennie).";return;}
+ $("rnote").textContent="";
+ r.forEach(x=>{const tr=document.createElement("tr");td(tr,x.c);td(tr,x.vs==null?"–":money(x.vs,x.c));td(tr,money(x.sf,x.c));td(tr,x.ve==null?"–":money(x.ve,x.c));
+  td(tr,x.pr==null?"–":money(x.pr,x.c),x.pr==null?"":cls(x.pr));td(tr,x.pct==null?"–":pct(x.pct),x.pct==null?"":cls(x.pct));B.append(tr);});
+}
+function drawPeriod(){
+ const ps=G.sel(),[a,b]=range();$("f1").value=a;$("f2").value=b;
+ $("pb2").innerHTML="";PRE.forEach(([k,l])=>{const e=document.createElement("button");e.type="button";e.textContent=l;if(R.p===k)e.className="dark";e.onclick=()=>{R.p=k;drawPeriod();};$("pb2").append(e);});
+ $("ch").innerHTML=chart(ps,$("cc").value,a,b);returns(ps,a,b);
+}
+function render(){
+ G.mountSelect($("ps"),render);
+ const ps=G.sel(),s=G.summary(ps),r=G.S.rate,agg=G.isAgg();
+ $("st").textContent=r?"Kurs USD/PLN: "+r.r.toFixed(4)+(r.e?" · USD/EUR: "+r.e.toFixed(4):"")+" ("+r.d+")":"Brak kursu USD/PLN - odswiez";
+ const neg=ps.flatMap(p=>G.negWallets(p).map(x=>(agg?p.name+": ":"")+x));
+ $("warn").textContent=s.missing.length?(localStorage.getItem("gielda-key")?"Brak cen dla: "+s.missing.join(", ")+" - kliknij Odswiez ceny i kurs.":"Brak cen dla: "+s.missing.join(", ")+" - ustaw klucz API Finnhub w zakladce Portfel (przycisk Klucz API) i odswiez."):s.cashMissing?"Brak kursu do przeliczenia gotowki - odswiez kurs.":neg.length?"Ujemne saldo: "+neg.join("; ")+" - zaksieguj wplate lub wymien waluty.":"";
+ const nTx=ps.reduce((a,p)=>a+p.tx.length,0),nTr=ps.reduce((a,p)=>a+p.trades.length,0),nPos=s.rows.filter(x=>x.open).length;
+ $("diag").textContent="Portfele: "+ps.length+" · wplaty: "+nTx+" · transakcje: "+nTr+" · otwarte pozycje: "+nPos+" · ceny: "+(nPos?(s.missing.length?"brak ("+s.missing.join(", ")+")":"ok"):"–")+" · kurs USD/PLN: "+(r?"ok":"brak")+" · zapisane dni: "+G.history(ps).length;
+ if(!r)$("cc").value="USD";
+ $("a1").textContent=pln(s.dPln);$("a1s").textContent=money(s.dEur,"EUR")+" · "+usd(s.dUsd);
+ $("a2").textContent=r?pln(s.vPln):usd(s.vUsd);$("a2s").textContent=usd(s.vUsd)+" (pozycje "+usd(s.mv)+" + gotowka "+usd(s.cash)+")";
+ $("a3").textContent=r?pln(s.totPln):"–";$("a3").className=r?cls(s.totPln):"";$("a3s").textContent=r?pct(s.totPct):"";
+ $("a4").textContent=s.avgRate?s.avgRate.toFixed(4)+" zl":"–";$("a4s").textContent=s.avgRate&&r?"biezacy "+r.r.toFixed(4)+" ("+pct((r.r/s.avgRate-1)*100)+")":"";
+ const B=$("bd");B.innerHTML="";
+ [["Pozycje (wartosc rynkowa)",usd(s.mv),null],["Wolna gotowka wg walut",wl(s.w)+" (rownowaznik "+usd(s.cash)+")",null],
+  ["Wynik z aktywow (USD)",usd(s.profUsd)+" ("+pct(s.profPct)+")",s.profUsd],
+  ["w tym niezrealizowany (USD)",usd(s.unreal),s.unreal],["w tym zrealizowany ze sprzedazy (USD)",usd(s.realized),s.realized],
+  ["Wynik z aktywow w PLN (po biezacym kursie)",r?pln(s.assetPln):"–",r?s.assetPln:null],
+  ["Wplyw wahan kursu USD/PLN",r?pln(s.fxPln)+(s.dPln>0?" ("+pct(s.fxPln/s.dPln*100)+")":""):"–",r?s.fxPln:null],
+  ["Wynik calkowity (PLN)",r?pln(s.totPln)+" ("+pct(s.totPct)+")":"–",r?s.totPln:null]].forEach(([a,b,v],i,arr)=>{
+  const tr=document.createElement("tr");td(tr,a);td(tr,b,v==null?"":cls(v));if(i===arr.length-1)tr.style.fontWeight="700";B.append(tr);});
+ $("pfs").hidden=!agg;$("ph").hidden=!agg;
+ const PB=$("pb"),PT=$("pt");PB.innerHTML=PT.innerHTML="";
+ if(agg){G.S.ps.forEach(p=>{const q=G.summary([p]),tr=document.createElement("tr");td(tr,p.name);td(tr,pln(q.dPln));td(tr,usd(q.vUsd));td(tr,usd(q.cash));
+   td(tr,usd(q.profUsd)+" ("+pct(q.profPct)+")",cls(q.profUsd));td(tr,r?pln(q.totPln)+" ("+pct(q.totPct)+")":"–",r?cls(q.totPln):"");PB.append(tr);});
+  const tr=document.createElement("tr");tr.style.fontWeight="700";td(tr,"Razem");td(tr,pln(s.dPln));td(tr,usd(s.vUsd));td(tr,usd(s.cash));td(tr,usd(s.profUsd)+" ("+pct(s.profPct)+")",cls(s.profUsd));td(tr,r?pln(s.totPln)+" ("+pct(s.totPct)+")":"–",r?cls(s.totPln):"");PT.append(tr);}
+ const R2=$("rows");R2.innerHTML="";
+ G.posRows().forEach(x=>{const tr=document.createElement("tr");td(tr,x.t+(x.open?"":" (zamknieta)"));if(agg)td(tr,x.pn);td(tr,x.open?String(+x.q.toFixed(6)):"0");td(tr,x.open?usd(x.avg):"–");td(tr,x.open&&x.p?usd(x.p):"–");td(tr,x.open?usd(x.mv):"–");
+  td(tr,x.open?usd(x.unreal)+(x.cost?" ("+pct(x.unreal/x.cost*100)+")":""):"–",x.open?cls(x.unreal):"");td(tr,usd(x.realized),cls(x.realized));R2.append(tr);});
+ const F=$("tf");F.innerHTML="";const fr=document.createElement("tr");fr.style.fontWeight="700";td(fr,"Razem");if(agg)td(fr,"");td(fr,"");td(fr,"");td(fr,"");td(fr,usd(s.mv));td(fr,usd(s.unreal),cls(s.unreal));td(fr,usd(s.realized),cls(s.realized));F.append(fr);
+ drawPeriod();
+}
+$("f1").onchange=$("f2").onchange=()=>{R={p:"CUSTOM",from:$("f1").value,to:$("f2").value};drawPeriod();};
+$("cc").onchange=drawPeriod;
+async function refresh(){$("st").textContent="Odswiezanie...";const e=await G.refreshAll();render();if(e)$("st").textContent=e;}
+$("rf").onclick=refresh;render();
+{const all=G.summary(G.S.ps),key=localStorage.getItem("gielda-key");
+ if(all.rows.some(x=>x.open)&&key&&(all.missing.length||!G.S.pricesTs||Date.now()-G.S.pricesTs>600e3))refresh();
+ else G.getRate().then(render).catch(render);}
+
+})();
+</script></body></html>

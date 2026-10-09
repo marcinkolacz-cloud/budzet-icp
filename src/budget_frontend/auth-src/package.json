@@ -1,0 +1,2 @@
+{"name":"budzet-auth","private":true,"type":"module","scripts":{"build":"esbuild auth-src.js --bundle --minify --format=iife --target=es2020 --outfile=../assets/auth.js"},
+"dependencies":{"@icp-sdk/auth":"10.0.1","@icp-sdk/core":"6.1.0"},"devDependencies":{"esbuild":"0.25.9"}}

@@ -3,3 +3,5 @@ node_modules/
 .env
 *.wasm
 *.wasm.gz
+
+node_modules/

@@ -110,7 +110,7 @@
       <div class="filt"><input id="qIn" placeholder="Szukaj..." /><select id="mIn"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option></select></div>
       <div class="note" id="sIn"></div><div id="inList"></div></section>
     <section><h2 id="hEx">Koszty</h2>
-      <div class="filt"><input id="qEx" placeholder="Szukaj..." /><select id="mEx"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option><option value="paid">Oplacone</option><option value="unpaid">Nieoplacone</option></select></div>
+      <div class="filt"><input id="qEx" placeholder="Szukaj..." /><input id="nEx" placeholder="Uwaga..." /><select id="mEx"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option><option value="paid">Oplacone</option><option value="unpaid">Nieoplacone</option></select></div>
       <div class="note" id="sEx"></div><div id="exList"></div></section>
   </div>
 </div>
@@ -230,14 +230,16 @@ $("kFile").onchange=async()=>{ const f=$("kFile").files[0]; if(!f) return;
   try{ applyImport(pendingCredit, parseSchedule(decode(await f.arrayBuffer()))); }catch(e){ alert(e.message); } };
 $("addCredit").onclick=()=>pickFile(null);
 // --- filtry
-const flt={in:{q:"",m:""},ex:{q:"",m:""}};
+const flt={in:{q:"",m:""},ex:{q:"",m:"",n:""}};
 function passes(kind,key,r){
   if(r.del&&r.del[key]) return false;
   const f=flt[kind]; if(f.q&&!ASC(key).includes(ASC(f.q))) return false;
+  if(f.n&&!ASC(((state.loans||{})[key]||{}).uwaga||"").includes(ASC(f.n))) return false;
   const v=num(r[key]);
   return f.m===""||(f.m==="val"&&v!==0)||(f.m==="zero"&&v===0)||(f.m==="paid"&&!!(r.paid&&r.paid[key]))||(f.m==="unpaid"&&v!==0&&!(r.paid&&r.paid[key]));
 }
 [["in","qIn","mIn"],["ex","qEx","mEx"]].forEach(([k,q,m])=>{ $(q).oninput=()=>{ flt[k].q=$(q).value; render(); }; $(m).onchange=()=>{ flt[k].m=$(m).value; render(); }; });
+$("nEx").oninput=()=>{ flt.ex.n=$("nEx").value; render(); };
 const row = () => state.rows[state.month] || state.rows[0];
 const earned = r => state.incomes.reduce((a,k)=>a+num(r[k]),0);
 const spent = r => state.expenses.reduce((a,k)=>a+num(r[k]),0);

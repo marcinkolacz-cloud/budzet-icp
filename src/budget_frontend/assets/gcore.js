@@ -70,8 +70,18 @@ async function cgQuote(t){
   const x=(await r.json())[id];if(!x||!(x.usd>0))throw 0;return {c:x.usd,pc:x.usd/(1+(x.usd_24h_change||0)/100)};}
  catch{if(STABLE.includes(t))return {c:1,pc:1};throw new Error("Brak ceny "+t+" (CoinGecko)");}
 }
+const WKK="gielda-worker";
+function setWorker(){const u=prompt("URL Cloudflare Worker (gielda-quote), np. https://gielda-quote.xxx.workers.dev");if(u)localStorage.setItem(WKK,u.trim().replace(/\/+$/,""));return localStorage.getItem(WKK);}
+async function euQuote(t){
+ const u=localStorage.getItem(WKK)||"https://gielda-quote.marcinkolacz.workers.dev";if(!u)throw new Error("Brak URL workera");
+ let r;try{r=await fetch(u+"/q?s="+encodeURIComponent(t));}catch{throw new Error("Worker niedostepny");}
+ if(!r.ok)throw new Error("Worker blad "+r.status);
+ const x=(await r.json())[t];if(!x||!(x.usd>0))throw new Error("Nie znaleziono: "+t+(x&&x.err?" ("+x.err+")":""));
+ return {c:x.usd,pc:x.pcUsd||x.usd,cur:x.cur,n:x.c,name:x.name};
+}
 async function quote(t){
  if(CRYPTO[t])return cgQuote(t);
+ if(t.includes("."))return euQuote(t);
  const k=localStorage.getItem(KK)||setKey();if(!k)throw new Error("Brak klucza API");
  const r=await fetch("https://finnhub.io/api/v1/quote?symbol="+encodeURIComponent(t)+"&token="+encodeURIComponent(k));
  if(r.status===401||r.status===403){localStorage.removeItem(KK);throw new Error("Zly klucz API");}
@@ -160,5 +170,5 @@ function importJson(txt){
  localStorage.setItem(BK,localStorage.getItem(KEY)||"");S=norm(s);if(o.snaps)localStorage.setItem(SNK,JSON.stringify(o.snaps));save();
 }
 return {get S(){return S},CUR,save,P,isAgg,sel,derive,summary,posRows,validTrades,negWallets,quote,rates,convert,depositValues,getRate,refreshAll,snaps,history,points,flows,valueIn,ptAt,periodReturn,
- mountSelect,addPortfolio,rename,removePortfolio,restore,exportJson,importJson,setKey,today,uid,num,money,pct,cls,cmp,byD};
+ mountSelect,addPortfolio,rename,removePortfolio,restore,exportJson,importJson,setKey,setWorker,today,uid,num,money,pct,cls,cmp,byD};
 })();

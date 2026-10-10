@@ -29,7 +29,13 @@ const TILES=[
  return [G.money(s.vUsd,"USD"),G.pct(s.profPct)+" · wplaty netto "+zl(s.dPln),G.cls(s.profUsd)];}},
 {title:"Krypto",href:"krypto.html",val(){
  const s=K.summary(K.S.ps); if(!s.rows.length) return ["–","zaimportuj lub dodaj transakcje"];
- return [K.money(s.mv,"USD",0),K.pct(s.dayPct)+" 24h · wynik "+K.money(s.total,"USD",0),K.cls(s.total)];}}
+ return [K.money(s.mv,"USD",0),K.pct(s.dayPct)+" 24h · wynik "+K.money(s.total,"USD",0),K.cls(s.total)];}},
+{title:"Terminal sprzedazy",href:"terminal.html",val(){
+ const C=(K.S.term&&K.S.term.coins)||[];if(!C.length) return ["–","dodaj plan sprzedazy"];
+ const td=K.today(),mon=d=>{const x=new Date(d+"T00:00:00");x.setDate(x.getDate()-(x.getDay()+6)%7);return x.toLocaleDateString("sv");};
+ let rem=0;C.forEach(c=>{const p=(K.S.prices[c.t]||{}).p||0,L=[...c.lv].sort((a,b)=>a.p-b.p);let q=0;L.forEach(l=>{if(p>0&&p>=l.p)q=l.q;});
+  const k=c.cy==="d"?td:mon(td),s=c.sales.filter(x=>(c.cy==="d"?x.d:mon(x.d))===k).reduce((a,x)=>a+x.q,0);rem+=Math.max(0,q-s)*p;});
+ return [K.money(rem,"USD",0),"do sprzedania w biezacym cyklu",rem>0?"pos":""];}}
 ];
 const host=document.getElementById("tiles");
 TILES.forEach(t=>{const [v,s,c]=t.val();const a=document.createElement("a");a.className="tile";a.href=t.href;

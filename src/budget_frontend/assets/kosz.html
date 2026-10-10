@@ -50,6 +50,7 @@ function restoreOne(e){const {type,data:d}=e.i;
  if(type==="g-ps"){addPs(G,d.p);G.save();return "";}
  if(type==="k-trade"){const p=pf(K.S,d.pid),n=p.trades.length;p.trades.push(...d.ts);if(!K.validTrades(p.trades)){p.trades.length=n;return "sprzedaz przekroczylaby stan";}K.save();return "";}
  if(type==="k-ps"){addPs(K,d.p);K.save();return "";}
+ if(type==="k-term"){const T=K.S.term=K.S.term||{coins:[]};if(T.coins.some(c=>c.t===d.c.t&&c.cy===d.c.cy))return "plan tego aktywa i cyklu juz istnieje";T.coins.push(d.c);K.save();return "";}
  const b=bLoad();if(!b)return "brak danych budzetu";b.rows=b.rows||[];b.loans=b.loans||{};b.expenses=b.expenses||[];b.incomes=b.incomes||[];
  const byData=x=>b.rows.find(r=>r.data===x);
  if(type==="b-month"){b.rows.splice(Math.min(d.idx,b.rows.length),0,d.row);bSave(b);return "";}

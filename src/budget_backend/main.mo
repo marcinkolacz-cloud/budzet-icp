@@ -243,6 +243,7 @@ persistent actor Budget {
   var stLastRun : Int = 0;
   var stLog : Text = "";
   transient var stTimer : ?Timer.TimerId = null;
+  transient var stNTimer : ?Timer.TimerId = null;
   transient var stManualAt : Int = 0;
   transient var stNeuronAt : Int = 0;
 
@@ -416,10 +417,11 @@ persistent actor Budget {
     let e = lastSunday(y, 10) * 86_400 + 3_600;
     if (sec >= s and sec < e) 7_200 else 3_600
   };
-  func secsToNext0800() : Nat {
+  func secsToNext0800() : Nat { secsToNextAt(8 * 3_600) };
+  func secsToNextAt(at : Int) : Nat {
     let now = Time.now() / 1_000_000_000;
     let local = (now + warsawOffset(now)) % 86_400;
-    var diff : Int = 8 * 3_600 - local;
+    var diff : Int = at - local;
     if (diff <= 60) diff += 86_400;
     Int.abs(diff)
   };
@@ -626,7 +628,7 @@ persistent actor Budget {
   func stRun() : async () {
     stLastRun := Time.now();
     var log = "";
-    // neurony NIE sa synchronizowane automatycznie (tylko stSyncNeurons)
+    // neurony: osobny timer 18:02 (stNTick) + recznie stSyncNeurons
     var nearP = (0.0, 0.0); var injP = (0.0, 0.0);
     try {
       let hdr = if (stCgKey == "") [] else [{ name = "x-cg-demo-api-key"; value = stCgKey }];
@@ -667,6 +669,16 @@ persistent actor Budget {
     stArm<system>();
     await stRun();
   };
+  // auto sync neuronow codziennie 18:02 Europe/Warsaw (NNS Governance, bez outcalli)
+  func stNArm<system>() {
+    switch (stNTimer) { case (?t) Timer.cancelTimer(t); case null {} };
+    stNTimer := ?Timer.setTimer<system>(#seconds (secsToNextAt(18 * 3_600 + 120)), stNTick);
+  };
+  func stNTick() : async () {
+    stNArm<system>();
+    stNeuronAt := Time.now();
+    for (n in stNeurons.vals()) { await stSyncNeuron(n) };
+  };
 
   // reczny sync: czlonek, max raz na 10 min
   // reczny sync neuronow (NNS Governance, bez outcalli): czlonek, max raz na 10 min
@@ -688,7 +700,7 @@ persistent actor Budget {
     #ok(stLog)
   };
 
-  system func postupgrade() { stArm<system>() };
+  system func postupgrade() { stArm<system>(); stNArm<system>() };
 
   public query func health() : async Text { "ok" };
 

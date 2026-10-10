@@ -186,7 +186,7 @@ function render(){
  renderHist(dm,N,W);
  // status
  const nx=Number(D.nextRunSec),h=Math.floor(nx/3600),mi=Math.floor(nx%3600/60);
- $("st").innerHTML=`Ostatni sync: <b>${D.lastRun?new Date(Number(D.lastRun/1000000n)).toLocaleString("pl-PL",{timeZone:TZ}):"–"}</b> · auto 08:00 ceny/NEAR/INJ (za ${h} h ${mi} min) · neurony recznie`;
+ $("st").innerHTML=`Ostatni sync: <b>${D.lastRun?new Date(Number(D.lastRun/1000000n)).toLocaleString("pl-PL",{timeZone:TZ}):"–"}</b> · auto 08:00 ceny/NEAR/INJ (za ${h} h ${mi} min) · neurony auto 18:02`;
  $("chips").innerHTML=(D.hasKey?"":'<span class="bad">Brak klucza CoinGecko (stSetKey)</span>')+(D.log?`<span class="${D.log==="OK"?"ok":"bad"}">${esc(D.log)}</span>`:"")+(live.icp?`<span>ICP ${zl2(live.icp[K()])}</span><span>NEAR ${zl2(near.px)}</span><span>INJ ${zl2(inj.px)}</span>`:"");
 }
 function hRange(){

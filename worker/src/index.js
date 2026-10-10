@@ -12,14 +12,23 @@ async function yahoo(sym) {
     cur: m.currency || "USD", name: m.shortName || m.longName || sym };
 }
 
+const PREF = [".DE", ".AS", ".L", ".MI", ".PA", ".SW", ".WA", ".BR", ".MC", ".VI", ".ST", ".CO", ".HE", ".OL"];
+async function resolve(t) {
+  const base = t.split(".")[0], hits = (await search(base)).filter(x => x.s.split(".")[0] === base && x.s.includes("."));
+  for (const p of PREF) { const h = hits.find(x => x.s.endsWith(p)); if (h) return h.s; }
+  if (hits[0]) return hits[0].s;
+  throw new Error("brak w Yahoo");
+}
+
 async function quote(t, fx) {
-  const q = await yahoo(t);
+  let sym = t, q;
+  try { q = await yahoo(t); } catch { sym = await resolve(t); q = await yahoo(sym); }
   let cur = q.cur, k = 1;
   if (cur === "GBp" || cur === "GBX") { cur = "GBP"; k = 0.01; }
   else if (cur === "ILA") { cur = "ILS"; k = 0.01; }
   if (cur !== "USD" && fx[cur] == null) fx[cur] = (await yahoo(cur + "USD=X")).c;
   const r = cur === "USD" ? 1 : fx[cur];
-  return { c: q.c * k, pc: q.pc * k, cur, name: q.name, usd: q.c * k * r, pcUsd: q.pc * k * r };
+  return { sym, c: q.c * k, pc: q.pc * k, cur, name: q.name, usd: q.c * k * r, pcUsd: q.pc * k * r };
 }
 
 async function search(q) {

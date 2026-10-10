@@ -8,7 +8,7 @@
   :root { --bg:#f3f1ec; --ink:#1c1915; --muted:#7a736a; --card:#fffdf9; --line:#e6e0d6; --soft:#e7f6ee; }
   * { box-sizing:border-box; }
   body { margin:0; background:radial-gradient(900px 280px at 0 0,#efe6d6,transparent 60%),var(--bg); color:var(--ink); font:14px/1.4 "Segoe UI",sans-serif; }
-  .app { max-width:1080px; margin:0 auto; padding:22px 16px 40px; }
+  .app { max-width:1560px; margin:0 auto; padding:22px clamp(12px,3vw,40px) 40px; }
   header { display:flex; justify-content:space-between; gap:12px; align-items:end; flex-wrap:wrap; }
   h1 { margin:0; font-size:28px; letter-spacing:-.04em; }
   .sub { color:var(--muted); margin-top:4px; }
@@ -74,7 +74,7 @@
 </head>
 <body>
 <div class="app">
-<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html" class="on">Budzet</a><a href="gielda.html">Gielda</a></nav>
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html" class="on">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a></nav>
   <header>
     <div><h1>Budzet</h1><div class="sub">Miesiac, saldo i zbiorczy podglad okresu.</div></div>
     <div class="bar">
@@ -289,10 +289,6 @@ function render(){
   if(syncCredits()) save();
   if(state.month>=state.rows.length) state.month=state.rows.length-1;
   const r=row();
-  document.getElementById("balLabel").textContent="Zostaje · "+(r.data||"");
-  document.getElementById("bal").textContent=zl(earned(r)-spent(r));
-  document.getElementById("inc").textContent=zl(earned(r));
-  document.getElementById("out").textContent=zl(spent(r));
   const months=document.getElementById("months"); months.innerHTML="";
   state.rows.forEach((item,i)=>{ const b=document.createElement("button"); b.textContent=item.data||"miesiac"; if(i===state.month) b.className="on"; b.onclick=()=>{ state.month=i; save(); render(); }; months.append(b); });
   fillSelect("from"); fillSelect("to");
@@ -302,8 +298,11 @@ function render(){
   document.getElementById("exList").innerHTML="";
   state.expenses.forEach((k,i)=>{ if(!passes("ex",k,r)) return; shown.ex++; sums.ex+=num(r[k]); document.getElementById("exList").append(line(state.expenses,"ex",i)); });
   $("hIn").textContent="Wplywy ("+shown.in+"/"+state.incomes.length+")"; $("hEx").textContent="Koszty ("+shown.ex+"/"+state.expenses.length+")";
-  const act=k=>flt[k].q||flt[k].m;
+  const act=k=>flt[k].q||flt[k].m||flt[k].n, fa=act("in")||act("ex"), I=act("in")?sums.in:earned(r), E=act("ex")?sums.ex:spent(r);
   $("sIn").textContent=act("in")?"Suma widocznych: "+zl(sums.in):""; $("sEx").textContent=act("ex")?"Suma widocznych: "+zl(sums.ex):"";
+  $("balLabel").textContent="Zostaje · "+(r.data||"")+(fa?" · filtr":"");
+  $("bal").textContent=zl(I-E); $("inc").textContent=zl(I); $("out").textContent=zl(E);
+  if($("preview").className==="open") showPeriod();
   renderK();
 }
 function renderK(){
@@ -340,14 +339,14 @@ function showPeriod(){
   let a=+document.getElementById("from").value, b=+document.getElementById("to").value;
   if(a>b) [a,b]=[b,a];
   const slice=state.rows.slice(a,b+1);
-  const sumKey=k=>slice.reduce((s,r)=>s+num(r[k]),0);
-  const inn=state.incomes.reduce((s,k)=>s+sumKey(k),0), out=state.expenses.reduce((s,k)=>s+sumKey(k),0);
+  const sumKey=(k,kind)=>slice.reduce((s,r)=>s+(!kind||passes(kind,k,r)?num(r[k]):0),0);
+  const inn=state.incomes.reduce((s,k)=>s+sumKey(k,"in"),0), out=state.expenses.reduce((s,k)=>s+sumKey(k,"ex"),0);
   document.getElementById("preview").className="open";
   document.getElementById("previewTitle").textContent="Okres "+(state.rows[a].data||"")+" – "+(state.rows[b].data||"")+" · "+slice.length+" mies.";
   const host=document.getElementById("previewList"); host.innerHTML="";
   const add=(name,val)=>{ const d=document.createElement("div"); d.innerHTML="<span>"+name+"</span><strong>"+zl(val)+"</strong>"; host.append(d); };
   add("Przychod", inn); add("Wydatki", out); add("Zostaje", inn-out);
-  state.expenses.forEach(k=>add(k, sumKey(k)));
+  state.expenses.forEach(k=>{ const v=sumKey(k,"ex"); if(v||slice.some(r=>passes("ex",k,r))) add(k, v); });
 }
 document.getElementById("addMonth").onclick=()=>{ const n=prompt("Nazwa miesiaca","mar-25"); if(!n) return; const prevRow=state.rows[state.rows.length-1]; state.rows.push({data:n,paid:{},del:prevRow&&prevRow.del?{...prevRow.del}:{}}); state.month=state.rows.length-1; save(); render(); };
 document.getElementById("cloneMonth").onclick=()=>{

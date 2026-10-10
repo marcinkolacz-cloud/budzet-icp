@@ -82,6 +82,9 @@ async function euQuote(t){
 async function quote(t){
  if(CRYPTO[t])return cgQuote(t);
  if(t.includes("."))return euQuote(t);
+ try{return await usQuote(t);}catch(e){try{return await euQuote(t);}catch{throw e;}}
+}
+async function usQuote(t){
  const k=localStorage.getItem(KK)||setKey();if(!k)throw new Error("Brak klucza API");
  const r=await fetch("https://finnhub.io/api/v1/quote?symbol="+encodeURIComponent(t)+"&token="+encodeURIComponent(k));
  if(r.status===401||r.status===403){localStorage.removeItem(KK);throw new Error("Zly klucz API");}

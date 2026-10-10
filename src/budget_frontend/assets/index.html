@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dashboard</title><link rel="stylesheet" href="base.css"></head>
 <body><div class="app">
-<nav class="topnav"><a href="index.html" class="on">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a></nav>
+<nav class="topnav"><a href="index.html" class="on">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a></nav>
 <header><div><h1>Dashboard</h1><div class="sub" id="date"></div></div></header>
 <div class="tiles" id="tiles"></div>
 <section id="data" style="margin-top:18px"><h2 style="margin:0 0 4px;font-size:16px">Dane i kopie zapasowe</h2>
@@ -10,6 +10,7 @@
 </div>
 <script src="auth.js"></script>
 <script type="text/x-after-auth" src="gcore.js"></script>
+<script type="text/x-after-auth" src="ccore.js"></script>
 <script type="text/x-after-auth" src="io.js"></script>
 <script type="text/x-after-auth">
 ;(function(){
@@ -25,7 +26,10 @@ const TILES=[
  return [zl(inc-out),(r.data||"")+" · zostaje"];}},
 {title:"Gielda",href:"gielda.html",val(){
  const s=G.summary(G.S.ps); if(!s.rows.length&&!s.dPln) return ["–","dodaj pierwszy walor"];
- return [G.money(s.vUsd,"USD"),G.pct(s.profPct)+" · wplaty netto "+zl(s.dPln),G.cls(s.profUsd)];}}
+ return [G.money(s.vUsd,"USD"),G.pct(s.profPct)+" · wplaty netto "+zl(s.dPln),G.cls(s.profUsd)];}},
+{title:"Krypto",href:"krypto.html",val(){
+ const s=K.summary(K.S.ps); if(!s.rows.length) return ["–","zaimportuj lub dodaj transakcje"];
+ return [K.money(s.mv,"USD",0),K.pct(s.dayPct)+" 24h · wynik "+K.money(s.total,"USD",0),K.cls(s.total)];}}
 ];
 const host=document.getElementById("tiles");
 TILES.forEach(t=>{const [v,s,c]=t.val();const a=document.createElement("a");a.className="tile";a.href=t.href;

@@ -98,7 +98,7 @@ function excel(which){
  download(b,(which==="all"?"budzet-gielda":which)+"-"+TODAY()+".xlsx");
 }
 // ---------- kopia zapasowa JSON (budzet + gielda)
-function backupObj(){return {app:"budzet-icp",v:1,exported:new Date().toISOString(),budzet:jp("budzet-app-v3"),gielda:jp("gielda-v2"),snaps:jp("gielda-snaps")};}
+function backupObj(){return {app:"budzet-icp",v:1,exported:new Date().toISOString(),budzet:jp("budzet-app-v3"),gielda:jp("gielda-v2"),snaps:jp("gielda-snaps"),krypto:jp("krypto-v1"),ksnaps:jp("krypto-snaps")};}
 function backup(){
  const o=backupObj();if(!o.budzet&&!o.gielda)return alert("Brak danych do zapisania.");
  download(new Blob([JSON.stringify(o,null,1)],{type:"application/json"}),"budzet-kopia-"+TODAY()+".json");
@@ -108,7 +108,7 @@ function validBudzet(b){return b&&typeof b==="object"&&Array.isArray(b.rows)&&b.
 function validGielda(g){return g&&typeof g==="object"&&Array.isArray(g.ps)&&g.ps.length>0&&g.ps.every(p=>p&&p.id!=null&&typeof p.name==="string"&&Array.isArray(p.tx)&&Array.isArray(p.trades));}
 function parseBackup(text){
  let o;try{o=JSON.parse(text);}catch{throw new Error("To nie jest poprawny plik JSON");}
- if(o&&o.app==="budzet-icp")o={budzet:o.budzet,gielda:o.gielda,snaps:o.snaps};
+ if(o&&o.app==="budzet-icp")o={budzet:o.budzet,gielda:o.gielda,snaps:o.snaps,krypto:o.krypto,ksnaps:o.ksnaps};
  else if(o&&o.S)o={budzet:null,gielda:o.S,snaps:o.snaps};   // stary eksport samej gieldy
  else throw new Error("To nie jest kopia zapasowa tej aplikacji");
  if(o.budzet&&!validBudzet(o.budzet))throw new Error("Uszkodzone dane budzetu w pliku");
@@ -126,6 +126,8 @@ async function restore(file){
  if(o.budzet)LS.setItem("budzet-app-v3",JSON.stringify(o.budzet));
  if(o.gielda)LS.setItem("gielda-v2",JSON.stringify(o.gielda));
  if(o.snaps)LS.setItem("gielda-snaps",JSON.stringify(o.snaps));
+ if(o.krypto&&Array.isArray(o.krypto.ps))LS.setItem("krypto-v1",JSON.stringify(o.krypto));
+ if(o.ksnaps&&typeof o.ksnaps==="object")LS.setItem("krypto-snaps",JSON.stringify(o.ksnaps));
  document.body.insertAdjacentHTML("beforeend",'<div style="position:fixed;inset:0;z-index:10001;background:#f3f1ec;display:flex;align-items:center;justify-content:center;font-family:Segoe UI,sans-serif;color:#7a736a">Zapisywanie przywroconych danych…</div>');
  setTimeout(()=>location.reload(),1500);
 }

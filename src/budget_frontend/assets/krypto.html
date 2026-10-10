@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Krypto</title><link rel="stylesheet" href="base.css">
+<style>
+.sh{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}.sh h2{margin:0}
+.flt{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.flt input{width:220px}.flt input[type=date]{width:150px}
+th[data-k]{cursor:pointer;user-select:none}th[data-k]:hover{color:var(--ink)}th[data-k]::after{content:" ↕";opacity:.35}th.sa::after{content:" ↑";opacity:1}th.sd::after{content:" ↓";opacity:1}
+td .two{display:block;line-height:1.25}td .two small{display:block;color:var(--muted);font-size:11px}
+.sym{display:inline-block;padding:1px 7px;border:1px solid var(--line);border-radius:6px;font:11px ui-monospace,monospace;color:var(--muted);margin-left:6px}
+.ib{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 8px;font-size:12px;line-height:1.2}
+.ib.b{color:var(--pos)}.ib.s{color:var(--neg)}.acts{display:flex;gap:4px;justify-content:flex-end}
+.arr{font-size:11px;margin-right:3px}
+dialog{border:1px solid var(--line);border-radius:20px;padding:0;width:min(560px,calc(100vw - 24px));background:var(--card);color:var(--ink);box-shadow:0 24px 60px #0003}
+dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
+.dh{display:flex;justify-content:space-between;align-items:center;padding:16px 18px 6px}.dh h3{margin:0;font-size:18px}
+.db{padding:8px 18px 4px;display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}.db label{display:grid;gap:4px;font-size:12px;color:var(--muted)}.db .full{grid-column:1/-1}
+.db select{border-radius:10px;width:100%}.db .inl{display:flex;gap:6px}.db .inl button{padding:6px 10px;font-size:12px;white-space:nowrap}
+.seg{display:flex;gap:4px;background:#f3efe8;border-radius:12px;padding:4px}.seg button{flex:1;border:0;background:transparent;border-radius:9px;padding:7px}.seg button.on{background:#fff;box-shadow:0 1px 4px #0001;font-weight:600}
+.sum{grid-column:1/-1;background:#f7f4ee;border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px}
+.df{display:flex;justify-content:space-between;gap:8px;padding:14px 18px 18px}.df .r{display:flex;gap:8px;margin-left:auto}
+.err{grid-column:1/-1;color:var(--neg);font-size:12px;min-height:0}
+@media (max-width:760px){.db{grid-template-columns:1fr 1fr}.flt input{flex:1 1 100%;width:auto}dialog{border-radius:16px}}
+</style></head>
+<body><div class="app">
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html" class="on">Krypto</a></nav>
+<header><div><h1>Krypto</h1><div class="sub" id="st">Ceny: CoinGecko · kurs USD/PLN: ECB</div>
+<div class="nav"><a class="on" href="krypto.html">Portfel</a><a href="krypto-analityka.html">Analityka</a></div></div>
+<div class="form"><select id="ps"></select><button id="np" type="button">Nowy portfel</button><button id="rn" type="button">Zmien nazwe</button><button id="dp" type="button">Usun portfel</button><button id="rs" type="button">Przywroc usuniety</button>
+<button id="rf" class="dark" type="button">Odswiez ceny</button><button id="im" type="button">Import z innej aplikacji</button><button id="ex" type="button">Eksport JSON</button></div></header>
+<div class="stats">
+<div class="stat"><span>Wartosc</span><strong id="v">–</strong><small id="vs"></small></div>
+<div class="stat"><span>24h</span><strong id="d">–</strong><small id="ds"></small></div>
+<div class="stat"><span>Koszt otwartych pozycji</span><strong id="c">–</strong><small id="cs"></small></div>
+<div class="stat"><span>Wynik calkowity</span><strong id="w">–</strong><small id="ws"></small></div></div>
+<p class="note neg" id="wn"></p>
+<div class="g2">
+<section><h2>Struktura</h2><div id="alloc"></div></section>
+<section><h2>Ruchy 24h</h2><table><tbody id="mv"></tbody></table><p class="note" id="rw"></p></section>
+</div>
+<section><div class="sh"><h2>Aktywa</h2><div class="form"><button id="gh" type="button">Historia transakcji</button><button id="add" class="dark" type="button">+ Dodaj transakcje</button></div></div>
+<div class="flt"><input id="pq" placeholder="Szukaj aktywow..."><select id="pst"><option value="o">Otwarte</option><option value="c">Zamkniete</option><option value="">Wszystkie</option></select><select id="ppl"><option value="">Zysk i strata</option><option value="+">Tylko zysk</option><option value="-">Tylko strata</option></select></div>
+<table><thead><tr><th data-k="name">Aktywo</th><th data-k="pn" id="ph">Portfel</th><th data-k="p">Cena $</th><th data-k="avg" class="hm">Sr. cena zakupu $</th><th data-k="q" class="hm">Posiadane</th><th data-k="mv">Wartosc $</th><th data-k="cost" class="hm">Wartosc zakupu $</th><th data-k="total">Zysk/Strata $</th><th data-k="pctU" class="hm">Niezreal. %</th><th data-k="pctR" class="hm">Zreal. %</th><th data-k="ch24" class="hm">24h</th><th class="hm">7 dni</th><th>Akcje</th></tr></thead><tbody id="rows"></tbody><tfoot id="pf"></tfoot></table>
+<p class="note">K = kup, S = sprzedaj (formularz wstepnie wypelniony). ⋯ = cena reczna lub ID CoinGecko dla tokenow bez notowan.</p></section>
+<section id="hsec"><div class="sh"><h2>Historia transakcji</h2><span class="note" id="hsum"></span></div>
+<div class="flt"><input id="hq" placeholder="Szukaj symbolu lub uwag..."><select id="hty"><option value="">Wszystkie typy</option><option value="b">Kupno</option><option value="s">Sprzedaz</option><option value="r">Nagroda / staking</option></select><select id="has"><option value="">Wszystkie aktywa</option></select><input id="hd1" type="date" title="Od"><input id="hd2" type="date" title="Do"><button id="hcl" type="button">Wyczysc</button></div>
+<table><thead><tr><th data-h="d">Data</th><th data-h="pn" id="ph2">Portfel</th><th data-h="t">Aktywo</th><th data-h="typ">Typ</th><th data-h="q">Ilosc</th><th data-h="p" class="hm">Cena $</th><th data-h="v">Wartosc $</th><th class="hm">Uwagi</th><th>Akcje</th></tr></thead><tbody id="hs"></tbody></table></section>
+</div>
+<dialog id="dlg"><form method="dialog" id="fm">
+<div class="dh"><h3 id="dt">Nowa transakcja</h3><button type="button" id="dx" aria-label="Zamknij">✕</button></div>
+<div class="db">
+<div class="full seg" id="dty"><button type="button" data-v="b">Kupno</button><button type="button" data-v="s">Sprzedaz</button><button type="button" data-v="r">Nagroda / staking</button></div>
+<label>Portfel<select id="fp"></select></label>
+<label>Symbol<input id="fs" list="syml" autocomplete="off" placeholder="ICP"></label>
+<label>Data<input id="fd" type="date"></label>
+<label>Ilosc<div class="inl"><input id="fq" inputmode="decimal"><button type="button" id="fmax" hidden>Max</button></div></label>
+<label>Cena USD<div class="inl"><input id="fpr" inputmode="decimal"><button type="button" id="fcur">Aktualna</button></div></label>
+<label>Prowizja USD<input id="ff" inputmode="decimal" placeholder="0"></label>
+<label class="full">Uwagi<input id="fc" maxlength="120" placeholder="np. staking, zakup Marcin"></label>
+<div class="sum"><span id="fv">Wartosc: –</span><span id="fh"></span></div>
+<div class="err" id="fe"></div>
+</div>
+<div class="df"><button type="button" id="fdel" hidden style="color:var(--neg)">Usun</button><div class="r"><button type="button" id="fcan">Anuluj</button><button type="submit" class="dark" id="fok">Zapisz</button></div></div>
+</form></dialog>
+<datalist id="syml"></datalist>
+<script>addEventListener("error",e=>{const t=e.target&&e.target.src?"Nie zaladowano "+e.target.src:(e.message||"blad")+(e.lineno?" (linia "+e.lineno+")":"");let b=document.getElementById("errbox");if(!b){b=document.createElement("pre");b.id="errbox";b.style.cssText="position:fixed;left:8px;bottom:8px;right:8px;z-index:10003;margin:0;background:#fff0f0;color:#c23b3b;border:1px solid #c23b3b;border-radius:10px;padding:8px 12px;font:12px monospace;white-space:pre-wrap";document.body.append(b);}b.textContent+="Blad strony: "+t+"\n";},true);</script>
+<script src="auth.js"></script>
+<script type="text/x-after-auth" src="ccore.js"></script>
+<script type="text/x-after-auth" src="kchart.js"></script>
+<script type="text/x-after-auth">
+;(function(){
+const $=id=>document.getElementById(id),{money,price,qty,pct,num,cls}=K,usd=n=>money(n,"USD"),pln=n=>K.S.rate?money(n*K.S.rate,"PLN"):"";
+const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;};
+const td=(tr,t,c,hide)=>{const e=el("td",c);if(t instanceof Node)e.append(t);else e.textContent=t;if(hide)e.classList.add("hm");tr.append(e);return e;};
+const two=(a,b,c)=>{const s=el("span","two"+(c?" "+c:""),a);if(b){s.append(el("small",null,b));}return s;};
+const coin=r=>{const d=el("div","coin");if(r.img){const i=el("img");i.src=r.img;i.alt="";i.loading="lazy";d.append(i);}
+ const s=el("div",null,r.name);s.append(el("span","sym",r.t));d.append(s);return d;};
+const sP={k:"mv",d:-1},sH={k:"d",d:-1},fP={q:"",st:"o",pl:""},fH={q:"",ty:"",a:"",d1:"",d2:""};
+const typeOf=t=>t.s<0?"s":K.isReward(t)?"r":"b",TN={b:"Kupno",s:"Sprzedaz",r:"Nagroda"};
+const cmpBy=(k,d)=>(a,b)=>{const x=a[k],y=b[k];if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;return (typeof x==="string"?x.localeCompare(y,"pl"):x-y)*d;};
+function heads(){
+ document.querySelectorAll("th[data-k]").forEach(th=>{th.classList.toggle("sa",th.dataset.k===sP.k&&sP.d>0);th.classList.toggle("sd",th.dataset.k===sP.k&&sP.d<0);});
+ document.querySelectorAll("th[data-h]").forEach(th=>{th.classList.toggle("sa",th.dataset.h===sH.k&&sH.d>0);th.classList.toggle("sd",th.dataset.h===sH.k&&sH.d<0);});
+}
+function render(){
+ K.mountSelect($("ps"),render);const agg=K.isAgg(),S=K.S,s=K.summary(K.sel()),pl=S.rate||0;
+ $("dp").disabled=agg;$("ph").hidden=$("ph2").hidden=!agg;
+ $("v").textContent=usd(s.mv);$("vs").textContent=pl?money(s.mv*pl,"PLN",0):"";
+ $("d").textContent=(s.day>=0?"+":"")+usd(s.day);$("d").className=cls(s.day);$("ds").textContent=pct(s.dayPct);$("ds").className=cls(s.day);
+ $("c").textContent=usd(s.cost);$("cs").textContent="niezreal. "+(s.unreal>=0?"+":"")+usd(s.unreal);$("cs").className=cls(s.unreal);
+ $("w").textContent=(s.total>=0?"+":"")+usd(s.total);$("w").className=cls(s.total);$("ws").textContent=pct(s.totPct)+" · zreal. "+usd(s.realized)+(pl?" · "+money(s.total*pl,"PLN",0):"");
+ $("wn").textContent=s.missing.length?"Brak ceny: "+s.missing.join(", ")+" - wyceniono po koszcie zakupu. Odswiez lub ustaw cene / ID (⋯).":"";
+ $("st").textContent="Ceny: CoinGecko"+(S.ts?" · "+new Date(S.ts).toLocaleString("pl-PL"):" · nie odswiezono")+(pl?" · USD/PLN "+pl.toFixed(4):"");
+ const open=s.rows.filter(r=>r.open);
+ $("alloc").innerHTML=KC.donut(open.map(r=>({label:r.t,value:r.mv})),KC.kfmt(s.mv)+" $",open.length+" aktywow");
+ const M=$("mv");M.innerHTML="";const mvs=open.filter(r=>r.ch24!=null).sort((a,b)=>b.ch24-a.ch24),pick=mvs.length>8?[...mvs.slice(0,4),...mvs.slice(-4)]:mvs;
+ pick.forEach(r=>{const tr=el("tr");td(tr,coin(r));td(tr,pct(r.ch24),cls(r.ch24));td(tr,(r.day>=0?"+":"")+usd(r.day),cls(r.day));M.append(tr);});
+ if(!pick.length)M.innerHTML='<tr><td class="note">Odswiez ceny, aby zobaczyc zmiany.</td></tr>';
+ $("rw").textContent=s.rewV>0?"Nagrody / staking (wg biezacej ceny): "+usd(s.rewV):"";
+ // --- aktywa
+ const R=$("rows");R.innerHTML="";const ql=fP.q.toLowerCase();
+ const rows=K.posRows().filter(r=>(!fP.st||(fP.st==="o"?r.open:!r.open))&&(!ql||r.t.toLowerCase().includes(ql)||r.name.toLowerCase().includes(ql))&&(!fP.pl||(fP.pl==="+"?r.total>=0:r.total<0)))
+  .sort(cmpBy(sP.k,sP.d));
+ rows.forEach(r=>{const tr=el("tr");if(!r.open)tr.style.opacity=".6";const nop=r.nop||!r.p;
+  td(tr,coin(r));if(agg)td(tr,r.pn||"");
+  td(tr,two(r.p?price(r.p)+(S.manual[r.t]>0?" ✎":""):"–",r.p?pln(r.p):""));
+  td(tr,two(r.open?price(r.avg):"–",r.open?pln(r.avg):""),null,1);
+  td(tr,qty(r.q),null,1);
+  td(tr,two(r.open?usd(r.mv):"–",r.open?pln(r.mv):""));
+  td(tr,two(r.open?usd(r.cost):"–",r.open?pln(r.cost):""),null,1);
+  const pv=r.total;td(tr,two((nop&&r.open)?"–":(pv>=0?"▲ ":"▼ ")+usd(Math.abs(pv)),(nop&&r.open)?"brak ceny":pln(pv)),cls(pv));
+  td(tr,r.open&&!nop?pct(r.pctU):"–",cls(r.pctU||0),1);td(tr,pct(r.pctR),cls(r.pctR||0),1);td(tr,r.open?pct(r.ch24):"–",cls(r.ch24||0),1);
+  const sp=td(tr,"",null,1);sp.innerHTML=r.open?KC.spark(r.spark):"";
+  const a=el("div","acts"),pid=r.pid||(agg?null:K.S.cur);
+  const kb=el("button","ib b","K");kb.title="Kup "+r.t;kb.onclick=()=>openDlg({ty:"b",t:r.t,pid});
+  const sb=el("button","ib s","S");sb.title="Sprzedaj "+r.t;sb.disabled=!r.open;sb.onclick=()=>openDlg({ty:"s",t:r.t,pid});
+  const mb=el("button","ib","⋯");mb.title="Cena reczna / ID CoinGecko";mb.onclick=()=>more(r);
+  a.append(kb,sb,mb);td(tr,a);R.append(tr);});
+ if(!rows.length)R.innerHTML='<tr><td class="note" colspan="13">Brak aktywow dla wybranych filtrow.</td></tr>';
+ const F=$("pf");F.innerHTML="";const vis=rows.filter(r=>r.open),fr=el("tr"),sm=k=>vis.reduce((a,r)=>a+(r[k]||0),0),tu=rows.reduce((a,r)=>a+r.total,0);
+ td(fr,"Suma ("+rows.length+")");if(agg)td(fr,"");td(fr,"");td(fr,"",null,1);td(fr,"",null,1);td(fr,two(usd(sm("mv")),pln(sm("mv"))));td(fr,two(usd(sm("cost")),pln(sm("cost"))),null,1);
+ td(fr,two((tu>=0?"+":"")+usd(tu),pln(tu)),cls(tu));td(fr,sm("cost")>0?pct(sm("unreal")/sm("cost")*100):"–",cls(sm("unreal")),1);td(fr,"",null,1);td(fr,"",null,1);td(fr,"",null,1);td(fr,"");
+ [...fr.children].forEach(e=>e.style.borderTop="2px solid var(--line)");F.append(fr);
+ // --- historia
+ const all=K.sel().flatMap(p=>p.trades.map(t=>({...t,p0:p,pn:p.name,typ:typeOf(t),v:t.q*t.p}))),syms=[...new Set(all.map(t=>t.t))].sort();
+ const AS=$("has"),cur=AS.value;AS.innerHTML='<option value="">Wszystkie aktywa</option>';syms.forEach(x=>{const o=el("option",null,x);o.value=x;AS.append(o);});AS.value=syms.includes(cur)?cur:"";fH.a=AS.value;
+ $("syml").innerHTML="";[...new Set([...syms,...Object.keys(S.prices)])].forEach(x=>{const o=el("option");o.value=x;$("syml").append(o);});
+ const H=$("hs");H.innerHTML="";const hq=fH.q.toLowerCase();let sb=0,ss=0;
+ const hs=all.filter(t=>(!fH.ty||t.typ===fH.ty)&&(!fH.a||t.t===fH.a)&&(!fH.d1||t.d>=fH.d1)&&(!fH.d2||t.d<=fH.d2)&&(!hq||t.t.toLowerCase().includes(hq)||(t.c||"").toLowerCase().includes(hq)))
+  .sort((a,b)=>cmpBy(sH.k,sH.d)(a,b)||(b.id-a.id));
+ hs.forEach(t=>{if(t.s>0)sb+=t.v;else ss+=t.v;const tr=el("tr");td(tr,t.d);if(agg)td(tr,t.pn);
+  td(tr,coin({t:t.t,name:(S.meta[t.t]||{}).name||t.t,img:(S.meta[t.t]||{}).img}));
+  const op=el("span","pill",TN[t.typ]);op.style.color=t.typ==="s"?"var(--neg)":t.typ==="r"?"var(--pos)":"";td(tr,op);
+  td(tr,qty(t.q));td(tr,price(t.p),null,1);td(tr,two(usd(t.v),t.v?pln(t.v):""));
+  const c=td(tr,t.c||"",null,1);c.style.textAlign="left";c.style.whiteSpace="normal";c.style.maxWidth="260px";
+  const a=el("div","acts"),eb=el("button","ib","Edytuj");eb.onclick=()=>openDlg({edit:t});a.append(eb);td(tr,a);H.append(tr);});
+ if(!hs.length)H.innerHTML='<tr><td class="note" colspan="9">Brak transakcji dla wybranych filtrow.</td></tr>';
+ $("hsum").textContent=hs.length+" z "+all.length+" · kupno "+usd(sb)+(ss?" · sprzedaz "+usd(ss):"");
+ heads();
+}
+function more(r){
+ const v=prompt("Cena reczna USD dla "+r.t+" (puste = z CoinGecko).\nAby zmienic ID CoinGecko wpisz: id:nazwa-id  (obecne: "+(K.S.ids[r.t]||"brak")+")",K.S.manual[r.t]||"");
+ if(v==null)return;const x=v.trim();K.S.uids=K.S.uids||{};
+ if(x.startsWith("id:")){const id=x.slice(3).trim();if(id){K.S.ids[r.t]=id;K.S.uids[r.t]=1;}else{delete K.S.ids[r.t];delete K.S.uids[r.t];}delete K.S.manual[r.t];K.save();refresh();return;}
+ const n=num(x);if(n>0){K.S.manual[r.t]=n;K.S.prices[r.t]={...(K.S.prices[r.t]||{}),p:n,manual:true};}else{delete K.S.manual[r.t];}K.save();render();if(!(n>0))refresh();
+}
+// --- modal transakcji
+let ed=null,ty="b";
+function held(pid,t,excl){const p=K.S.ps.find(x=>x.id===pid);if(!p)return 0;const d=K.derive(p.trades.filter(x=>x.id!==excl));return (d[t]||{}).q||0;}
+function setTy(v){ty=v;[...$("dty").children].forEach(b=>b.classList.toggle("on",b.dataset.v===v));$("fmax").hidden=v!=="s";$("fpr").disabled=v==="r";$("fcur").disabled=v==="r";if(v==="r")$("fpr").value="0";upd();}
+function upd(){
+ const q=num($("fq").value),p=num($("fpr").value),f=num($("ff").value),t=$("fs").value.trim().toUpperCase(),pid=+$("fp").value,v=q*p+(ty==="s"?-f:f);
+ $("fv").textContent="Wartosc: "+usd(v)+(K.S.rate?" · "+money(v*K.S.rate,"PLN"):"");
+ const h=t?held(pid,t,ed&&ed.id):0,cur=(K.S.prices[t]||{}).p;
+ $("fh").textContent=t?("Posiadasz: "+qty(h)+" "+t+(cur?" · cena "+price(cur):"")):"";$("fe").textContent="";
+}
+function openDlg(o){
+ const S=K.S,P=$("fp");P.innerHTML="";S.ps.forEach(p=>{const op=el("option",null,p.name);op.value=p.id;P.append(op);});
+ ed=o.edit||null;$("fe").textContent="";
+ if(ed){$("dt").textContent="Edytuj transakcje";P.value=ed.p0.id;$("fs").value=ed.t;$("fd").value=ed.d;$("fq").value=ed.q;$("fpr").value=ed.p;$("ff").value=ed.f||"";$("fc").value=ed.c||"";$("fdel").hidden=false;setTy(typeOf(ed));}
+ else{const t=o.t||"",pid=o.pid||(K.isAgg()?(S.ps.find(p=>held(p.id,t)>0)||S.ps[0]).id:S.cur);
+  $("dt").textContent=o.ty==="s"?"Sprzedaj "+t:o.ty==="b"&&t?"Kup "+t:"Nowa transakcja";P.value=pid;$("fs").value=t;$("fd").value=K.today();
+  const cur=(S.prices[t]||{}).p;$("fpr").value=cur?+cur.toPrecision(6):"";$("ff").value="";$("fc").value="";$("fdel").hidden=true;
+  $("fq").value=o.ty==="s"?+held(pid,t).toFixed(8):"";setTy(o.ty||"b");}
+ upd();$("dlg").showModal();setTimeout(()=>($("fs").value?$("fq"):$("fs")).focus(),30);
+}
+[...$("dty").children].forEach(b=>b.onclick=()=>setTy(b.dataset.v));
+["fq","fpr","ff","fs","fp"].forEach(i=>$(i).addEventListener("input",upd));$("fp").onchange=upd;
+$("fmax").onclick=()=>{$("fq").value=+held(+$("fp").value,$("fs").value.trim().toUpperCase(),ed&&ed.id).toFixed(8);upd();};
+$("fcur").onclick=async()=>{const t=$("fs").value.trim().toUpperCase();if(!t)return;$("fcur").disabled=true;try{const p=await K.quoteOne(t);$("fpr").value=+p.toPrecision(6);}catch(e){$("fe").textContent=e.message;}$("fcur").disabled=false;upd();};
+$("dx").onclick=$("fcan").onclick=()=>$("dlg").close();
+$("fdel").onclick=()=>{if(!ed||!confirm("Usunac transakcje "+ed.t+" z "+ed.d+"?"))return;const p=ed.p0,bk=p.trades;p.trades=bk.filter(x=>x.id!==ed.id);
+ if(!K.validTrades(p.trades)){p.trades=bk;$("fe").textContent="Nie mozna - pozniejsza sprzedaz przekroczylaby stan.";return;}K.save();$("dlg").close();render();};
+$("fm").onsubmit=e=>{e.preventDefault();
+ const t=$("fs").value.trim().toUpperCase(),q=num($("fq").value),p=ty==="r"?0:num($("fpr").value),f=num($("ff").value),d=$("fd").value||K.today(),pid=+$("fp").value,c=$("fc").value.trim();
+ if(!/^[A-Z0-9.\-]{1,15}$/.test(t))return $("fe").textContent="Podaj symbol";if(!(q>0))return $("fe").textContent="Ilosc musi byc > 0";
+ if(ty!=="r"&&!(p>0))return $("fe").textContent="Podaj cene (lub kliknij Aktualna)";
+ const tr={id:ed?ed.id:K.uid(),d,t,s:ty==="s"?-1:1,q,p,f,c:ty==="r"&&!c?"staking":c};
+ const P=K.S.ps.find(x=>x.id===pid),O=ed?ed.p0:null,bkP=P.trades.slice(),bkO=O?O.trades.slice():null;
+ if(O)O.trades=O.trades.filter(x=>x.id!==ed.id);
+ if(O===P)P.trades=O.trades;P.trades.push(tr);
+ if(!K.validTrades(P.trades)||(O&&O!==P&&!K.validTrades(O.trades))){P.trades=bkP;if(O)O.trades=bkO;return $("fe").textContent="Za mala ilosc "+t+" do sprzedazy w tym dniu.";}
+ K.save();$("dlg").close();render();if(!(K.S.prices[t]||{}).p)K.quoteOne(t).then(render,()=>{});
+};
+// --- filtry i sortowanie
+document.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{const k=th.dataset.k;sP.d=sP.k===k?-sP.d:(k==="name"||k==="pn"?1:-1);sP.k=k;render();});
+document.querySelectorAll("th[data-h]").forEach(th=>th.onclick=()=>{const k=th.dataset.h;sH.d=sH.k===k?-sH.d:(k==="t"||k==="pn"||k==="typ"?1:-1);sH.k=k;render();});
+$("pq").oninput=()=>{fP.q=$("pq").value;render();};$("pst").onchange=()=>{fP.st=$("pst").value;render();};$("ppl").onchange=()=>{fP.pl=$("ppl").value;render();};
+$("hq").oninput=()=>{fH.q=$("hq").value;render();};$("hty").onchange=()=>{fH.ty=$("hty").value;render();};$("has").onchange=()=>{fH.a=$("has").value;render();};
+$("hd1").onchange=()=>{fH.d1=$("hd1").value;render();};$("hd2").onchange=()=>{fH.d2=$("hd2").value;render();};
+$("hcl").onclick=()=>{Object.assign(fH,{q:"",ty:"",a:"",d1:"",d2:""});["hq","hty","has","hd1","hd2"].forEach(i=>$(i).value="");render();};
+$("add").onclick=()=>openDlg({ty:"b"});$("gh").onclick=()=>$("hsec").scrollIntoView({behavior:"smooth"});
+// --- portfele, import, eksport
+async function refresh(){$("st").textContent="Odswiezanie cen...";$("rf").disabled=true;const e=await K.refresh();$("rf").disabled=false;render();if(e)$("wn").textContent=e;}
+$("np").onclick=()=>{const v=prompt("Nazwa nowego portfela");if(v&&v.trim()){K.addPortfolio(v.trim());render();}};
+$("rn").onclick=()=>{const cur=K.isAgg()?K.S.aggName:K.P().name,v=prompt("Nowa nazwa",cur);if(v&&v.trim()){K.rename(v.trim());render();}};
+$("dp").onclick=()=>{const p=K.P();if(!p)return;const v=prompt("Aby usunac portfel wpisz jego nazwe: "+p.name);if(v!==p.name)return v!=null&&alert("Nazwa sie nie zgadza - nic nie usunieto");const m=K.removePortfolio(p);if(m)alert(m);render();};
+$("rs").onclick=()=>{K.restore();render();};
+$("rf").onclick=refresh;
+$("im").onclick=()=>{const i=el("input");i.type="file";i.accept=".json,application/json";i.onchange=async()=>{
+ const f=i.files[0];if(!f)return;let l;try{l=K.parseExport(JSON.parse(await f.text()));}catch(e){return alert(e.message||"Nieprawidlowy plik");}
+ const info=l.map(x=>"• "+x.name+": "+x.trades.length+" transakcji"+(x.fix.length?" (korekty stanu: "+x.fix.join(", ")+")":"")).join("\n");
+ if(!confirm("Zaimportowac?\n"+info))return;
+ const dup=l.some(x=>K.S.ps.some(p=>p.name===x.name));
+ const mode=dup&&confirm("Portfel o tej nazwie juz istnieje.\nOK = zastap jego transakcje, Anuluj = dodaj jako nowy portfel")?"replace":"add";
+ K.applyImport(l,mode);render();refresh();};i.click();};
+$("ex").onclick=()=>{const a=el("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(K.exportJson(),null,1)],{type:"application/json"}));a.download="krypto-"+K.today()+".json";document.body.append(a);a.click();a.remove();};
+render();
+if(!K.S.ts||Date.now()-K.S.ts>10*60e3)refresh();
+})();
+</script></body></html>

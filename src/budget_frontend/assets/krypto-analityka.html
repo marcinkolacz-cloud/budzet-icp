@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Krypto analityka</title><link rel="stylesheet" href="base.css"></head>
+<body><div class="app">
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html" class="on">Krypto</a></nav>
+<header><div><h1>Analityka krypto</h1><div class="sub" id="st"></div>
+<div class="nav"><a href="krypto.html">Portfel</a><a class="on" href="krypto-analityka.html">Analityka</a></div></div>
+<div class="form"><select id="ps"></select><button id="rf" type="button">Odswiez ceny</button><button id="hb" class="dark" type="button">Pobierz historie cen</button></div></header>
+<p class="note" id="prog"></p>
+<div class="stats">
+<div class="stat"><span>Zainwestowano netto</span><strong id="a1">–</strong><small id="a1s"></small></div>
+<div class="stat"><span>Wartosc</span><strong id="a2">–</strong><small id="a2s"></small></div>
+<div class="stat"><span>Wynik calkowity</span><strong id="a3">–</strong><small id="a3s"></small></div>
+<div class="stat"><span>Nagrody / staking</span><strong id="a4">–</strong><small id="a4s"></small></div></div>
+<section><h2>Wartosc portfela a koszt</h2>
+<div class="form period" id="per" style="margin-bottom:8px"></div>
+<div class="legend"><span><i style="background:#1a8a4a"></i>Wartosc</span><span><i style="background:#1c1915"></i>Koszt otwartych pozycji</span></div>
+<div id="ch"></div><p class="note" id="chn"></p>
+<table style="margin-top:8px"><tbody id="pr"></tbody></table></section>
+<div class="g2">
+<section><h2>Wynik na aktywach (USD)</h2><div id="pl"></div></section>
+<section><h2>Struktura kosztu vs wartosci</h2><div id="cv"></div></section>
+</div>
+<section><h2>Zakupy netto miesiecznie (USD)</h2><div id="mb"></div><p class="note">Kupno minus sprzedaz w danym miesiacu, bez nagrod.</p></section>
+<div class="g3">
+<section><h2>Najlepsze i najslabsze (% od sredniej ceny)</h2><table><thead><tr><th>Aktywo</th><th>Sr. cena</th><th>Cena</th><th>Zmiana</th><th>30d</th></tr></thead><tbody id="bw"></tbody></table></section>
+<section><h2>Nagrody i staking</h2><table><thead><tr><th>Aktywo</th><th>Ilosc</th><th>Wartosc</th><th>% pozycji</th></tr></thead><tbody id="rw"></tbody></table></section>
+<section><h2>Sprzedaze (zrealizowane)</h2><table><thead><tr><th>Aktywo</th><th>Sprzedano za</th><th>Zysk zrealizowany</th></tr></thead><tbody id="rz"></tbody></table></section>
+</div>
+<section id="pfs"><h2>Portfele</h2><table><thead><tr><th>Portfel</th><th>Aktywa</th><th>Koszt</th><th>Wartosc</th><th>Niezreal.</th><th>Zreal.</th><th>Wynik %</th></tr></thead><tbody id="pb"></tbody></table></section>
+</div>
+<script>addEventListener("error",e=>{const t=e.target&&e.target.src?"Nie zaladowano "+e.target.src:(e.message||"blad")+(e.lineno?" (linia "+e.lineno+")":"");let b=document.getElementById("errbox");if(!b){b=document.createElement("pre");b.id="errbox";b.style.cssText="position:fixed;left:8px;bottom:8px;right:8px;z-index:10003;margin:0;background:#fff0f0;color:#c23b3b;border:1px solid #c23b3b;border-radius:10px;padding:8px 12px;font:12px monospace;white-space:pre-wrap";document.body.append(b);}b.textContent+="Blad strony: "+t+"\n";},true);</script>
+<script src="auth.js"></script>
+<script type="text/x-after-auth" src="ccore.js"></script>
+<script type="text/x-after-auth" src="kchart.js"></script>
+<script type="text/x-after-auth">
+;(function(){
+const $=id=>document.getElementById(id),{money,price,qty,pct,cls}=K,usd=n=>money(n,"USD"),usd0=n=>money(n,"USD",0);
+const row=(host,cells)=>{const tr=document.createElement("tr");cells.forEach(([t,c])=>{const e=document.createElement("td");e.textContent=t;if(c)e.className=c;tr.append(e);});host.append(tr);};
+const PER=[["30 dni",30],["90 dni",90],["6 mies.",180],["1 rok",365]];let days=+(localStorage.getItem("krypto-per")||180);
+function chart(){
+ const ps=K.sel(),ser=K.series(ps,days),hasH=ser.some(x=>x.ok&&x.d<K.today());
+ $("ch").innerHTML=KC.line([{name:"Koszt",color:"#1c1915",pts:ser.map(x=>[Date.parse(x.d),x.c]),dash:true,w:1.6},{name:"Wartosc",color:"#1a8a4a",pts:ser.map(x=>[Date.parse(x.d),x.v]),fill:true,w:2.4}],{label:"Wartosc portfela a koszt",w:$("ch").clientWidth});
+ $("chn").textContent=hasH?"":"Brak historii cen - kliknij „Pobierz historie cen” (CoinGecko, ok. 1-2 s na token). Bez niej wartosc liczona po sredniej cenie zakupu.";
+ const a=ser[0],b=ser[ser.length-1],P=$("pr");P.innerHTML="";
+ if(a&&b){const dv=b.v-a.v,dc=b.c-a.c,g=dv-dc;
+  row(P,[["Wartosc "+a.d],[usd(a.v)]]);row(P,[["Wartosc "+b.d],[usd(b.v)]]);row(P,[["Doplacono / wyplacono (zmiana kosztu)"],[(dc>=0?"+":"")+usd(dc)]]);
+  row(P,[["Wynik rynkowy w okresie"],[(g>=0?"+":"")+usd(g)+(a.v+Math.max(0,dc)>0?" ("+pct(g/(a.v+Math.max(0,dc))*100)+")":""),cls(g)]]);}
+}
+function render(){
+ K.mountSelect($("ps"),render);const agg=K.isAgg(),S=K.S,s=K.summary(K.sel()),pl=S.rate||0,open=s.rows.filter(r=>r.open);
+ $("st").textContent=S.ts?"Ceny z "+new Date(S.ts).toLocaleString("pl-PL"):"Ceny nieodswiezone";
+ $("a1").textContent=usd0(s.inv);$("a1s").textContent=pl?money(s.inv*pl,"PLN",0)+" · kupno - sprzedaz":"kupno - sprzedaz";
+ $("a2").textContent=usd0(s.mv);$("a2s").textContent=pl?money(s.mv*pl,"PLN",0):"";
+ const tot=s.mv-s.inv;$("a3").textContent=(tot>=0?"+":"")+usd0(tot);$("a3").className=cls(tot);$("a3s").textContent=(s.inv>0?pct(tot/s.inv*100):"–")+" · zreal. "+usd0(s.realized);
+ $("a4").textContent=usd0(s.rewV);$("a4s").textContent=s.mv>0?(s.rewV/s.mv*100).toFixed(1)+"% wartosci portfela":"";
+ $("per").innerHTML="";PER.forEach(([l,d])=>{const b=document.createElement("button");b.type="button";b.textContent=l;if(d===days)b.className="on";b.onclick=()=>{days=d;try{localStorage.setItem("krypto-per",d);}catch{}render();};$("per").append(b);});
+ chart();
+ const pls=s.rows.filter(r=>Math.abs(r.total)>0.005).sort((a,b)=>b.total-a.total).map(r=>({label:r.t,value:r.total}));
+ $("pl").innerHTML=KC.hbars(pls,v=>(v>=0?"+":"")+usd0(v));
+ const cv=open.slice().sort((a,b)=>b.mv-a.mv),mx=Math.max(1,...cv.flatMap(r=>[r.mv,r.cost]));
+ $("cv").innerHTML='<div class="hb">'+cv.map(r=>`<div class="hbr" style="grid-template-columns:70px 1fr 110px"><span>${KC.esc(r.t)}</span><div style="display:grid;gap:3px"><div class="hbt" style="height:7px"><i style="left:0;width:${(r.cost/mx*100).toFixed(1)}%;background:#1c1915"></i></div><div class="hbt" style="height:7px"><i style="left:0;width:${(r.mv/mx*100).toFixed(1)}%;background:#1a8a4a"></i></div></div><b class="${cls(r.unreal)}">${pct(r.pctU)}</b></div>`).join("")+'</div><div class="legend" style="margin-top:10px"><span><i style="background:#1c1915"></i>Koszt</span><span><i style="background:#1a8a4a"></i>Wartosc</span></div>';
+ const mm={};K.sel().forEach(p=>p.trades.forEach(t=>{if(K.isReward(t))return;const k=t.d.slice(0,7);mm[k]=(mm[k]||0)+t.s*t.q*t.p;}));
+ const ks=Object.keys(mm).sort();if(ks.length){const out=[];let [y,m]=ks[0].split("-").map(Number);const [ye,me]=K.today().slice(0,7).split("-").map(Number);
+  while(y<ye||(y===ye&&m<=me)){const k=y+"-"+String(m).padStart(2,"0");out.push({label:String(m).padStart(2,"0")+"."+String(y).slice(2),value:mm[k]||0});m++;if(m>12){m=1;y++;}}
+  $("mb").innerHTML=KC.bars(out.slice(-36),{label:"Zakupy netto miesiecznie",w:$("mb").clientWidth});}else $("mb").innerHTML='<p class="note">Brak transakcji.</p>';
+ const BW=$("bw");BW.innerHTML="";const ch=open.filter(r=>r.avg>0&&r.p>0).map(r=>({...r,c:(r.p/r.avg-1)*100})).sort((a,b)=>b.c-a.c);
+ (ch.length>10?[...ch.slice(0,5),...ch.slice(-5)]:ch).forEach(r=>row(BW,[[r.t],[price(r.avg)],[price(r.p)],[pct(r.c),cls(r.c)],[pct(r.ch30),cls(r.ch30||0)]]));
+ const RW=$("rw");RW.innerHTML="";s.rows.filter(r=>r.rew>0).sort((a,b)=>b.rewV-a.rewV).forEach(r=>row(RW,[[r.t],[qty(r.rew)],[r.p?usd(r.rewV):"–"],[r.q>0?(Math.min(r.rew,r.q)/r.q*100).toFixed(1)+"%":"–"]]));
+ if(!RW.children.length)RW.innerHTML='<tr><td class="note">Brak nagrod (kupno z cena 0 lub uwaga „staking/nagroda”).</td></tr>';
+ $("pfs").hidden=!agg;const PB=$("pb");PB.innerHTML="";
+ if(agg)K.S.ps.forEach(p=>{const x=K.summary([p]);row(PB,[[p.name],[String(x.rows.filter(r=>r.open).length)],[usd0(x.cost)],[usd0(x.mv)],[usd0(x.unreal),cls(x.unreal)],[usd0(x.realized),cls(x.realized)],[pct(x.totPct),cls(x.total)]]);});
+ const RZ=$("rz");RZ.innerHTML="";s.rows.filter(r=>r.sold>0).sort((a,b)=>b.realized-a.realized).forEach(r=>row(RZ,[[r.t],[usd(r.sold)],[(r.realized>=0?"+":"")+usd(r.realized),cls(r.realized)]]));
+ if(!RZ.children.length)RZ.innerHTML='<tr><td class="note">Brak sprzedazy.</td></tr>';
+}
+$("rf").onclick=async()=>{$("prog").textContent="Odswiezanie cen...";const e=await K.refresh();$("prog").textContent=e||"";render();};
+$("hb").onclick=async()=>{$("hb").disabled=true;try{await K.history(Math.max(days,365),(i,n,t)=>$("prog").textContent="Historia cen: "+t+" ("+i+"/"+n+")...");$("prog").textContent="Historia cen pobrana.";}catch(e){$("prog").textContent=e.message;}$("hb").disabled=false;render();};
+render();
+let rz;addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(render,200);});
+})();
+</script></body></html>

@@ -1,7 +1,7 @@
 :root{--bg:#f3f1ec;--ink:#1c1915;--muted:#7a736a;--card:#fffdf9;--line:#e6e0d6;--pos:#1a8a4a;--neg:#c23b3b}
 *{box-sizing:border-box}
 body{margin:0;background:radial-gradient(900px 280px at 0 0,#efe6d6,transparent 60%),var(--bg);color:var(--ink);font:14px/1.4 "Segoe UI",sans-serif}
-.app{max-width:1080px;margin:0 auto;padding:22px 16px 40px}
+.app{max-width:1560px;margin:0 auto;padding:22px clamp(16px,3vw,40px) 40px}
 header{display:flex;justify-content:space-between;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:16px}
 h1{margin:0;font-size:28px;letter-spacing:-.04em}
 .sub,.back{color:var(--muted);margin-top:4px;text-decoration:none}
@@ -38,3 +38,16 @@ section h2{margin:0 0 10px;font-size:16px}
 .topnav a{padding:6px 14px;border:1px solid var(--line);border-radius:999px;color:var(--ink);text-decoration:none;background:#fff}
 .topnav a.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 @media (max-width:640px){.topnav{padding-right:0;margin-top:34px}}
+.topnav,.nav{overflow-x:auto;scrollbar-width:none}.topnav a,.nav a{white-space:nowrap}
+section table th:first-child,section table td:first-child{position:sticky;left:0;background:var(--card);z-index:1}
+@media (max-width:760px){
+ .app{padding:14px 12px 32px}h1{font-size:23px}
+ header{gap:10px}header>.form{width:100%}
+ header>.form select{flex:1 1 100%}header>.form button{flex:1 1 auto;padding:7px 10px;font-size:13px}
+ .stats,.tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .stat,.tile{padding:12px 13px;border-radius:14px}.stat strong,.tile strong{font-size:19px}.stat span,.tile span{font-size:10.5px}.stat small{font-size:11px}
+ section{padding:12px 10px;border-radius:14px}
+ .form input,.form select{flex:1 1 calc(50% - 8px);width:auto!important;min-width:0}.form button{flex:1 1 auto}
+ th,td{padding:6px 5px;font-size:12.5px}.hm{display:none}
+ input,select{font-size:16px}
+}

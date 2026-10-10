@@ -28,7 +28,7 @@
 <section><h2>Wplaty i wyplaty</h2><table><thead><tr><th>Data</th><th>Portfel</th><th>Operacja</th><th>Waluta</th><th>Kwota</th><th>= PLN</th><th>= EUR</th><th>= USD</th><th></th></tr></thead><tbody id="tx"></tbody><tfoot id="tf"></tfoot></table>
 <p class="note">PLN/EUR/USD = wartosc wplaty po kursie ECB z dnia ksiegowania (stala).</p></section>
 <section><h2>Wymiany walut</h2><table><thead><tr><th>Data</th><th>Portfel</th><th>Wymiana</th><th>Kurs</th><th></th></tr></thead><tbody id="fx"></tbody></table></section>
-<section><h2>Historia transakcji</h2><table><thead><tr><th>Data</th><th>Portfel</th><th>Ticker</th><th>Operacja</th><th>Ilosc</th><th>Cena</th><th>Prowizja</th><th>Wartosc</th><th></th></tr></thead><tbody id="hs"></tbody></table></section>
+<section><h2>Historia transakcji</h2><table><thead><tr><th>Data</th><th>Portfel</th><th>Ticker</th><th>Operacja</th><th>Ilosc</th><th>Cena</th><th>Prowizja</th><th>Wartosc</th><th>Uwagi</th><th></th></tr></thead><tbody id="hs"></tbody></table></section>
 </div>
 <script src="auth.js"></script>
 <script type="text/x-after-auth" src="gcore.js"></script>
@@ -60,7 +60,7 @@ function render(){
  td(pr,usd(s.mv));td(pr,usd(s.unreal),cls(s.unreal));td(pr,usd(s.realized),cls(s.realized));td(pr,"");PF.append(pr);
  const X=$("tx");X.innerHTML="";
  ps.flatMap(p=>p.tx.map(x=>({x,p}))).sort((a,b)=>G.byD(a.x,b.x)).forEach(({x,p})=>{
-  const tr=document.createElement("tr"),c=x.c||"PLN",a=x.a!=null?x.a:x.pln;td(tr,x.d);td(tr,p.name);td(tr,x.s>0?(x.tid?"Wplata (zakup)":"Wplata"):"Wyplata",x.s>0?"pos":"neg");td(tr,c);td(tr,money(x.s*a,c));
+  const tr=document.createElement("tr"),c=x.c||"PLN",a=x.a!=null?x.a:x.pln;td(tr,x.d);td(tr,p.name);td(tr,x.s>0?(x.tid?"Wplata (zakup "+((p.trades.find(t=>t.id===x.tid)||{}).t||"")+")":"Wplata"):"Wyplata",x.s>0?"pos":"neg");td(tr,c);td(tr,money(x.s*a,c));
   td(tr,money(x.s*x.pln,"PLN"));td(tr,money(x.s*x.eur,"EUR"));td(tr,money(x.s*x.usd,"USD"));
   del(tr,()=>{if(x.tid)return alert("Wplata powiazana z zakupem - usun transakcje kupna");const i=p.tx.indexOf(x);if(!confirm("Usunac wplate/wyplate z "+x.d+" ("+money(a,c)+")?"))return;p.tx.splice(i,1);
    if(x.s>0&&G.negWallets(p).length&&!confirm("Po usunieciu saldo bedzie ujemne ("+G.negWallets(p).join(", ")+"). Usunac mimo to?")){p.tx.splice(i,0,x);return;}G.save();render();});X.append(tr);});
@@ -75,7 +75,7 @@ function render(){
  const H=$("hs");H.innerHTML="";
  ps.flatMap(p=>p.trades.map(t=>({t,p}))).sort((a,b)=>G.cmp(b.t,a.t)).slice(0,300).forEach(({t,p})=>{
   const tr=document.createElement("tr");td(tr,t.d);td(tr,p.name);td(tr,t.t);td(tr,t.s>0?(t.ext?"Kupno (doplata)":"Kupno"):"Sprzedaz",t.s>0?"pos":"neg");td(tr,String(+t.q.toFixed(6)));
-  td(tr,usd(t.p));td(tr,t.f?usd(t.f):"–");td(tr,usd(t.q*t.p));
+  td(tr,usd(t.p));td(tr,t.f?usd(t.f):"–");td(tr,usd(t.q*t.p));td(tr,t.s<0?"auto: +"+usd(t.q*t.p-(t.f||0))+" na saldo USD ze sprzedazy "+(+t.q.toFixed(6))+" "+t.t+" po "+usd(t.p):t.ext?"doplata z zewnatrz: wplata "+usd(t.q*t.p+(t.f||0)):"z salda USD: -"+usd(t.q*t.p+(t.f||0)));
   del(tr,()=>{if(!confirm("Usunac transakcje "+t.t+" z "+t.d+"?"))return;const i=p.trades.indexOf(t),bt=p.tx;p.trades.splice(i,1);p.tx=bt.filter(x=>x.tid!==t.id);
    if(!G.validTrades(p.trades)){p.trades.splice(i,0,t);p.tx=bt;return alert("Nie mozna usunac - pozniejsza sprzedaz przekroczylaby stan");}G.save();render();});H.append(tr);});
  $("uxl").hidden=$("cu").value==="USD"||$("op").value==="w";

@@ -128,7 +128,7 @@ async function restore(file){
  if(o.snaps)LS.setItem("gielda-snaps",JSON.stringify(o.snaps));
  if(o.krypto&&Array.isArray(o.krypto.ps))LS.setItem("krypto-v1",JSON.stringify(o.krypto));
  if(o.ksnaps&&typeof o.ksnaps==="object")LS.setItem("krypto-snaps",JSON.stringify(o.ksnaps));
- document.body.insertAdjacentHTML("beforeend",'<div style="position:fixed;inset:0;z-index:10001;background:#f3f1ec;display:flex;align-items:center;justify-content:center;font-family:Segoe UI,sans-serif;color:#7a736a">Zapisywanie przywroconych danych…</div>');
+ document.body.insertAdjacentHTML("beforeend",'<div style="position:fixed;inset:0;z-index:10001;background:var(--bg,#f3f1ec);display:flex;align-items:center;justify-content:center;font-family:Segoe UI,sans-serif;color:var(--muted,#7a736a)">Zapisywanie przywroconych danych…</div>');
  setTimeout(()=>location.reload(),1500);
 }
 function pick(){const i=document.createElement("input");i.type="file";i.accept=".json,application/json";i.onchange=()=>restore(i.files[0]);i.click();}

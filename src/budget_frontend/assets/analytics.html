@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Analityka</title><link rel="stylesheet" href="base.css"></head>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Analityka</title><link rel="stylesheet" href="base.css"><link rel="stylesheet" href="theme.css"><script src="theme.js"></script></head>
 <body><div class="app">
 <nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html" class="on">Gielda</a><a href="krypto.html">Krypto</a></nav>
 <header><div><h1>Analityka</h1><div class="sub" id="st"></div>
@@ -17,7 +17,7 @@
 <section><h2>Wplaty a wartosc aktywow</h2>
 <div class="form" id="pb2"></div>
 <div class="form" style="margin:8px 0"><input id="f1" type="date" style="width:150px"><input id="f2" type="date" style="width:150px"><select id="cc"><option>PLN</option><option>EUR</option><option>USD</option></select></div>
-<div class="legend"><span><i style="background:#1c1915"></i>Wplaty narastajaco</span><span><i style="background:#1a8a4a"></i>Wartosc portfela</span></div><div id="ch"></div>
+<div class="legend"><span><i style="background:var(--acc,#1c1915)"></i>Wplaty narastajaco</span><span><i style="background:var(--pos,#1a8a4a)"></i>Wartosc portfela</span></div><div id="ch"></div>
 <h2 style="margin:14px 0 8px;font-size:15px" id="rh">Zwrot w okresie</h2>
 <table><thead><tr><th>Waluta</th><th>Wartosc na poczatku</th><th>Wplaty netto w okresie</th><th>Wartosc na koncu</th><th>Zysk</th><th>Zwrot %</th></tr></thead><tbody id="rt"></tbody></table>
 <p class="note" id="rnote"></p>

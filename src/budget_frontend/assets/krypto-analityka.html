@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Krypto analityka</title><link rel="stylesheet" href="base.css"></head>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Krypto analityka</title><link rel="stylesheet" href="base.css"><link rel="stylesheet" href="theme.css"><script src="theme.js"></script></head>
 <body><div class="app">
 <nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html" class="on">Krypto</a></nav>
 <header><div><h1>Analityka krypto</h1><div class="sub" id="st"></div>
@@ -13,7 +13,7 @@
 <div class="stat"><span>Nagrody / staking</span><strong id="a4">–</strong><small id="a4s"></small></div></div>
 <section><h2>Wartosc portfela a koszt</h2>
 <div class="form period" id="per" style="margin-bottom:8px"></div>
-<div class="legend"><span><i style="background:#1a8a4a"></i>Wartosc</span><span><i style="background:#1c1915"></i>Koszt otwartych pozycji</span></div>
+<div class="legend"><span><i style="background:var(--pos,#1a8a4a)"></i>Wartosc</span><span><i style="background:var(--acc,#1c1915)"></i>Koszt otwartych pozycji</span></div>
 <div id="ch"></div><p class="note" id="chn"></p>
 <table style="margin-top:8px"><tbody id="pr"></tbody></table></section>
 <div class="g2">
@@ -58,7 +58,7 @@ function render(){
  const pls=s.rows.filter(r=>Math.abs(r.total)>0.005).sort((a,b)=>b.total-a.total).map(r=>({label:r.t,value:r.total}));
  $("pl").innerHTML=KC.hbars(pls,v=>(v>=0?"+":"")+usd0(v));
  const cv=open.slice().sort((a,b)=>b.mv-a.mv),mx=Math.max(1,...cv.flatMap(r=>[r.mv,r.cost]));
- $("cv").innerHTML='<div class="hb">'+cv.map(r=>`<div class="hbr" style="grid-template-columns:70px 1fr 110px"><span>${KC.esc(r.t)}</span><div style="display:grid;gap:3px"><div class="hbt" style="height:7px"><i style="left:0;width:${(r.cost/mx*100).toFixed(1)}%;background:#1c1915"></i></div><div class="hbt" style="height:7px"><i style="left:0;width:${(r.mv/mx*100).toFixed(1)}%;background:#1a8a4a"></i></div></div><b class="${cls(r.unreal)}">${pct(r.pctU)}</b></div>`).join("")+'</div><div class="legend" style="margin-top:10px"><span><i style="background:#1c1915"></i>Koszt</span><span><i style="background:#1a8a4a"></i>Wartosc</span></div>';
+ $("cv").innerHTML='<div class="hb">'+cv.map(r=>`<div class="hbr" style="grid-template-columns:70px 1fr 110px"><span>${KC.esc(r.t)}</span><div style="display:grid;gap:3px"><div class="hbt" style="height:7px"><i style="left:0;width:${(r.cost/mx*100).toFixed(1)}%;background:var(--acc,#1c1915)"></i></div><div class="hbt" style="height:7px"><i style="left:0;width:${(r.mv/mx*100).toFixed(1)}%;background:var(--pos,#1a8a4a)"></i></div></div><b class="${cls(r.unreal)}">${pct(r.pctU)}</b></div>`).join("")+'</div><div class="legend" style="margin-top:10px"><span><i style="background:var(--acc,#1c1915)"></i>Koszt</span><span><i style="background:var(--pos,#1a8a4a)"></i>Wartosc</span></div>';
  const mm={};K.sel().forEach(p=>p.trades.forEach(t=>{if(K.isReward(t))return;const k=t.d.slice(0,7);mm[k]=(mm[k]||0)+t.s*t.q*t.p;}));
  const ks=Object.keys(mm).sort();if(ks.length){const out=[];let [y,m]=ks[0].split("-").map(Number);const [ye,me]=K.today().slice(0,7).split("-").map(Number);
   while(y<ye||(y===ye&&m<=me)){const k=y+"-"+String(m).padStart(2,"0");out.push({label:String(m).padStart(2,"0")+"."+String(y).slice(2),value:mm[k]||0});m++;if(m>12){m=1;y++;}}

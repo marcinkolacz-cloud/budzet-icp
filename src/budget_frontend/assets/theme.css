@@ -1,0 +1,61 @@
+/* Motyw: jasny/ciemny + kolor akcentu. Ladowany po base.css / stylach strony. */
+:root{--field:#f7f4ee;--field2:#fff;--grid:#ece6dc;--soft:#e7f6ee;--acc:#1c1915;--acc-ink:#fff;--glow:#efe6d6;color-scheme:light}
+:root[data-accent=indygo]{--acc:#4f46e5;--glow:#e6e4fb}
+:root[data-accent=ocean]{--acc:#2563eb;--glow:#e1ebfb}
+:root[data-accent=szmaragd]{--acc:#0f766e;--glow:#dcefeb}
+:root[data-accent=bursztyn]{--acc:#b45309;--glow:#f6e6d2}
+:root[data-accent=roz]{--acc:#be185d;--glow:#f7e1ea}
+
+html[data-theme=dark]{color-scheme:dark;--bg:#0e0f11;--ink:#ecebe8;--muted:#9a978f;--card:#17181b;--line:#2a2b30;--pos:#3ecf7a;--neg:#ff6b6b;--soft:#13291d;--field:#202125;--field2:#1d1e22;--grid:#25262b;--acc:#ecebe8;--acc-ink:#141414;--glow:#1b1a17}
+html[data-theme=dark][data-accent=indygo]{--acc:#818cf8;--acc-ink:#0d0f24;--glow:#18172b}
+html[data-theme=dark][data-accent=ocean]{--acc:#60a5fa;--acc-ink:#06142b;--glow:#111a29}
+html[data-theme=dark][data-accent=szmaragd]{--acc:#2dd4bf;--acc-ink:#04201c;--glow:#0f2220}
+html[data-theme=dark][data-accent=bursztyn]{--acc:#f5a524;--acc-ink:#1f1300;--glow:#251b0f}
+html[data-theme=dark][data-accent=roz]{--acc:#f472b6;--acc-ink:#2a0717;--glow:#2a1320}
+
+/* Wspolne (oba motywy) */
+html{background:var(--bg)}
+html body{min-height:100vh;background:radial-gradient(900px 280px at 0 0,var(--glow),transparent 60%) no-repeat,var(--bg);transition:background-color .2s,color .2s}
+html button.dark,html .nav a.on,html .topnav a.on,html .months button.on,html .tabs button.on,html .period button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+html .stat.bal{background:var(--acc);color:var(--acc-ink)}
+html .stat.bal span{color:inherit;opacity:.7}
+html .tile:hover{border-color:color-mix(in srgb,var(--acc) 35%,var(--line))}
+html :is(input,select):focus-visible{outline:2px solid color-mix(in srgb,var(--acc) 45%,transparent);outline-offset:1px}
+html button:focus-visible,html a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+/* Wykresy SVG (atrybuty z kodu JS) */
+[stroke="#1c1915"]{stroke:var(--acc)}
+[fill="#1c1915"]{fill:var(--acc)}
+text[fill="#1c1915"]{fill:var(--ink)}
+text[fill="#7a736a"]{fill:var(--muted)}
+[stroke="#ece6dc"],[stroke="#e6e0d6"]{stroke:var(--grid)}
+[fill="#1a8a4a"]{fill:var(--pos)}[stroke="#1a8a4a"]{stroke:var(--pos)}
+[fill="#c23b3b"]{fill:var(--neg)}[stroke="#c23b3b"]{stroke:var(--neg)}
+[fill="#fffdf9"]{fill:var(--card)}[stroke="#fffdf9"]{stroke:var(--card)}
+
+/* Tylko ciemny */
+html[data-theme=dark] :is(button:not(.dark):not(.on),select,.nav a:not(.on),.topnav a:not(.on),.ib,details div,details button,.row.paid input,.seg button.on){background:var(--field2)}
+html[data-theme=dark] :is(input:not([readonly]),.sum,.seg,.pill,.hbt,textarea){background:var(--field)}
+html[data-theme=dark] input[readonly]{background:transparent}
+html[data-theme=dark] :is(td,.row,.plist div){border-color:var(--line)}
+html[data-theme=dark] .row.paid{background:var(--soft)}
+html[data-theme=dark] .newc{background:var(--soft);border-color:#1f4a33}
+html[data-theme=dark] .tile:hover{box-shadow:0 8px 24px #0006}
+html[data-theme=dark] dialog{box-shadow:0 24px 60px #000a}
+html[data-theme=dark] dialog::backdrop{background:#000a}
+html[data-theme=dark] summary{color:var(--muted)}
+html[data-theme=dark] ::-webkit-scrollbar{width:10px;height:10px}
+html[data-theme=dark] ::-webkit-scrollbar-thumb{background:#33343a;border-radius:8px}
+
+/* Przelacznik */
+.thm{display:flex;gap:6px;margin-left:auto;align-items:center;position:relative;flex:0 0 auto}
+.thm>button{width:34px;height:34px;padding:0;display:grid;place-items:center;border-radius:999px}
+.thm svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.thm .pop{position:fixed;z-index:9998;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:0 12px 32px #0002;display:grid;gap:10px;min-width:210px}
+.thm .pop b{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.thm .seg2{display:flex;gap:4px;background:var(--field);border-radius:10px;padding:3px}
+html[data-theme] .thm .seg2 button{flex:1;border:0;background:transparent;border-radius:8px;padding:6px 8px;font-size:12px}
+html[data-theme] .thm .seg2 button.on{background:var(--card);box-shadow:0 1px 4px #0002;font-weight:600}
+.thm .dots{display:flex;gap:8px}
+.thm .dots button{width:24px;height:24px;padding:0;border-radius:50%;border:2px solid var(--card);box-shadow:0 0 0 1px var(--line)}
+.thm .dots button.on{box-shadow:0 0 0 2px var(--ink)}
+@media (prefers-reduced-motion:reduce){html body{transition:none}}

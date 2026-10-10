@@ -5,3 +5,4 @@ node_modules/
 *.wasm.gz
 
 node_modules/
+worker/.wrangler/

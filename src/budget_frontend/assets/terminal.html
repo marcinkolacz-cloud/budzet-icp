@@ -18,6 +18,8 @@ tfoot td{font-weight:600;border-top:1px solid var(--line)}
 .flt{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.flt input[type=date]{width:150px}
 .empty{padding:28px 0;text-align:center;color:var(--muted)}
 button.warn{color:var(--neg)}
+.mb{display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;white-space:nowrap}.mb i{display:inline-block;height:6px;border-radius:9px;background:var(--pos);min-width:3px}.mb.z{color:var(--muted)}
+.pool{background:var(--field);border-radius:12px;padding:10px 12px;display:grid;gap:6px;font-size:12.5px}.pool .r{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.pool .bar i{background:var(--acc)}
 dialog{border:1px solid var(--line);border-radius:20px;padding:0;width:min(560px,calc(100vw - 24px));background:var(--card);color:var(--ink);box-shadow:0 24px 60px #0003}
 dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 .dh{display:flex;justify-content:space-between;align-items:center;padding:16px 18px 6px}.dh h3{margin:0;font-size:18px}
@@ -44,7 +46,7 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 <div class="cards" id="cards"></div><div class="empty" id="em" hidden>Brak planow. Dodaj pierwszy: symbol, cykl i progi cen z iloscia do sprzedania.</div></section>
 <section id="tsec"><div class="sh"><h2>Drabinka zbiorcza</h2><select id="tcy"><option value="w">Cykl tygodniowy</option><option value="d">Cykl dzienny</option></select></div>
 <table class="ct"><thead id="th"></thead><tbody id="tb"></tbody></table>
-<p class="note">Kolumna Razem = wartosc sprzedazy w cyklu, gdyby wszystkie aktywa byly na danym poziomie.</p></section>
+<p class="note">Kolumna Razem = wartosc sprzedazy w cyklu, gdyby wszystkie aktywa byly na danym poziomie. Pasek N× = w ilu cyklach sprzedano na tym poziomie (poziom wg ceny sprzedazy).</p></section>
 <section><div class="sh"><h2>Historia sprzedazy</h2><span class="note" id="hn"></span></div>
 <div class="flt"><select id="hf"><option value="">Wszystkie aktywa</option></select><input id="hd1" type="date" title="Od"><input id="hd2" type="date" title="Do"><button id="hcl" type="button">Wyczysc</button></div>
 <table class="ct"><thead><tr><th class="l">Data</th><th class="l">Cykl</th><th class="l">Aktywo</th><th>Ilosc</th><th>Cena $</th><th>Suma $</th><th class="l hm">Krypto</th><th></th></tr></thead><tbody id="hs"></tbody><tfoot id="hft"></tfoot></table></section>
@@ -54,6 +56,7 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 <div class="db">
 <label>Symbol<input id="pt" autocomplete="off" placeholder="ICP"></label>
 <label>Cykl<select id="pc"><option value="w">Tygodniowy (pn–nd)</option><option value="d">Dzienny</option></select></label>
+<label class="full">Calkowita ilosc do sprzedazy (pula, opcjonalnie)<input id="ptot" inputmode="decimal" placeholder="np. 5000"></label>
 <div class="full lvr"><span>#</span><span>Cena progu $</span><span>Ilosc w cyklu</span><span class="hv">Wartosc $</span><span></span></div>
 <div class="full" id="pl" style="display:grid;gap:6px"></div>
 <div class="full"><button type="button" id="pa">+ Dodaj prog</button></div>
@@ -95,8 +98,15 @@ function st(c){
  const L=lvs(c),p=P(c.t),k=ck(c.cy,today());let ai=-1;L.forEach((l,i)=>{if(p>0&&p>=l.p)ai=i;});
  const tgt=ai>=0?L[ai].q:0,cs=c.sales.filter(s=>ck(c.cy,s.d)===k),sq=cs.reduce((a,s)=>a+s.q,0),sv=cs.reduce((a,s)=>a+s.q*s.p,0);
  const tq=c.sales.reduce((a,s)=>a+s.q,0),tv=c.sales.reduce((a,s)=>a+s.q*s.p,0),nx=L[ai+1]||null;
- return {L,p,ai,tgt,sq,sv,rem:Math.max(0,tgt-sq),tq,tv,avg:tq>0?tv/tq:0,nx,toNx:nx&&p>0?(nx.p/p-1)*100:null,k};
+ const left=c.tot>0?Math.max(0,c.tot-tq):null,rem=left==null?Math.max(0,tgt-sq):Math.min(Math.max(0,tgt-sq),left);
+ return {L,p,ai,tgt,sq,sv,rem,left,tq,tv,avg:tq>0?tv/tq:0,nx,toNx:nx&&p>0?(nx.p/p-1)*100:null,k,by:byLv(c,L)};
 }
+// wykonanie per poziom: sprzedaz przypisana do najwyzszego progu <= cena sprzedazy; n = liczba cykli z ta sprzedaza
+function byLv(c,L){const o=L.map(()=>({n:new Set(),q:0,v:0})),u={n:new Set(),q:0,v:0};
+ c.sales.forEach(s=>{let i=-1;L.forEach((l,j)=>{if(s.p>=l.p-1e-12)i=j;});const b=i<0?u:o[i];b.n.add(ck(c.cy,s.d));b.q+=s.q;b.v+=s.q*s.p;});
+ const f=b=>({n:b.n.size,q:b.q,v:b.v});return {lv:o.map(f),under:f(u),max:Math.max(1,...o.map(b=>b.n.size),u.n.size)};}
+const cyU=c=>c.cy==="d"?"dni":"tyg.";
+const mb=(b,max,w)=>b.n?'<span class="mb" title="'+qty(b.q)+' szt. · '+usd(b.v,2)+'"><i style="width:'+Math.max(3,Math.round(b.n/max*(w||60)))+'px"></i>'+b.n+'×</span>':'<span class="mb z">–</span>';
 // --- render
 function render(){
  const C=T().coins;$("em").hidden=!!C.length;$("tsec").hidden=!C.length;
@@ -109,8 +119,10 @@ function render(){
   '<div class="px"><strong>'+price(x.p)+'</strong><small>'+(x.nx?"do progu "+price(x.nx.p)+": "+pct(x.toNx):x.ai>=0?"najwyzszy prog":"")+'</small></div></div>'+
   '<div class="kv"><div><span>Cel cyklu</span><strong>'+qty(x.tgt)+'</strong></div><div><span>Sprzedano</span><strong>'+qty(x.sq)+'</strong></div><div><span>Zostalo</span><strong class="'+(x.rem>0?"pos":"")+'">'+qty(x.rem)+'</strong><small class="note" style="display:block;margin:0">'+usd(x.rem*x.p)+'</small></div></div>'+
   '<div class="bar" title="'+pr.toFixed(0)+'%"><i style="width:'+pr+'%"></i></div>'+
-  '<table class="lv"><thead><tr><th>Prog $</th><th>Ilosc</th><th>Wartosc $</th></tr></thead><tbody>'+
-  x.L.map((l,i)=>'<tr class="'+(i===x.ai?"act":i<x.ai?"hit":"miss")+'"><td>'+price(l.p)+'</td><td>'+qty(l.q)+'</td><td>'+usd(l.p*l.q)+'</td></tr>').join("")+'</tbody></table>'+
+  (c.tot>0?'<div class="pool"><div class="r"><span>Pula: <b>'+qty(c.tot)+'</b></span><span>Sprzedano: <b>'+qty(x.tq)+'</b> ('+(x.tq/c.tot*100).toFixed(1)+'%)</span></div><div class="bar"><i style="width:'+Math.min(100,x.tq/c.tot*100)+'%"></i></div><div class="r"><span>Zostalo w puli: <b class="'+(x.left>0?"":"pos")+'">'+qty(x.left)+'</b> · '+usd(x.left*x.p)+'</span><span>'+(x.left>0&&x.tgt>0?"≈ "+Math.ceil(x.left/x.tgt)+" "+cyU(c)+" przy obecnym progu":x.left>0?"":"pula sprzedana")+'</span></div></div>':'')+
+  '<table class="lv"><thead><tr><th>Prog $</th><th>Ilosc</th><th>Wartosc $</th><th>Wykonano</th></tr></thead><tbody>'+
+  x.L.map((l,i)=>'<tr class="'+(i===x.ai?"act":i<x.ai?"hit":"miss")+'"><td>'+price(l.p)+'</td><td>'+qty(l.q)+'</td><td>'+usd(l.p*l.q)+'</td><td>'+mb(x.by.lv[i],x.by.max,50)+'</td></tr>').join("")+
+  (x.by.under.n?'<tr class="miss"><td>ponizej progow</td><td>'+qty(x.by.under.q)+'</td><td>'+usd(x.by.under.v)+'</td><td>'+mb(x.by.under,x.by.max,50)+'</td></tr>':'')+'</tbody></table>'+
   '<div class="note" style="margin:0">Lacznie: '+qty(x.tq)+' '+esc(c.t)+' · sr. cena '+price(x.avg)+' · '+usd(x.tv,2)+'</div>'+
   '<div class="ca"><button type="button" class="dark" data-a="s">Zanotuj sprzedaz</button><span class="sp"></span><button type="button" data-a="e">Edytuj</button><button type="button" class="warn" data-a="d">Usun</button></div>';
   d.querySelector('[data-a=s]').onclick=()=>openSale(c,x);d.querySelector('[data-a=e]').onclick=()=>openPlan(c);d.querySelector('[data-a=d]').onclick=()=>delPlan(c);
@@ -123,9 +135,11 @@ function render(){
  ladder();hist();
 }
 function ladder(){
- const cy=$("tcy").value,C=T().coins.filter(c=>c.cy===cy),n=Math.max(0,...C.map(c=>c.lv.length));
+ const cy=$("tcy").value,C=T().coins.filter(c=>c.cy===cy),n=Math.max(0,...C.map(c=>c.lv.length)),B=C.map(c=>byLv(c,lvs(c)));
  $("th").innerHTML='<tr><th class="l">Poziom</th>'+C.map(c=>'<th>'+esc(c.t)+'</th>').join("")+'<th>Razem $</th></tr>';
- let h="";for(let i=0;i<n;i++){let s=0;h+='<tr><td class="l">'+(i+1)+'</td>'+C.map(c=>{const l=lvs(c)[i];if(!l)return "<td>–</td>";s+=l.p*l.q;return '<td><span class="two">'+qty(l.q)+' × '+price(l.p)+'<small class="note" style="display:block;margin:0">'+usd(l.p*l.q)+'</small></span></td>';}).join("")+'<td><strong>'+usd(s)+'</strong></td></tr>';}
+ let h="";for(let i=0;i<n;i++){let s=0,sv=0,sn=0;h+='<tr><td class="l">'+(i+1)+'</td>'+C.map((c,j)=>{const l=lvs(c)[i];if(!l)return "<td>–</td>";s+=l.p*l.q;const b=B[j].lv[i];sv+=b.v;sn+=b.n;
+  return '<td><span class="two">'+qty(l.q)+' × '+price(l.p)+'<small class="note" style="display:block;margin:0">'+usd(l.p*l.q)+'</small><small style="display:block;margin-top:3px">'+mb(b,B[j].max,60)+(b.n?' <span class="note">'+qty(b.q)+' szt.</span>':'')+'</small></span></td>';}).join("")+
+  '<td><span class="two"><strong>'+usd(s)+'</strong><small class="note" style="display:block;margin:0">'+(sn?"sprzedano "+usd(sv):"")+'</small></span></td></tr>';}
  $("tb").innerHTML=h||'<tr><td class="l note">Brak planow w tym cyklu</td></tr>';
 }
 function hist(){
@@ -147,7 +161,7 @@ function lvRow(l){const r=document.createElement("div");r.className="lvr";r.inne
 function pRows(){return [...$("pl").children].map(r=>{const [a,b]=r.querySelectorAll("input");return {p:num(a.value),q:num(b.value),r};});}
 function pSum(){const R=pRows();R.forEach((x,i)=>{x.r.children[0].textContent=i+1;x.r.children[3].textContent=x.p&&x.q?usd(x.p*x.q):"";});
  const ok=R.filter(x=>x.p>0&&x.q>0);$("ps").innerHTML='<span>Progi: <b>'+ok.length+'</b></span><span>Maks. w cyklu: <b>'+usd(Math.max(0,...ok.map(x=>x.p*x.q)))+'</b></span>';}
-function openPlan(c){edP=c||null;$("dpt").textContent=c?"Edytuj plan "+c.t:"Nowy plan";$("pt").value=c?c.t:"";$("pt").disabled=!!c;$("pc").value=c?c.cy:"w";$("pe").textContent="";
+function openPlan(c){edP=c||null;$("dpt").textContent=c?"Edytuj plan "+c.t:"Nowy plan";$("pt").value=c?c.t:"";$("pt").disabled=!!c;$("pc").value=c?c.cy:"w";$("ptot").value=c&&c.tot?c.tot:"";$("pe").textContent="";
  $("pl").innerHTML="";(c?lvs(c):[null,null,null]).forEach(lvRow);pSum();$("dp").showModal();}
 $("pa").onclick=()=>{lvRow();pSum();};
 $("fp").onsubmit=e=>{e.preventDefault();
@@ -156,7 +170,8 @@ $("fp").onsubmit=e=>{e.preventDefault();
  if(!lv.length)return $("pe").textContent="Dodaj co najmniej jeden prog (cena i ilosc > 0)";
  if(new Set(lv.map(l=>l.p)).size!==lv.length)return $("pe").textContent="Ceny progow nie moga sie powtarzac";
  if(!edP&&T().coins.some(c=>c.t===t&&c.cy===cy))return $("pe").textContent="Plan "+t+" dla tego cyklu juz istnieje";
- if(edP){edP.cy=cy;edP.lv=lv;}else T().coins.push({id:uid(),t,cy,lv,sales:[]});
+ const tot=num($("ptot").value);if(tot<0)return $("pe").textContent="Pula nie moze byc ujemna";
+ if(edP){edP.cy=cy;edP.lv=lv;if(tot>0)edP.tot=tot;else delete edP.tot;}else{const c={id:uid(),t,cy,lv,sales:[]};if(tot>0)c.tot=tot;T().coins.push(c);}
  K.save();$("dp").close();render();if(!P(t))K.quoteOne(t).then(render,er=>{$("wn").textContent=er.message;});};
 function delPlan(c){if(!confirm("Usunac plan "+c.t+" ("+c.sales.length+" zapisanych sprzedazy)? Trafi do kosza."))return;
  K.toBin("k-term","Terminal: plan "+c.t,{c});T().coins=T().coins.filter(x=>x!==c);K.save();render();}

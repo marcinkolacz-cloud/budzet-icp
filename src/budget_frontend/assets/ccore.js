@@ -19,6 +19,8 @@ function norm(o){o.ps=o.ps||[];o.ids=o.ids||{};o.manual=o.manual||{};o.prices=o.
  if(o.cur!==0&&!o.ps.some(p=>p.id===o.cur))o.cur=o.ps[0].id;return o;}
 let S=norm(jp(KEY,{}));
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));save();
+const toBin=(type,label,data)=>{(S.bin=S.bin||[]).push({id:Date.now()*1000+Math.floor(Math.random()*1000),ts:Date.now(),type,label,data});};
+
 const P=()=>S.ps.find(p=>p.id===S.cur),isAgg=()=>S.cur===0,sel=()=>isAgg()?S.ps:[P()];
 const isReward=t=>t.s>0&&(t.p<=0.0011||/nagrod|staking|stakin|reward|neuron|airdrop/i.test(t.c||""));
 function derive(trades,upTo){
@@ -116,7 +118,7 @@ function mountSelect(el,cb){el.innerHTML="";const add=(v,t)=>{const o=document.c
 function addPortfolio(name){const id=uid();S.ps.push({id,name:name.slice(0,40),trades:[]});S.cur=id;save();}
 function rename(name){if(isAgg())S.aggName=name.slice(0,40);else P().name=name.slice(0,40);save();}
 function removePortfolio(p){if(!p)return "Wybierz konkretny portfel";if(S.ps.length<2)return "Musi zostac przynajmniej jeden portfel";
- S.trash={ts:Date.now(),p};S.ps=S.ps.filter(x=>x.id!==p.id);S.cur=S.ps[0].id;save();return "";}
+ toBin("k-ps","Portfel "+p.name+" ("+p.trades.length+" transakcji)",{p});S.ps=S.ps.filter(x=>x.id!==p.id);S.cur=S.ps[0].id;save();return "";}
 function restore(){if(!S.trash)return alert("Brak usunietego portfela");S.ps.push(S.trash.p);S.cur=S.trash.p.id;S.trash=null;save();}
 // --- import z innej aplikacji (portfolio_export_*.json)
 const nsDate=v=>{try{const ms=typeof v==="string"&&v.length>15?Number(BigInt(v)/1000000n):Number(v);const d=new Date(ms<1e11?ms*1000:ms);return isNaN(d)?today():d.toLocaleDateString("sv");}catch{return today();}};
@@ -141,6 +143,6 @@ function applyImport(list,mode){
  S.cur=S.ps[S.ps.length-1].id;save();
 }
 function exportJson(){return {app:"budzet-icp-krypto",v:1,exported:new Date().toISOString(),krypto:S,snaps:snaps()};}
-return {get S(){return S},save,P,isAgg,sel,derive,summary,posRows,validTrades,refresh,quoteOne,resolve,history,series,snaps,mountSelect,addPortfolio,rename,removePortfolio,restore,
+return {get S(){return S},save,P,isAgg,sel,derive,summary,posRows,validTrades,refresh,quoteOne,resolve,history,series,snaps,mountSelect,addPortfolio,rename,removePortfolio,restore,toBin,
  parseExport,applyImport,exportJson,isReward,today,uid,num,money,price,qty,pct,cls,cmp};
 })();

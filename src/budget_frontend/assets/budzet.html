@@ -75,7 +75,7 @@
 </head>
 <body>
 <div class="app">
-<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html" class="on">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a></nav>
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html" class="on">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="kosz.html">Kosz</a></nav>
   <header>
     <div><h1>Budzet</h1><div class="sub">Miesiac, saldo i zbiorczy podglad okresu.</div></div>
     <div class="bar">
@@ -145,6 +145,7 @@ const zl = n => new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN",m
 const num = v => { const n = Number(String(v??"").replace(/\s/g,"").replace(",",".")); return Number.isFinite(n)?n:0; };
 const save = () => localStorage.setItem(KEY, JSON.stringify(state));
 state.credits = state.credits || [];
+const toBin=(type,label,data)=>{(state.bin=state.bin||[]).push({id:Date.now()*1000+Math.floor(Math.random()*1000),ts:Date.now(),type,label,data:JSON.parse(JSON.stringify(data))});};
 const $ = id => document.getElementById(id);
 const zl2 = n => new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN"}).format(n||0);
 const ASC = t => String(t??"").toLowerCase().replace(/ł/g,"l").normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -217,8 +218,9 @@ function applyImport(c,p){
   syncCredits(); save(); render();
 }
 function removeCredit(c){
-  if(!confirm("Usunac "+c.name+" razem z harmonogramem i wartosciami w budzecie (rata i nadplata)?")) return;
+  if(!confirm("Przeniesc do kosza "+c.name+" razem z harmonogramem i wartosciami w budzecie (rata i nadplata)?")) return;
   const keys=[c.name,overKey(c)];
+  toBin("b-credit",c.name+" ("+c.schedule.length+" rat)",{c,keys,ex:keys.map(k=>state.expenses.indexOf(k)),rows:state.rows.map(r=>({data:r.data,v:keys.map(k=>r[k]),p:keys.map(k=>!!(r.paid&&r.paid[k]))})),loans:keys.map(k=>(state.loans||{})[k])});
   state.credits=state.credits.filter(x=>x!==c);
   state.expenses=state.expenses.filter(k=>!keys.includes(k));
   state.rows.forEach(r=>keys.forEach(k=>{ delete r[k]; if(r.paid) delete r.paid[k]; }));
@@ -259,7 +261,8 @@ function line(list, kind, i){
   if(i>0) items.push(["wyzej",()=>{ [list[i-1],list[i]]=[list[i],list[i-1]]; save(); render(); }]);
   if(i<list.length-1) items.push(["nizej",()=>{ [list[i+1],list[i]]=[list[i],list[i+1]]; save(); render(); }]);
   if(!cr&&!ov&&!(kind==="in"&&key==="przychod")) items.push(["usun",()=>{
-    if(!confirm("Usunac „"+key+"” od miesiaca "+(r.data||"")+"? Wczesniejsze miesiace zostaja bez zmian.")) return;
+    if(!confirm("Przeniesc do kosza „"+key+"” od miesiaca "+(r.data||"")+"? Wczesniejsze miesiace zostaja bez zmian.")) return;
+    toBin("b-item",(kind==="in"?"Wplyw":"Koszt")+" „"+key+"” od "+(r.data||""),{kind,key,li:list.indexOf(key),rows:state.rows.map((rr,ix)=>ix>=state.month?{data:rr.data,v:rr[key],p:!!(rr.paid&&rr.paid[key]),d:!!(rr.del&&rr.del[key])}:null).filter(Boolean),loan:(state.loans||{})[key]});
     state.rows.forEach((rr,ix)=>{ if(ix>=state.month){ rr.del=rr.del||{}; rr.del[key]=true; delete rr[key]; if(rr.paid) delete rr.paid[key]; } });
     if(!state.rows.some(rr=>num(rr[key])!==0)){ list.splice(list.indexOf(key),1); state.rows.forEach(rr=>{ delete rr[key]; if(rr.paid) delete rr.paid[key]; if(rr.del) delete rr.del[key]; }); delete state.loans[key]; }
     save(); render(); }]);
@@ -377,7 +380,7 @@ function nextName(name){
   }
   return text;
 }
-document.getElementById("delMonth").onclick=()=>{ const r=row(); if(!confirm("Usunac miesiac "+(r.data||"")+"?")) return; state.rows.splice(state.month,1); state.month=Math.max(0,state.month-1); save(); render(); };
+document.getElementById("delMonth").onclick=()=>{ const r=row(); if(!confirm("Przeniesc do kosza miesiac "+(r.data||"")+"?")) return; toBin("b-month","Miesiac "+(r.data||""),{idx:state.month,row:r}); state.rows.splice(state.month,1); state.month=Math.max(0,state.month-1); save(); render(); };
 function addItem(list,n){ n=n.trim(); if(!n) return; if(list.includes(n)){ state.rows.forEach((rr,ix)=>{ if(ix>=state.month&&rr.del) delete rr.del[n]; }); } else list.push(n); save(); render(); }
 document.getElementById("addIn").onclick=()=>{ const n=prompt("Nazwa przychodu"); if(n) addItem(state.incomes,n); };
 document.getElementById("addEx").onclick=()=>{ const n=prompt("Nazwa kosztu"); if(n) addItem(state.expenses,n); };

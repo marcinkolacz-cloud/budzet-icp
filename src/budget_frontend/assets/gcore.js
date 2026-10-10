@@ -27,6 +27,8 @@ function load(){
 }
 let S=load();
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));save();
+const toBin=(type,label,data)=>{(S.bin=S.bin||[]).push({id:Date.now()*1000+Math.floor(Math.random()*1000),ts:Date.now(),type,label,data});};
+
 const P=()=>S.ps.find(p=>p.id===S.cur);
 const isAgg=()=>S.cur===0;
 const sel=()=>isAgg()?S.ps:[P()];
@@ -160,7 +162,7 @@ function addPortfolio(name){const id=uid();S.ps.push({id,name:name.slice(0,40),t
 function rename(name){if(isAgg())S.aggName=name.slice(0,40);else P().name=name.slice(0,40);save();}
 function removePortfolio(p){
  if(!p)return "Wybierz konkretny portfel";if(S.ps.length<2)return "Musi zostac przynajmniej jeden portfel";
- S.trash={ts:Date.now(),p};S.ps=S.ps.filter(x=>x.id!==p.id);S.cur=S.ps[0].id;save();return "";
+ toBin("g-ps","Portfel "+p.name+" ("+p.trades.length+" transakcji)",{p});S.ps=S.ps.filter(x=>x.id!==p.id);S.cur=S.ps[0].id;save();return "";
 }
 function restore(){if(!S.trash)return;const p=S.trash.p;if(S.ps.some(x=>x.id===p.id))p.id=uid();S.ps.push(p);S.cur=p.id;S.trash=null;save();}
 function exportJson(){
@@ -173,5 +175,5 @@ function importJson(txt){
  localStorage.setItem(BK,localStorage.getItem(KEY)||"");S=norm(s);if(o.snaps)localStorage.setItem(SNK,JSON.stringify(o.snaps));save();
 }
 return {get S(){return S},CUR,save,P,isAgg,sel,derive,summary,posRows,validTrades,negWallets,quote,rates,convert,depositValues,getRate,refreshAll,snaps,history,points,flows,valueIn,ptAt,periodReturn,
- mountSelect,addPortfolio,rename,removePortfolio,restore,exportJson,importJson,setKey,setWorker,today,uid,num,money,pct,cls,cmp,byD};
+ mountSelect,addPortfolio,rename,removePortfolio,restore,toBin,exportJson,importJson,setKey,setWorker,today,uid,num,money,pct,cls,cmp,byD};
 })();

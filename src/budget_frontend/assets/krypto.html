@@ -22,10 +22,10 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 @media (max-width:760px){.db{grid-template-columns:1fr 1fr}.flt input{flex:1 1 100%;width:auto}dialog{border-radius:16px}}
 </style></head>
 <body><div class="app">
-<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html" class="on">Krypto</a></nav>
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html" class="on">Krypto</a><a href="kosz.html">Kosz</a></nav>
 <header><div><h1>Krypto</h1><div class="sub" id="st">Ceny: CoinGecko · kurs USD/PLN: ECB</div>
 <div class="nav"><a class="on" href="krypto.html">Portfel</a><a href="krypto-analityka.html">Analityka</a></div></div>
-<div class="form"><select id="ps"></select><button id="np" type="button">Nowy portfel</button><button id="rn" type="button">Zmien nazwe</button><button id="dp" type="button">Usun portfel</button><button id="rs" type="button">Przywroc usuniety</button>
+<div class="form"><select id="ps"></select><button id="np" type="button">Nowy portfel</button><button id="rn" type="button">Zmien nazwe</button><button id="dp" type="button">Usun portfel</button><button id="rs" type="button">Kosz</button>
 <button id="rf" class="dark" type="button">Odswiez ceny</button><button id="im" type="button">Import z innej aplikacji</button><button id="ex" type="button">Eksport JSON</button></div></header>
 <div class="stats">
 <div class="stat"><span>Wartosc</span><strong id="v">–</strong><small id="vs"></small></div>
@@ -174,8 +174,8 @@ function openDlg(o){
 $("fmax").onclick=()=>{$("fq").value=+held(+$("fp").value,$("fs").value.trim().toUpperCase(),ed&&ed.id).toFixed(8);upd();};
 $("fcur").onclick=async()=>{const t=$("fs").value.trim().toUpperCase();if(!t)return;$("fcur").disabled=true;try{const p=await K.quoteOne(t);$("fpr").value=+p.toPrecision(6);}catch(e){$("fe").textContent=e.message;}$("fcur").disabled=false;upd();};
 $("dx").onclick=$("fcan").onclick=()=>$("dlg").close();
-$("fdel").onclick=()=>{if(!ed||!confirm("Usunac transakcje "+ed.t+" z "+ed.d+"?"))return;const p=ed.p0,bk=p.trades;p.trades=bk.filter(x=>x.id!==ed.id&&x.id!==ed.lk);
- if(!K.validTrades(p.trades)){p.trades=bk;$("fe").textContent="Nie mozna - pozniejsza sprzedaz przekroczylaby stan.";return;}K.save();$("dlg").close();render();};
+$("fdel").onclick=()=>{if(!ed||!confirm("Przeniesc do kosza transakcje "+ed.t+" z "+ed.d+"?"))return;const p=ed.p0,bk=p.trades;p.trades=bk.filter(x=>x.id!==ed.id&&x.id!==ed.lk);
+ if(!K.validTrades(p.trades)){p.trades=bk;$("fe").textContent="Nie mozna - pozniejsza sprzedaz przekroczylaby stan.";return;}{const rm=bk.filter(x=>x.id===ed.id||x.id===ed.lk),m=rm.find(x=>x.id===ed.id)||rm[0];K.toBin("k-trade",(m.s>0?"Kupno ":"Sprzedaz ")+(+m.q.toFixed(8))+" "+m.t+" · "+m.d+" · "+p.name+(rm.length>1?" (+"+(rm.length-1)+" powiazana)":""),{pid:p.id,ts:rm});}K.save();$("dlg").close();render();};
 $("fm").onsubmit=e=>{e.preventDefault();
  const t=$("fs").value.trim().toUpperCase(),q=num($("fq").value),p=ty==="r"?0:num($("fpr").value),f=num($("ff").value),d=$("fd").value||K.today(),pid=+$("fp").value,c=$("fc").value.trim();
  if(!/^[A-Z0-9.\-]{1,15}$/.test(t))return $("fe").textContent="Podaj symbol";if(!(q>0))return $("fe").textContent="Ilosc musi byc > 0";
@@ -204,7 +204,7 @@ async function refresh(){$("st").textContent="Odswiezanie cen...";$("rf").disabl
 $("np").onclick=()=>{const v=prompt("Nazwa nowego portfela");if(v&&v.trim()){K.addPortfolio(v.trim());render();}};
 $("rn").onclick=()=>{const cur=K.isAgg()?K.S.aggName:K.P().name,v=prompt("Nowa nazwa",cur);if(v&&v.trim()){K.rename(v.trim());render();}};
 $("dp").onclick=()=>{const p=K.P();if(!p)return;const v=prompt("Aby usunac portfel wpisz jego nazwe: "+p.name);if(v!==p.name)return v!=null&&alert("Nazwa sie nie zgadza - nic nie usunieto");const m=K.removePortfolio(p);if(m)alert(m);render();};
-$("rs").onclick=()=>{K.restore();render();};
+$("rs").onclick=()=>{location.href="kosz.html";};
 $("rf").onclick=refresh;
 $("im").onclick=()=>{const i=el("input");i.type="file";i.accept=".json,application/json";i.onchange=async()=>{
  const f=i.files[0];if(!f)return;let l;try{l=K.parseExport(JSON.parse(await f.text()));}catch(e){return alert(e.message||"Nieprawidlowy plik");}

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Kosz</title><link rel="stylesheet" href="base.css"><link rel="stylesheet" href="theme.css"><script src="theme.js"></script>
+<style>
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.bar .sp{flex:1}
+.src{display:inline-block;padding:2px 9px;border-radius:999px;background:var(--field,#f3efe8);color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+table.bt td,table.bt th{text-align:left;vertical-align:middle}table.bt td.r,table.bt th.r{text-align:right}
+table.bt td:nth-child(4){white-space:normal;min-width:240px}
+table.bt input[type=checkbox]{width:16px;height:16px;accent-color:var(--acc,#1c1915);cursor:pointer}
+.acts{display:flex;gap:6px;justify-content:flex-end}.acts button{padding:4px 10px;font-size:12px}
+.empty{padding:28px 0;text-align:center;color:var(--muted)}
+button.warn{color:var(--neg)}
+</style></head>
+<body><div class="app">
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="kosz.html" class="on">Kosz</a></nav>
+<header><div><h1>Kosz</h1><div class="sub" id="st">Usuniete elementy. Przywroc lub usun na stale.</div></div></header>
+<section>
+<div class="bar"><select id="fs"><option value="">Wszystkie zrodla</option><option value="b">Budzet</option><option value="g">Gielda</option><option value="k">Krypto</option></select>
+<span class="sp"></span><button id="ra" type="button" disabled>Przywroc zaznaczone</button><button id="da" type="button" class="warn" disabled>Usun zaznaczone na stale</button><button id="ea" type="button" class="dark">Oprozni kosz</button></div>
+<table class="bt" style="margin-top:10px"><thead><tr><th style="width:28px"><input type="checkbox" id="all" aria-label="Zaznacz wszystko"></th><th>Usunieto</th><th>Zrodlo</th><th>Element</th><th class="r"></th></tr></thead><tbody id="tb"></tbody></table>
+<div class="empty" id="em" hidden>Kosz jest pusty</div>
+</section>
+</div>
+<script src="auth.js"></script>
+<script type="text/x-after-auth" src="gcore.js"></script>
+<script type="text/x-after-auth" src="ccore.js"></script>
+<script type="text/x-after-auth">
+;(function(){
+const $=id=>document.getElementById(id),BK="budzet-app-v3",SRC={b:"Budzet",g:"Gielda",k:"Krypto"};
+const bLoad=()=>{try{return JSON.parse(localStorage.getItem(BK)||"null")}catch{return null}};
+const bSave=b=>localStorage.setItem(BK,JSON.stringify(b));
+// migracja starego pojedynczego "trash" (usuniety portfel)
+[[G,"g-ps"],[K,"k-ps"]].forEach(([X,t])=>{const S=X.S;if(S.trash&&S.trash.p){(S.bin=S.bin||[]).push({id:Date.now()*1000+Math.floor(Math.random()*1000),ts:S.trash.ts||Date.now(),type:t,label:"Portfel "+S.trash.p.name,data:{p:S.trash.p}});S.trash=null;X.save();}});
+const sel=new Set();
+function all(){const b=bLoad(),out=[];
+ ((b&&b.bin)||[]).forEach(i=>out.push({s:"b",i}));(G.S.bin||[]).forEach(i=>out.push({s:"g",i}));(K.S.bin||[]).forEach(i=>out.push({s:"k",i}));
+ return out.sort((a,c)=>c.i.ts-a.i.ts);}
+const key=e=>e.s+":"+e.i.id;
+function drop(list){const ids={b:new Set(),g:new Set(),k:new Set()};list.forEach(e=>ids[e.s].add(e.i.id));
+ if(ids.b.size){const b=bLoad();if(b){b.bin=(b.bin||[]).filter(i=>!ids.b.has(i.id));bSave(b);}}
+ if(ids.g.size){G.S.bin=(G.S.bin||[]).filter(i=>!ids.g.has(i.id));G.save();}
+ if(ids.k.size){K.S.bin=(K.S.bin||[]).filter(i=>!ids.k.has(i.id));K.save();}
+ list.forEach(e=>sel.delete(key(e)));}
+const pf=(S,pid)=>S.ps.find(p=>p.id===pid)||S.ps[0];
+function addPs(X,p){const S=X.S;if(S.ps.some(x=>x.id===p.id))p.id=Date.now()*1000+Math.floor(Math.random()*1000);if(S.ps.some(x=>x.name===p.name))p.name=(p.name+" (przywrocony)").slice(0,40);S.ps.push(p);}
+// zwraca "" gdy OK, inaczej powod
+function restoreOne(e){const {type,data:d}=e.i;
+ if(type==="g-tx"){pf(G.S,d.pid).tx.push(d.x);G.save();return "";}
+ if(type==="g-fx"){const p=pf(G.S,d.pid);(p.fx=p.fx||[]).push(d.x);G.save();return "";}
+ if(type==="g-trade"){const p=pf(G.S,d.pid);p.trades.push(d.t);if(!G.validTrades(p.trades)){p.trades.pop();return "sprzedaz przekroczylaby stan";}p.tx.push(...(d.tx||[]));G.save();return "";}
+ if(type==="g-ps"){addPs(G,d.p);G.save();return "";}
+ if(type==="k-trade"){const p=pf(K.S,d.pid),n=p.trades.length;p.trades.push(...d.ts);if(!K.validTrades(p.trades)){p.trades.length=n;return "sprzedaz przekroczylaby stan";}K.save();return "";}
+ if(type==="k-ps"){addPs(K,d.p);K.save();return "";}
+ const b=bLoad();if(!b)return "brak danych budzetu";b.rows=b.rows||[];b.loans=b.loans||{};b.expenses=b.expenses||[];b.incomes=b.incomes||[];
+ const byData=x=>b.rows.find(r=>r.data===x);
+ if(type==="b-month"){b.rows.splice(Math.min(d.idx,b.rows.length),0,d.row);bSave(b);return "";}
+ if(type==="b-credit"){b.credits=b.credits||[];if(b.credits.some(c=>c.name===d.c.name))return "kredyt o tej nazwie juz istnieje";
+  b.credits.push(d.c);d.keys.forEach((k,j)=>{if(!b.expenses.includes(k))b.expenses.splice(d.ex[j]<0?b.expenses.length:Math.min(d.ex[j],b.expenses.length),0,k);if(d.loans[j]!=null)b.loans[k]=d.loans[j];});
+  d.rows.forEach(x=>{const r=byData(x.data);if(!r)return;d.keys.forEach((k,j)=>{if(x.v[j]!=null)r[k]=x.v[j];if(x.p[j]){r.paid=r.paid||{};r.paid[k]=true;}});});bSave(b);return "";}
+ if(type==="b-item"){const L=d.kind==="in"?b.incomes:b.expenses;if(!L.includes(d.key))L.splice(d.li<0?L.length:Math.min(d.li,L.length),0,d.key);if(d.loan!=null&&b.loans[d.key]==null)b.loans[d.key]=d.loan;
+  d.rows.forEach(x=>{const r=byData(x.data);if(!r)return;if(x.v!=null)r[d.key]=x.v;if(x.p){r.paid=r.paid||{};r.paid[d.key]=true;}if(r.del){if(x.d)r.del[d.key]=true;else delete r.del[d.key];}});bSave(b);return "";}
+ return "nieznany typ";}
+function restore(list){const err=[],ok=[];list.forEach(e=>{const m=restoreOne(e);m?err.push(e.i.label+": "+m):ok.push(e);});drop(ok);
+ if(err.length)alert("Nie przywrocono:\n"+err.join("\n"));$("st").textContent=ok.length?"Przywrocono: "+ok.length:"";render();}
+function purge(list,what){if(!list.length)return;if(!confirm("Usunac na stale "+what+"? Tej operacji nie mozna cofnac."))return;drop(list);$("st").textContent="Usunieto na stale: "+list.length;render();}
+const dt=ts=>new Date(ts).toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+function vis(){const f=$("fs").value;return all().filter(e=>!f||e.s===f);}
+function render(){const L=vis(),T=$("tb");T.innerHTML="";$("em").hidden=!!L.length;
+ L.forEach(e=>{const tr=document.createElement("tr"),k=key(e);
+  const c=document.createElement("input");c.type="checkbox";c.checked=sel.has(k);c.setAttribute("aria-label","Zaznacz");c.onchange=()=>{c.checked?sel.add(k):sel.delete(k);bar();};
+  const td=(x,cl)=>{const d=document.createElement("td");if(cl)d.className=cl;typeof x==="string"?d.textContent=x:d.append(x);tr.append(d);return d;};
+  td(c);td(dt(e.i.ts));const sp=document.createElement("span");sp.className="src";sp.textContent=SRC[e.s];td(sp);td(e.i.label||e.i.type);
+  const a=document.createElement("div");a.className="acts";const rb=document.createElement("button");rb.type="button";rb.textContent="Przywroc";rb.onclick=()=>restore([e]);
+  const db=document.createElement("button");db.type="button";db.className="warn";db.textContent="Usun";db.onclick=()=>purge([e],"„"+(e.i.label||"")+"”");a.append(rb,db);td(a,"r");T.append(tr);});
+ bar();}
+function bar(){const L=vis(),n=L.filter(e=>sel.has(key(e))).length;$("ra").disabled=$("da").disabled=!n;$("ra").textContent="Przywroc zaznaczone"+(n?" ("+n+")":"");$("da").textContent="Usun zaznaczone na stale"+(n?" ("+n+")":"");
+ $("ea").disabled=!L.length;$("all").checked=!!L.length&&n===L.length;$("all").indeterminate=n>0&&n<L.length;}
+const chosen=()=>vis().filter(e=>sel.has(key(e)));
+$("all").onchange=()=>{vis().forEach(e=>$("all").checked?sel.add(key(e)):sel.delete(key(e)));render();};
+$("ra").onclick=()=>restore(chosen());
+$("da").onclick=()=>{const L=chosen();purge(L,L.length+" elementow");};
+$("ea").onclick=()=>{const L=vis();purge(L,"wszystkie elementy"+($("fs").value?" ("+SRC[$("fs").value]+")":"")+" – "+L.length);};
+$("fs").onchange=render;
+render();
+})();
+</script></body></html>

@@ -12,11 +12,13 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 dialog form{padding:20px 22px;display:grid;gap:10px}dialog h3{margin:0 0 4px}dialog label{font-size:12px;color:var(--muted);display:grid;gap:4px}
 dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
 .sub b{color:var(--ink);font-weight:600}
+#mb{position:relative}#mb rect{cursor:pointer;transition:opacity .12s}#mb:hover rect{opacity:.55}#mb rect.hv{opacity:1}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--card);font-size:12px;line-height:1.35;padding:6px 10px;border-radius:10px;white-space:nowrap;transform:translate(-50%,calc(-100% - 8px));box-shadow:0 6px 18px #0002;z-index:5}.tip b{display:block;font-size:13px}
 </style></head>
 <body><div class="app">
 <nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html" class="on">Staking</a><a href="kosz.html">Kosz</a></nav>
 <header><div><h1>Staking</h1><div class="sub" id="st">Wczytywanie…</div><div class="chips" id="chips"></div></div>
-<div class="form"><button id="bn" type="button">Synchronizuj neurony</button><button id="bs" class="dark" type="button">Synchronizuj ceny, NEAR, INJ</button><button id="bi" type="button">Import kopii Rewards</button><button id="be" type="button">Eksport JSON</button></div></header>
+<div class="form"><select id="cur" aria-label="Waluta"><option>PLN</option><option>USD</option></select><button id="bn" type="button">Synchronizuj neurony</button><button id="bs" class="dark" type="button">Synchronizuj ceny, NEAR, INJ</button><button id="bi" type="button">Import kopii Rewards</button><button id="be" type="button">Eksport JSON</button></div></header>
 <p class="note" id="prog"></p>
 <div class="stats">
 <div class="stat"><span>Wartosc stakingu</span><strong id="t1">–</strong><small id="t1s"></small></div>
@@ -24,10 +26,10 @@ dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
 <div class="stat"><span>Nagrody w tym miesiacu</span><strong id="t3">–</strong><small id="t3s"></small></div>
 <div class="stat"><span>Nagrody lacznie</span><strong id="t4">–</strong><small id="t4s"></small></div></div>
 
-<section><h2>Nagrody miesiecznie (PLN)</h2><div id="mb"></div>
+<section><h2>Nagrody miesiecznie (<span class="cu">PLN</span>)</h2><div id="mb"></div>
 <div class="legend" style="margin-top:6px"><span>Wycena nagrod po cenie z dnia otrzymania (ICP: cena z dnia syncu lub biezaca)</span></div></section>
 
-<section><h2>Aktywa</h2><table><thead><tr><th>Aktywo</th><th>Stake</th><th class="hm">Dzis</th><th class="hm">Sr. 7d</th><th class="hm">Sr. 30d</th><th>APY 30d</th><th>Nagrody lacznie</th><th>Wartosc PLN</th></tr></thead><tbody id="ta"></tbody></table></section>
+<section><h2>Aktywa</h2><table><thead><tr><th>Aktywo</th><th>Stake</th><th class="hm">Dzis</th><th class="hm">Sr. 7d</th><th class="hm">Sr. 30d</th><th>APY 30d</th><th>Nagrody lacznie</th><th>Wartosc <span class="cu">PLN</span></th></tr></thead><tbody id="ta"></tbody></table></section>
 
 <section><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">Neurony ICP</h2><button id="an" type="button">Dodaj neuron</button></div>
 <p class="note">Sync czyta neuron z NNS Governance - canister backendu Budzetu (<code>tj3o4-rqaaa-aaaac-bgdmq-cai</code>) musi byc hotkeyem neuronu.</p>
@@ -78,8 +80,10 @@ let D=null,live={},tab="all";
 const TZ="Europe/Warsaw",day=ns=>new Date(Number(BigInt(ns)/1000000n)).toLocaleDateString("sv",{timeZone:TZ});
 const today=new Date().toLocaleDateString("sv",{timeZone:TZ}),month=today.slice(0,7);
 const f=(v,d=2)=>new Intl.NumberFormat("pl-PL",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v||0);
-const zl=v=>new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN",maximumFractionDigits:0}).format(v||0);
-const zl2=v=>new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN",minimumFractionDigits:2,maximumFractionDigits:2}).format(v||0);
+let cur="PLN";try{if(localStorage.getItem("staking-cur")==="USD")cur="USD";}catch{}
+const K=()=>cur==="USD"?"usd":"pln",KI=()=>cur==="USD"?"icpUsd":"icpPln";
+const zl=v=>new Intl.NumberFormat("pl-PL",{style:"currency",currency:cur,maximumFractionDigits:0}).format(v||0);
+const zl2=v=>new Intl.NumberFormat("pl-PL",{style:"currency",currency:cur,minimumFractionDigits:2,maximumFractionDigits:2}).format(v||0);
 const pct=v=>v?f(v,2)+"%":"–";
 const e8=v=>Number(v)/1e8,esc=KC.esc;
 const unwrap=r=>{if("err" in r)throw new Error(r.err);return r.ok;};
@@ -119,41 +123,54 @@ function extStats(chain){
  const avg=n=>{if(rows.length<2)return 0;const t=rows.slice(-n);return t.reduce((a,x)=>a+r(x),0)/t.length;};
  const tot=rows.reduce((a,x)=>a+r(x),0),staked=l?Number(l.staked)/dec:0,a30=avg(30);
  return {rows,dec,r,staked,today:l&&l.day===today?r(l):0,avg7:avg(7),avg30:a30,tot,apy:staked?(Math.pow(1+a30/staked,365)-1)*100:0,
-  pln:live[chain]?.pln||l?.pln||0,usd:live[chain]?.usd||l?.usd||0,last:l};
+  px:live[chain]?.[K()]||l?.[K()]||0,last:l};
 }
 const priceOn=(d,k)=>{const p=D.prices.find(x=>x.day===d);return p&&p[k]>0?p[k]:0;};
-function icpPln(){return live.icp?.pln||(D.prices.length?D.prices[D.prices.length-1].icpPln:0);}
+function icpPx(){return live.icp?.[K()]||(D.prices.length?D.prices[D.prices.length-1][KI()]:0);}
 
-// dzienna mapa nagrod (jednostki + PLN)
+// dzienna mapa nagrod (jednostki + wartosc v w wybranej walucie)
 function dailyMap(){
- const m=new Map(),at=d=>{if(!m.has(d))m.set(d,{icp:0,nicp:0,near:0,inj:0,pln:0});return m.get(d);},ip=icpPln();
- for(const r of D.rewards)if(isRew(r)){const d=day(r.ts),v=e8(r.delta),o=at(d);o.icp+=v;o.pln+=v*(priceOn(d,"icpPln")||ip);}
- for(const p of D.wtnPos){const w=wtnStats(p);w.s.forEach((x,i)=>{if(i&&w.ev[i]==="organicGrowth"){const g=x.red-w.s[i-1].red;if(g>0){const d=day(x.date),o=at(d);o.nicp+=g;o.pln+=g*(priceOn(d,"icpPln")||ip);}}});}
- for(const c of ["near","inj"]){const e=extStats(c);for(const x of e.rows){const v=e.r(x),o=at(x.day);o[c]+=v;o.pln+=v*(x.pln||e.pln);}}
+ const m=new Map(),at=d=>{if(!m.has(d))m.set(d,{icp:0,nicp:0,near:0,inj:0,v:0});return m.get(d);},ip=icpPx();
+ for(const r of D.rewards)if(isRew(r)){const d=day(r.ts),v=e8(r.delta),o=at(d);o.icp+=v;o.v+=v*(priceOn(d,KI())||ip);}
+ for(const p of D.wtnPos){const w=wtnStats(p);w.s.forEach((x,i)=>{if(i&&w.ev[i]==="organicGrowth"){const g=x.red-w.s[i-1].red;if(g>0){const d=day(x.date),o=at(d);o.nicp+=g;o.v+=g*(priceOn(d,KI())||ip);}}});}
+ for(const c of ["near","inj"]){const e=extStats(c);for(const x of e.rows){const v=e.r(x),o=at(x.day);o[c]+=v;o.v+=v*(x[K()]||e.px);}}
  return m;
 }
 
 // --- render
 function render(){
- const ip=icpPln(),N=D.neurons.map(n=>({n,s:neuronStats(n)})),W=D.wtnPos.map(p=>({p,s:wtnStats(p)})),near=extStats("near"),inj=extStats("inj");
+ const ip=icpPx(),N=D.neurons.map(n=>({n,s:neuronStats(n)})),W=D.wtnPos.map(p=>({p,s:wtnStats(p)})),near=extStats("near"),inj=extStats("inj");
  const icpStake=N.reduce((a,x)=>a+x.s.stake+x.s.mat,0),wtnV=W.reduce((a,x)=>a+x.s.red,0);
- const vIcp=icpStake*ip,vW=wtnV*ip,vN=near.staked*near.pln,vI=inj.staked*inj.pln;
- const dm=dailyMap(),td=dm.get(today)||{pln:0,icp:0,nicp:0,near:0,inj:0};
+ const vIcp=icpStake*ip,vW=wtnV*ip,vN=near.staked*near.px,vI=inj.staked*inj.px;
+ const dm=dailyMap(),td=dm.get(today)||{v:0,icp:0,nicp:0,near:0,inj:0};
  let mon=0,tot=0;const months=new Map();
- for(const [d,o] of dm){tot+=o.pln;if(d.startsWith(month))mon+=o.pln;months.set(d.slice(0,7),(months.get(d.slice(0,7))||0)+o.pln);}
+ for(const [d,o] of dm){tot+=o.v;if(d.startsWith(month))mon+=o.v;months.set(d.slice(0,7),(months.get(d.slice(0,7))||0)+o.v);}
  $("t1").textContent=zl(vIcp+vW+vN+vI);$("t1s").textContent=`ICP ${f(icpStake+wtnV,1)} · NEAR ${f(near.staked,0)} · INJ ${f(inj.staked,1)}`;
- $("t2").textContent=zl2(td.pln);$("t2s").textContent=[td.icp&&f(td.icp,3)+" ICP",td.nicp&&f(td.nicp,3)+" nICP",td.near&&f(td.near,2)+" NEAR",td.inj&&f(td.inj,3)+" INJ"].filter(Boolean).join(" · ")||"brak odczytow z dzis";
+ $("t2").textContent=zl2(td.v);$("t2s").textContent=[td.icp&&f(td.icp,3)+" ICP",td.nicp&&f(td.nicp,3)+" nICP",td.near&&f(td.near,2)+" NEAR",td.inj&&f(td.inj,3)+" INJ"].filter(Boolean).join(" · ")||"brak odczytow z dzis";
  $("t3").textContent=zl(mon);$("t3s").textContent=month;
- try{localStorage.setItem("staking-sum",JSON.stringify({v:vIcp+vW+vN+vI,td:td.pln,mon,at:Date.now()}));}catch{}
+ if(cur==="PLN")try{localStorage.setItem("staking-sum",JSON.stringify({v:vIcp+vW+vN+vI,td:td.v,mon,at:Date.now()}));}catch{}
+ document.querySelectorAll(".cu").forEach(x=>x.textContent=cur);
  $("t4").textContent=zl(tot);$("t4s").textContent=dm.size+" dni z nagrodami";
  const ml=[...months.entries()].sort(([a],[b])=>a<b?-1:1).slice(-24).map(([k,v])=>({label:k.slice(2).replace("-","/"),value:Math.round(v)}));
- $("mb").innerHTML=KC.bars(ml,{label:"Nagrody miesiecznie PLN",w:$("mb").clientWidth,color:"#1a8a4a"});
+ const mlx=[...months.entries()].sort(([a],[b])=>a<b?-1:1).slice(-24);
+ $("mb").innerHTML=KC.bars(ml,{label:"Nagrody miesiecznie "+cur,w:$("mb").clientWidth,color:"#1a8a4a"});
+ $("mb").querySelectorAll("rect").forEach((r,i)=>{r.querySelector("title")?.remove();r.dataset.i=i;});
+ const mb=$("mb");mb.onpointermove=e=>{const r=e.target.closest("rect");mb.querySelectorAll("rect.hv").forEach(x=>x.classList.remove("hv"));let t=mb.querySelector(".tip");
+  if(!r||!mlx[r.dataset.i]){t&&t.remove();return;}r.classList.add("hv");if(!t){t=document.createElement("div");t.className="tip";mb.append(t);}
+  const [k,v]=mlx[r.dataset.i],bb=r.getBoundingClientRect(),mr=mb.getBoundingClientRect();
+  t.innerHTML=`<b>${zl2(v)}</b>${new Date(k+"-01T12:00:00").toLocaleDateString("pl-PL",{month:"long",year:"numeric"})}`;
+  t.style.left=(bb.left-mr.left+bb.width/2)+"px";t.style.top=(bb.top-mr.top)+"px";};
+ mb.onpointerleave=()=>{mb.querySelector(".tip")?.remove();mb.querySelectorAll("rect.hv").forEach(x=>x.classList.remove("hv"));};
  // aktywa
- const nRew=N.reduce((a,x)=>a+x.s.rew,0),nAvg=N.reduce((a,x)=>a+x.s.avg,0),capN=N.reduce((a,x)=>a+x.s.cap,0),apyN=capN?N.reduce((a,x)=>a+x.s.apy*x.s.cap,0)/capN:0;
+ const nRew=N.reduce((a,x)=>a+x.s.rew,0),capN=N.reduce((a,x)=>a+x.s.cap,0),apyN=capN?N.reduce((a,x)=>a+x.s.apy*x.s.cap,0)/capN:0;
  const capW=W.reduce((a,x)=>a+x.s.paid,0),apyW=capW?W.reduce((a,x)=>a+x.s.apy*x.s.paid,0)/capW:0;
  const row=(nm,stake,u,t,a7,a30,apy,tr,v)=>`<tr><td><b>${nm}</b></td><td>${f(stake,2)} ${u}</td><td class="hm">${t?f(t,4):"–"}</td><td class="hm">${a7?f(a7,4):"–"}</td><td class="hm">${a30?f(a30,4):"–"}</td><td>${pct(apy)}</td><td>${f(tr,3)} ${u}</td><td>${zl(v)}</td></tr>`;
- $("ta").innerHTML=row("ICP neurony",icpStake,"ICP",td.icp,0,nAvg,apyN,nRew,vIcp)+row("WaterNeuron",wtnV,"ICP",td.nicp,0,0,apyW,W.reduce((a,x)=>a+x.s.earned,0),vW)+
-  row("NEAR",near.staked,"NEAR",near.today,near.avg7,near.avg30,near.apy,near.tot,vN)+row("INJ",inj.staked,"INJ",inj.today,inj.avg7,inj.avg30,inj.apy,inj.tot,vI);
+ // srednia dzienna: suma z ostatnich n dni kalendarzowych / n (krocej, jesli historia jest krotsza)
+ const first={},avg=(k,n)=>{if(!first[k])return 0;const d0=new Date(today+"T12:00:00Z");d0.setUTCDate(d0.getUTCDate()-n+1);const from=d0.toISOString().slice(0,10);
+  let sum=0;for(const [d,o] of dm)if(d>=from&&d<=today)sum+=o[k];const span=Math.round((Date.parse(today)-Date.parse(first[k]>from?first[k]:from))/864e5)+1;return sum/Math.max(1,Math.min(n,span));};
+ for(const [d,o] of dm)for(const k of ["icp","nicp","near","inj"])if(o[k]>0&&(!first[k]||d<first[k]))first[k]=d;
+ $("ta").innerHTML=row("ICP neurony",icpStake,"ICP",td.icp,avg("icp",7),avg("icp",30),apyN,nRew,vIcp)+row("WaterNeuron",wtnV,"ICP",td.nicp,avg("nicp",7),avg("nicp",30),apyW,W.reduce((a,x)=>a+x.s.earned,0),vW)+
+  row("NEAR",near.staked,"NEAR",near.today,avg("near",7),avg("near",30),near.apy,near.tot,vN)+row("INJ",inj.staked,"INJ",inj.today,avg("inj",7),avg("inj",30),inj.apy,inj.tot,vI);
  // neurony
  const syn=id=>D.sync.find(x=>x.nid===id);
  $("tn").innerHTML=N.length?N.map(({n,s})=>{const y=syn(n.id),tg=!y?'<span class="tag">brak</span>':y.ok?`<span class="tag ok" title="${esc(day(y.at))}">OK</span>`:`<span class="tag bad" title="${esc(y.err)}">blad</span>`;
@@ -167,30 +184,30 @@ function render(){
  // status
  const nx=Number(D.nextRunSec),h=Math.floor(nx/3600),mi=Math.floor(nx%3600/60);
  $("st").innerHTML=`Ostatni sync: <b>${D.lastRun?new Date(Number(D.lastRun/1000000n)).toLocaleString("pl-PL",{timeZone:TZ}):"–"}</b> · auto 08:00 ceny/NEAR/INJ (za ${h} h ${mi} min) · neurony recznie`;
- $("chips").innerHTML=(D.hasKey?"":'<span class="bad">Brak klucza CoinGecko (stSetKey)</span>')+(D.log?`<span class="${D.log==="OK"?"ok":"bad"}">${esc(D.log)}</span>`:"")+(live.icp?`<span>ICP ${zl2(live.icp.pln)}</span><span>NEAR ${zl2(near.pln)}</span><span>INJ ${zl2(inj.pln)}</span>`:"");
+ $("chips").innerHTML=(D.hasKey?"":'<span class="bad">Brak klucza CoinGecko (stSetKey)</span>')+(D.log?`<span class="${D.log==="OK"?"ok":"bad"}">${esc(D.log)}</span>`:"")+(live.icp?`<span>ICP ${zl2(live.icp[K()])}</span><span>NEAR ${zl2(near.px)}</span><span>INJ ${zl2(inj.px)}</span>`:"");
 }
 function renderHist(dm,N,W){
  const T=[["all","Wszystko"],["icp","ICP neurony"],["wtn","WaterNeuron"],["near","NEAR"],["inj","INJ"]];
  $("tabs").innerHTML=T.map(([k,l])=>`<button type="button" data-tab="${k}" class="${tab===k?"on":""}">${l}</button>`).join("");
  let head="",rows="",note="";
  if(tab==="all"){
-  head="<tr><th>Dzien</th><th>ICP</th><th>nICP (ICP)</th><th>NEAR</th><th>INJ</th><th>PLN</th></tr>";
-  rows=[...dm.entries()].sort(([a],[b])=>a<b?1:-1).slice(0,90).map(([d,o])=>`<tr><td>${d}</td><td>${o.icp?f(o.icp,4):"–"}</td><td>${o.nicp?f(o.nicp,4):"–"}</td><td>${o.near?f(o.near,3):"–"}</td><td>${o.inj?f(o.inj,4):"–"}</td><td>${zl2(o.pln)}</td></tr>`).join("");
-  note="Ostatnie 90 dni.";
+  head="<tr><th>Dzien</th><th>ICP</th><th>nICP (ICP)</th><th>NEAR</th><th>INJ</th><th>"+cur+"</th></tr>";
+  rows=[...dm.entries()].sort(([a],[b])=>a<b?1:-1).map(([d,o])=>`<tr><td>${d}</td><td>${o.icp?f(o.icp,4):"–"}</td><td>${o.nicp?f(o.nicp,4):"–"}</td><td>${o.near?f(o.near,3):"–"}</td><td>${o.inj?f(o.inj,4):"–"}</td><td>${zl2(o.v)}</td></tr>`).join("");
+  note=dm.size+" dni.";
  }else if(tab==="icp"){
   head="<tr><th>Data</th><th>Neuron</th><th>Zdarzenie</th><th>Zmiana</th><th>Dojrzalosc</th><th class=\"hm\">Stake +</th><th></th></tr>";
   const nm=id=>(D.neurons.find(n=>n.id===id)||{}).name||String(id);
-  rows=[...D.rewards].sort((a,b)=>Number(b.ts-a.ts)).slice(0,200).map(r=>`<tr><td>${day(r.ts)}</td><td>${esc(nm(r.nid))}</td><td><span class="tag">${esc(r.ev)}</span></td><td class="${r.delta<0n?"neg":"pos"}">${f(e8(r.delta),4)}</td><td>${f(e8(r.un+r.sm),3)}</td><td class="hm">${r.sd?f(e8(r.sd),3):"–"}</td>
+  rows=[...D.rewards].sort((a,b)=>Number(b.ts-a.ts)).map(r=>`<tr><td>${day(r.ts)}</td><td>${esc(nm(r.nid))}</td><td><span class="tag">${esc(r.ev)}</span></td><td class="${r.delta<0n?"neg":"pos"}">${f(e8(r.delta),4)}</td><td>${f(e8(r.un+r.sm),3)}</td><td class="hm">${r.sd?f(e8(r.sd),3):"–"}</td>
    <td class="row-act"><button data-dr="${r.nid}|${r.ts}">Usun</button></td></tr>`).join("");
-  note="Ostatnie 200 odczytow.";
+  note=D.rewards.length+" odczytow.";
  }else if(tab==="wtn"){
   head="<tr><th>Data</th><th>Pozycja</th><th>Zdarzenie</th><th>nICP</th><th>Wplacono</th><th>Wartosc</th><th></th></tr>";
   rows=W.flatMap(({p,s})=>s.s.map((x,i)=>({p,x,ev:s.ev[i]}))).sort((a,b)=>Number(b.x.date-a.x.date)).map(({p,x,ev})=>`<tr><td>${day(x.date)}</td><td>${esc(p.name)}</td><td><span class="tag">${ev}</span></td><td>${f(x.nicp,4)}</td><td>${f(x.paid,4)}</td><td>${f(x.red,4)}</td>
    <td class="row-act"><button data-dw="${p.id}|${x.date}">Usun</button></td></tr>`).join("");
  }else{
   const e=extStats(tab),u=tab.toUpperCase();
-  head=`<tr><th>Dzien</th><th>Stake ${u}</th>${tab==="inj"?"<th>Do odebrania</th>":""}<th>Nagroda</th><th>Cena PLN</th><th>PLN</th></tr>`;
-  rows=[...e.rows].reverse().map(x=>`<tr><td>${x.day}</td><td>${f(Number(x.staked)/e.dec,3)}</td>${tab==="inj"?`<td>${f(Number(x.pending)/e.dec,4)}</td>`:""}<td>${f(e.r(x),4)}</td><td>${zl2(x.pln)}</td><td>${zl2(e.r(x)*(x.pln||e.pln))}</td></tr>`).join("");
+  head=`<tr><th>Dzien</th><th>Stake ${u}</th>${tab==="inj"?"<th>Do odebrania</th>":""}<th>Nagroda</th><th>Cena ${cur}</th><th>${cur}</th></tr>`;
+  rows=[...e.rows].reverse().map(x=>`<tr><td>${x.day}</td><td>${f(Number(x.staked)/e.dec,3)}</td>${tab==="inj"?`<td>${f(Number(x.pending)/e.dec,4)}</td>`:""}<td>${f(e.r(x),4)}</td><td>${zl2(x[K()])}</td><td>${zl2(e.r(x)*(x[K()]||e.px))}</td></tr>`).join("");
   note=e.rows.length<2?"Zbieranie danych bazowych (min. 2 odczyty).":"";
  }
  $("hh").innerHTML=head;$("hb").innerHTML=rows||'<tr><td colspan="7" class="note">Brak danych.</td></tr>';$("hn").textContent=note;
@@ -288,6 +305,7 @@ $("be").onclick=()=>{
  const j=JSON.stringify({version:"staking-1",exportedAt:new Date().toISOString(),...D},(_k,v)=>typeof v==="bigint"?v.toString():v,1);
  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([j],{type:"application/json"}));a.download=`staking-backup-${today}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 };
+$("cur").value=cur;$("cur").onchange=()=>{cur=$("cur").value;try{localStorage.setItem("staking-cur",cur);}catch{}render();};
 addEventListener("resize",()=>{clearTimeout(window.__rz);window.__rz=setTimeout(()=>D&&render(),200);});
 load().then(livePrices).catch(e=>prog("Blad wczytywania: "+(e&&e.message||e)));
 })();

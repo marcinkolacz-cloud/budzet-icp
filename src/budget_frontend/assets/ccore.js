@@ -42,7 +42,7 @@ function summary(ps){
  rows.forEach(r=>r.share=mv>0?r.mv/mv*100:0);
  rows.sort((a,b)=>(b.open-a.open)||(b.mv-a.mv)||(a.t<b.t?-1:1));
  const unreal=mv-cost,inv=ps.reduce((a,p)=>a+p.trades.reduce((s,t)=>s+(t.s>0?t.q*t.p+(t.f||0):-(t.q*t.p-(t.f||0))),0),0);
- return {rows,mv,day,dayPct:mv-day>0?day/(mv-day)*100:0,cost,unreal,realized,total:unreal+realized,totPct:cost>0?(unreal+realized)/cost*100:0,inv,rewV,missing,pln:S.rate||0};
+ return {rows,mv,day,dayPct:mv-day>0?day/(mv-day)*100:0,cost,unreal,realized,total:unreal+realized,unrealPct:cost>0?unreal/cost*100:0,basis:cost+rows.reduce((x,r)=>x+(r.cs||0),0),totPct:(cost+rows.reduce((x,r)=>x+(r.cs||0),0))>0?(unreal+realized)/(cost+rows.reduce((x,r)=>x+(r.cs||0),0))*100:0,inv,rewV,missing,pln:S.rate||0};
 }
 const posRows=()=>isAgg()?S.ps.flatMap(p=>summary([p]).rows.map(r=>({...r,pn:p.name,pid:p.id}))):summary(sel()).rows;
 function validTrades(tr){const q={};for(const t of [...tr].sort(cmp)){q[t.t]=(q[t.t]||0)+(t.s>0?t.q:-t.q);if(q[t.t]<-1e-6)return false;}return true;}

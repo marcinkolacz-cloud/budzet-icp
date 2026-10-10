@@ -31,6 +31,7 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 <div class="stat"><span>Wartosc</span><strong id="v">–</strong><small id="vs"></small></div>
 <div class="stat"><span>24h</span><strong id="d">–</strong><small id="ds"></small></div>
 <div class="stat"><span>Koszt otwartych pozycji</span><strong id="c">–</strong><small id="cs"></small></div>
+<div class="stat"><span>Zysk biezacy</span><strong id="u">–</strong><small id="us"></small></div>
 <div class="stat"><span>Wynik calkowity</span><strong id="w">–</strong><small id="ws"></small></div></div>
 <p class="note neg" id="wn"></p>
 <div class="g2">
@@ -88,8 +89,9 @@ function render(){
  $("dp").disabled=agg;$("ph").hidden=$("ph2").hidden=!agg;
  $("v").textContent=usd(s.mv);$("vs").textContent=pl?money(s.mv*pl,"PLN",0):"";
  $("d").textContent=(s.day>=0?"+":"")+usd(s.day);$("d").className=cls(s.day);$("ds").textContent=pct(s.dayPct);$("ds").className=cls(s.day);
- $("c").textContent=usd(s.cost);$("cs").textContent="niezreal. "+(s.unreal>=0?"+":"")+usd(s.unreal);$("cs").className=cls(s.unreal);
- $("w").textContent=(s.total>=0?"+":"")+usd(s.total);$("w").className=cls(s.total);$("ws").textContent=pct(s.totPct)+" · zreal. "+usd(s.realized)+(pl?" · "+money(s.total*pl,"PLN",0):"");
+ $("c").textContent=usd(s.cost);$("cs").textContent=pl?money(s.cost*pl,"PLN",0):"";
+ $("u").textContent=(s.unreal>=0?"+":"")+usd(s.unreal);$("u").className=cls(s.unreal);$("us").textContent=pct(s.unrealPct)+" · otwarte pozycje"+(pl?" · "+money(s.unreal*pl,"PLN",0):"");$("us").className=cls(s.unreal);
+ $("w").textContent=(s.total>=0?"+":"")+usd(s.total);$("w").className=cls(s.total);$("ws").textContent=pct(s.totPct)+" od "+usd(s.basis)+" · zreal. "+(s.realized>=0?"+":"")+usd(s.realized)+(pl?" · "+money(s.total*pl,"PLN",0):"");
  $("wn").textContent=s.missing.length?"Brak ceny: "+s.missing.join(", ")+" - wyceniono po koszcie zakupu. Odswiez lub ustaw cene / ID (⋯).":"";
  $("st").textContent="Ceny: CoinGecko"+(S.ts?" · "+new Date(S.ts).toLocaleString("pl-PL"):" · nie odswiezono")+(pl?" · USD/PLN "+pl.toFixed(4):"");
  const open=s.rows.filter(r=>r.open);

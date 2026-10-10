@@ -7,7 +7,8 @@ th[data-k]{cursor:pointer;user-select:none}th[data-k]:hover{color:var(--ink)}th[
 td .two{display:block;line-height:1.25}td .two small{display:block;color:var(--muted);font-size:11px}
 .sym{display:inline-block;padding:1px 7px;border:1px solid var(--line);border-radius:6px;font:11px ui-monospace,monospace;color:var(--muted);margin-left:6px}
 .ib{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 8px;font-size:12px;line-height:1.2}
-.ib.b{color:var(--pos)}.ib.s{color:var(--neg)}.acts{display:flex;gap:4px;justify-content:flex-end}
+.ib.b{color:var(--pos)}.ib.s{color:var(--neg)}.acts{display:flex;gap:4px;justify-content:center}
+table.ct th,table.ct td{text-align:center;vertical-align:middle}table.ct th.l,table.ct td.l{text-align:left}table.ct th{white-space:nowrap}table.ct .coin{white-space:nowrap}
 .arr{font-size:11px;margin-right:3px}
 dialog{border:1px solid var(--line);border-radius:20px;padding:0;width:min(560px,calc(100vw - 24px));background:var(--card);color:var(--ink);box-shadow:0 24px 60px #0003}
 dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
@@ -38,11 +39,11 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 </div>
 <section><div class="sh"><h2>Aktywa</h2><div class="form"><button id="gh" type="button">Historia transakcji</button><button id="add" class="dark" type="button">+ Dodaj transakcje</button></div></div>
 <div class="flt"><input id="pq" placeholder="Szukaj aktywow..."><select id="pst"><option value="o">Otwarte</option><option value="c">Zamkniete</option><option value="">Wszystkie</option></select><select id="ppl"><option value="">Zysk i strata</option><option value="+">Tylko zysk</option><option value="-">Tylko strata</option></select></div>
-<table><thead><tr><th data-k="name">Aktywo</th><th data-k="pn" id="ph">Portfel</th><th data-k="p">Cena $</th><th data-k="avg" class="hm">Sr. cena zakupu $</th><th data-k="q" class="hm">Posiadane</th><th data-k="mv">Wartosc $</th><th data-k="cost" class="hm">Wartosc zakupu $</th><th data-k="total">Zysk/Strata $</th><th data-k="pctU" class="hm">Niezreal. %</th><th data-k="pctR" class="hm">Zreal. %</th><th data-k="ch24" class="hm">24h</th><th class="hm">7 dni</th><th>Akcje</th></tr></thead><tbody id="rows"></tbody><tfoot id="pf"></tfoot></table>
+<table class="ct"><thead><tr><th data-k="name" class="l">Aktywo</th><th data-k="pn" id="ph">Portfel</th><th data-k="p">Cena $</th><th data-k="avg" class="hm">Sr. cena zakupu $</th><th data-k="q" class="hm">Posiadane</th><th data-k="mv">Wartosc $</th><th data-k="cost" class="hm">Wartosc zakupu $</th><th data-k="total">Zysk/Strata $</th><th data-k="pctU" class="hm">Niezreal. %</th><th data-k="pctR" class="hm">Zreal. %</th><th data-k="ch24" class="hm">24h</th><th class="hm">7 dni</th><th>Akcje</th></tr></thead><tbody id="rows"></tbody><tfoot id="pf"></tfoot></table>
 <p class="note">K = kup, S = sprzedaj (formularz wstepnie wypelniony). ⋯ = cena reczna lub ID CoinGecko dla tokenow bez notowan.</p></section>
 <section id="hsec"><div class="sh"><h2>Historia transakcji</h2><span class="note" id="hsum"></span></div>
 <div class="flt"><input id="hq" placeholder="Szukaj symbolu lub uwag..."><select id="hty"><option value="">Wszystkie typy</option><option value="b">Kupno</option><option value="s">Sprzedaz</option><option value="r">Nagroda / staking</option></select><select id="has"><option value="">Wszystkie aktywa</option></select><input id="hd1" type="date" title="Od"><input id="hd2" type="date" title="Do"><button id="hcl" type="button">Wyczysc</button></div>
-<table><thead><tr><th data-h="d">Data</th><th data-h="pn" id="ph2">Portfel</th><th data-h="t">Aktywo</th><th data-h="typ">Typ</th><th data-h="q">Ilosc</th><th data-h="p" class="hm">Cena $</th><th data-h="v">Wartosc $</th><th class="hm">Uwagi</th><th>Akcje</th></tr></thead><tbody id="hs"></tbody></table></section>
+<table class="ct"><thead><tr><th data-h="d">Data</th><th data-h="pn" id="ph2">Portfel</th><th data-h="t" class="l">Aktywo</th><th data-h="typ">Typ</th><th data-h="q">Ilosc</th><th data-h="p" class="hm">Cena $</th><th data-h="v">Wartosc $</th><th class="hm l">Uwagi</th><th>Akcje</th></tr></thead><tbody id="hs"></tbody></table></section>
 </div>
 <dialog id="dlg"><form method="dialog" id="fm">
 <div class="dh"><h3 id="dt">Nowa transakcja</h3><button type="button" id="dx" aria-label="Zamknij">✕</button></div>
@@ -100,7 +101,7 @@ function render(){
  const rows=K.posRows().filter(r=>(!fP.st||(fP.st==="o"?r.open:!r.open))&&(!ql||r.t.toLowerCase().includes(ql)||r.name.toLowerCase().includes(ql))&&(!fP.pl||(fP.pl==="+"?r.total>=0:r.total<0)))
   .sort(cmpBy(sP.k,sP.d));
  rows.forEach(r=>{const tr=el("tr");if(!r.open)tr.style.opacity=".6";const nop=r.nop||!r.p;
-  td(tr,coin(r));if(agg)td(tr,r.pn||"");
+  td(tr,coin(r),"l");if(agg)td(tr,r.pn||"");
   td(tr,two(r.p?price(r.p)+(S.manual[r.t]>0?" ✎":""):"–",r.p?pln(r.p):""));
   td(tr,two(r.open?price(r.avg):"–",r.open?pln(r.avg):""),null,1);
   td(tr,qty(r.q),null,1);
@@ -116,7 +117,7 @@ function render(){
   a.append(kb,sb,mb);td(tr,a);R.append(tr);});
  if(!rows.length)R.innerHTML='<tr><td class="note" colspan="13">Brak aktywow dla wybranych filtrow.</td></tr>';
  const F=$("pf");F.innerHTML="";const vis=rows.filter(r=>r.open),fr=el("tr"),sm=k=>vis.reduce((a,r)=>a+(r[k]||0),0),tu=rows.reduce((a,r)=>a+r.total,0);
- td(fr,"Suma ("+rows.length+")");if(agg)td(fr,"");td(fr,"");td(fr,"",null,1);td(fr,"",null,1);td(fr,two(usd(sm("mv")),pln(sm("mv"))));td(fr,two(usd(sm("cost")),pln(sm("cost"))),null,1);
+ td(fr,"Suma ("+rows.length+")","l");if(agg)td(fr,"");td(fr,"");td(fr,"",null,1);td(fr,"",null,1);td(fr,two(usd(sm("mv")),pln(sm("mv"))));td(fr,two(usd(sm("cost")),pln(sm("cost"))),null,1);
  td(fr,two((tu>=0?"+":"")+usd(tu),pln(tu)),cls(tu));td(fr,sm("cost")>0?pct(sm("unreal")/sm("cost")*100):"–",cls(sm("unreal")),1);td(fr,"",null,1);td(fr,"",null,1);td(fr,"",null,1);td(fr,"");
  [...fr.children].forEach(e=>e.style.borderTop="2px solid var(--line)");F.append(fr);
  // --- historia
@@ -127,10 +128,10 @@ function render(){
  const hs=all.filter(t=>(!fH.ty||t.typ===fH.ty)&&(!fH.a||t.t===fH.a)&&(!fH.d1||t.d>=fH.d1)&&(!fH.d2||t.d<=fH.d2)&&(!hq||t.t.toLowerCase().includes(hq)||(t.c||"").toLowerCase().includes(hq)))
   .sort((a,b)=>cmpBy(sH.k,sH.d)(a,b)||(b.id-a.id));
  hs.forEach(t=>{if(t.s>0)sb+=t.v;else ss+=t.v;const tr=el("tr");td(tr,t.d);if(agg)td(tr,t.pn);
-  td(tr,coin({t:t.t,name:(S.meta[t.t]||{}).name||t.t,img:(S.meta[t.t]||{}).img}));
+  td(tr,coin({t:t.t,name:(S.meta[t.t]||{}).name||t.t,img:(S.meta[t.t]||{}).img}),"l");
   const op=el("span","pill",TN[t.typ]);op.style.color=t.typ==="s"?"var(--neg)":t.typ==="r"?"var(--pos)":"";td(tr,op);
   td(tr,qty(t.q));td(tr,price(t.p),null,1);td(tr,two(usd(t.v),t.v?pln(t.v):""));
-  const c=td(tr,t.c||"",null,1);c.style.textAlign="left";c.style.whiteSpace="normal";c.style.maxWidth="260px";
+  const c=td(tr,t.c||"","l",1);c.style.whiteSpace="normal";c.style.maxWidth="260px";
   const a=el("div","acts"),eb=el("button","ib","Edytuj");eb.onclick=()=>openDlg({edit:t});a.append(eb);td(tr,a);H.append(tr);});
  if(!hs.length)H.innerHTML='<tr><td class="note" colspan="9">Brak transakcji dla wybranych filtrow.</td></tr>';
  $("hsum").textContent=hs.length+" z "+all.length+" · kupno "+usd(sb)+(ss?" · sprzedaz "+usd(ss):"");

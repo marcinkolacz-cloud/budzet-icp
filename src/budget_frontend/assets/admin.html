@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Admin</title><link rel="stylesheet" href="base.css">
+<style>
+table.ct th,table.ct td{text-align:center;vertical-align:middle}table.ct th.l,table.ct td.l{text-align:left}
+.code{font:600 15px ui-monospace,monospace;letter-spacing:.06em}.pp{font:12px ui-monospace,monospace;cursor:pointer}
+.ib{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 9px;font-size:12px}.acts{display:flex;gap:4px;justify-content:center;flex-wrap:wrap}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#f3efe8;color:var(--muted);font-size:11px}.pill.ok{color:var(--pos)}.pill.bad{color:var(--neg)}
+.newc{display:none;margin-top:12px;background:#e7f6ee;border:1px solid #cfe9da;border-radius:14px;padding:12px 14px;align-items:center;gap:12px;flex-wrap:wrap}.newc.on{display:flex}
+</style></head>
+<body><div class="app">
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="admin.html" class="on">Admin</a></nav>
+<header><div><h1>Administracja</h1><div class="sub" id="st">Dostep do aplikacji tylko z kodem zaproszenia</div></div></header>
+<p class="note neg" id="deny" hidden>Brak uprawnien administratora.</p>
+<div id="main" hidden>
+<section><h2>Nowy kod zaproszenia</h2>
+<div class="form"><input id="nn" placeholder="Dla kogo (notatka)" maxlength="80" style="width:260px"><select id="nd"><option value="1">Wazny 1 dzien</option><option value="7" selected>Wazny 7 dni</option><option value="30">Wazny 30 dni</option></select><button id="nc" class="dark" type="button">Generuj kod</button></div>
+<div class="newc" id="nbox"><span>Kod:</span><span class="code" id="ncode"></span><button id="ncp" class="ib" type="button">Kopiuj</button><span class="note" style="margin:0">Jednorazowy. Przekaz go osobie, ktora ma sie zalogowac.</span></div>
+<p class="note neg" id="ne"></p></section>
+<section><h2>Kody zaproszen</h2><table class="ct"><thead><tr><th class="l">Kod</th><th class="l">Notatka</th><th>Utworzony</th><th>Wygasa</th><th>Status</th><th>Akcje</th></tr></thead><tbody id="inv"></tbody></table></section>
+<section><h2>Uzytkownicy</h2>
+<table class="ct"><thead><tr><th class="l">Principal</th><th class="l">Notatka</th><th>Dodany</th><th>Rola</th><th>Dane</th><th>Akcje</th></tr></thead><tbody id="mem"></tbody></table>
+<div class="form" style="margin-top:12px"><input id="ap" placeholder="Principal do dodania recznie" style="width:380px"><input id="an" placeholder="Notatka" style="width:200px"><button id="ab" type="button">Dodaj uzytkownika</button></div>
+<p class="note">Odebranie dostepu nie usuwa danych konta - mozna go przywrocic. Wpisy „BEZ DOSTEPU” to konta z danymi sprzed wprowadzenia zaproszen.</p></section>
+</div>
+</div>
+<script>addEventListener("error",e=>{const t=e.target&&e.target.src?"Nie zaladowano "+e.target.src:(e.message||"blad")+(e.lineno?" (linia "+e.lineno+")":"");let b=document.getElementById("errbox");if(!b){b=document.createElement("pre");b.id="errbox";b.style.cssText="position:fixed;left:8px;bottom:8px;right:8px;z-index:10003;margin:0;background:#fff0f0;color:#c23b3b;border:1px solid #c23b3b;border-radius:10px;padding:8px 12px;font:12px monospace;white-space:pre-wrap";document.body.append(b);}b.textContent+="Blad strony: "+t+"\n";},true);</script>
+<script src="auth.js"></script>
+<script type="text/x-after-auth">
+;(function(){
+const $=id=>document.getElementById(id),A=window.Auth,api=A.api;
+if(!A.admin){$("deny").hidden=false;return;}
+$("main").hidden=false;
+const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;};
+const td=(tr,x,c)=>{const e=el("td",c);if(x instanceof Node)e.append(x);else e.textContent=x;tr.append(e);return e;};
+const dt=ns=>{const n=Number(ns);return n?new Date(n/1e6).toLocaleString("pl-PL",{dateStyle:"short",timeStyle:"short"}):"–";};
+const short=p=>p.slice(0,11)+"…"+p.slice(-7);
+const copy=t=>{try{navigator.clipboard.writeText(t);}catch{}};
+const ib=(t,fn,c)=>{const b=el("button","ib",t);b.type="button";if(c)b.style.color=c;b.onclick=fn;return b;};
+const res=r=>{if("err" in r){alert(r.err);return false;}return true;};
+async function load(){
+ $("st").textContent="Wczytywanie…";
+ const [inv,mem]=await Promise.all([api.listInvites(),api.listMembers()]);const now=Date.now()*1e6;
+ const I=$("inv");I.innerHTML="";
+ inv.slice().sort((a,b)=>Number(b.created-a.created)).forEach(v=>{const tr=el("tr");
+  const c=el("span","code",v.code);c.style.cursor="pointer";c.title="Kopiuj";c.onclick=()=>copy(v.code);td(tr,c,"l");td(tr,v.note||"–","l");td(tr,dt(v.created));td(tr,dt(v.expires));
+  const used=v.usedBy.length>0,exp=Number(v.expires)<now;
+  td(tr,el("span","pill "+(used?"ok":exp?"bad":""),used?"uzyty "+dt(v.usedAt):exp?"wygasl":"aktywny"));
+  const a=el("div","acts");a.append(ib("Kopiuj",()=>copy(v.code)),ib("Usun",async()=>{if(!confirm("Usunac kod "+v.code+"?"))return;res(await api.deleteInvite(v.code));load();},"var(--neg)"));td(tr,a);I.append(tr);});
+ if(!inv.length)I.innerHTML='<tr><td class="note" colspan="6">Brak kodow.</td></tr>';
+ const M=$("mem");M.innerHTML="";
+ mem.forEach(m=>{const tr=el("tr"),p=m.p.toText(),me=p===A.principal,no=m.note==="BEZ DOSTEPU";
+  const pp=el("span","pp",short(p)+(me?" (Ty)":""));pp.title=p+" - kliknij, aby skopiowac";pp.onclick=()=>copy(p);td(tr,pp,"l");
+  td(tr,no?el("span","pill bad","bez dostepu"):(m.note||"–"),"l");td(tr,dt(m.added));
+  td(tr,el("span","pill"+(m.admin?" ok":""),m.admin?"admin":no?"–":"uzytkownik"));
+  td(tr,Number(m.keys)+" kl. · "+(Number(m.bytes)/1024).toFixed(1)+" KB");
+  const a=el("div","acts");
+  if(no)a.append(ib("Przywroc dostep",async()=>{res(await api.addMember(m.p,"przywrocony"));load();},"var(--pos)"));
+  else{
+   if(m.admin){if(!me)a.append(ib("Odbierz admina",async()=>{if(!confirm("Odebrac uprawnienia administratora?"))return;res(await api.removeAdmin(m.p));load();}));}
+   else{a.append(ib("Nadaj admina",async()=>{if(!confirm("Nadac uprawnienia administratora dla "+short(p)+"?"))return;res(await api.addAdmin(m.p));load();}),
+    ib("Odbierz dostep",async()=>{if(!confirm("Odebrac dostep dla "+short(p)+"? Dane zostana zachowane."))return;res(await api.removeMember(m.p));load();},"var(--neg)"));}
+  }
+  td(tr,a);M.append(tr);});
+ $("st").textContent=mem.filter(m=>m.note!=="BEZ DOSTEPU").length+" uzytkownikow · "+inv.filter(v=>!v.usedBy.length&&Number(v.expires)>now).length+" aktywnych kodow";
+}
+$("nc").onclick=async()=>{$("nc").disabled=true;$("ne").textContent="";
+ try{const r=await api.createInvite($("nn").value.trim(),BigInt(+$("nd").value));if("ok" in r){$("ncode").textContent=r.ok;$("nbox").classList.add("on");$("nn").value="";copy(r.ok);load();}else $("ne").textContent=r.err;}
+ catch(e){$("ne").textContent=e.message||String(e);}$("nc").disabled=false;};
+$("ncp").onclick=()=>copy($("ncode").textContent);
+$("ab").onclick=async()=>{const t=$("ap").value.trim();if(!t)return;let p;try{p=window.Auth.Principal?window.Auth.Principal.fromText(t):null;}catch{return alert("Nieprawidlowy principal");}
+ if(!p)return alert("Brak obslugi principal");if(res(await api.addMember(p,$("an").value.trim()))){$("ap").value=$("an").value="";load();}};
+load().catch(e=>$("st").textContent="Blad: "+(e.message||e));
+})();
+</script></body></html>

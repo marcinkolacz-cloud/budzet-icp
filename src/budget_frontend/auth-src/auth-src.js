@@ -1,6 +1,7 @@
 import {AuthClient} from "@icp-sdk/auth/client";
 import {HttpAgent,Actor} from "@icp-sdk/core/agent";
 import {IDL} from "@icp-sdk/core/candid";
+import {Principal} from "@icp-sdk/core/principal";
 
 const CANISTER="tj3o4-rqaaa-aaaac-bgdmq-cai";
 const SYNC=["gielda-v2","gielda-snaps","budzet-app-v3","krypto-v1","krypto-snaps"];           // synchronizowane z kontem (backend)
@@ -12,7 +13,15 @@ const revs={},timers={},chain={};
 const idl=({IDL})=>{
  const Item=IDL.Record({key:IDL.Text,value:IDL.Text,rev:IDL.Nat});
  const Res=IDL.Variant({ok:IDL.Nat,err:IDL.Text});
- return IDL.Service({kvGetAll:IDL.Func([],[IDL.Vec(Item)],["query"]),kvPut:IDL.Func([IDL.Text,IDL.Text,IDL.Nat],[Res],[])});
+ const RT=IDL.Variant({ok:IDL.Text,err:IDL.Text});
+ const Access=IDL.Record({member:IDL.Bool,admin:IDL.Bool,principal:IDL.Principal});
+ const Invite=IDL.Record({code:IDL.Text,note:IDL.Text,created:IDL.Int,expires:IDL.Int,usedBy:IDL.Opt(IDL.Principal),usedAt:IDL.Int});
+ const MemberView=IDL.Record({p:IDL.Principal,note:IDL.Text,added:IDL.Int,admin:IDL.Bool,keys:IDL.Nat,bytes:IDL.Nat});
+ return IDL.Service({kvGetAll:IDL.Func([],[IDL.Vec(Item)],["query"]),kvPut:IDL.Func([IDL.Text,IDL.Text,IDL.Nat],[Res],[]),
+  myAccess:IDL.Func([],[Access],["query"]),redeemInvite:IDL.Func([IDL.Text],[RT],[]),
+  createInvite:IDL.Func([IDL.Text,IDL.Nat],[RT],[]),listInvites:IDL.Func([],[IDL.Vec(Invite)],["query"]),deleteInvite:IDL.Func([IDL.Text],[RT],[]),
+  listMembers:IDL.Func([],[IDL.Vec(MemberView)],["query"]),addMember:IDL.Func([IDL.Principal,IDL.Text],[RT],[]),removeMember:IDL.Func([IDL.Principal],[RT],[]),
+  addAdmin:IDL.Func([IDL.Principal],[RT],[]),removeAdmin:IDL.Func([IDL.Principal],[RT],[])});
 };
 
 // --- izolacja localStorage per konto + zapis przez backend
@@ -30,9 +39,10 @@ function overlay(html){
  o.innerHTML='<div style="background:#fffdf9;border:1px solid #e6e0d6;border-radius:20px;padding:32px 36px;max-width:360px;text-align:center;box-shadow:0 12px 40px #0001">'+html+"</div>";
  document.body.append(o);return o;
 }
-function chipUi(pr){
+function chipUi(pr,admin){
  chip=document.createElement("div");chip.style.cssText=css;
  const a=document.createElement("span");a.textContent=pr.slice(0,5)+"…"+pr.slice(-3);a.title=pr;
+ if(admin){const ad=document.createElement("a");ad.href="admin.html";ad.textContent="Admin";ad.style.cssText="color:#1c1915;font-weight:600;text-decoration:none";chip.append(ad);}
  stEl=document.createElement("span");stEl.style.color="#7a736a";stEl.textContent="zsynchronizowano";
  const b=document.createElement("button");b.textContent="Wyloguj";b.style.cssText="border:1px solid #e6e0d6;background:#fff;border-radius:999px;padding:3px 10px;cursor:pointer;font:inherit";
  b.onclick=logout;chip.append(a,stEl,b);document.body.append(chip);
@@ -122,6 +132,28 @@ async function login(){
  });
 }
 
+// --- dostep: kod zaproszenia
+const BTN="border:0;background:#1c1915;color:#fff;border-radius:999px;padding:10px 22px;cursor:pointer;font:inherit";
+async function access(pr){
+ for(;;){
+  let a;try{a=await actor.myAccess();}catch(e){await new Promise(r=>{const o=overlay('<h2 style="margin:0 0 8px">Brak polaczenia</h2><p style="color:#7a736a;margin:0 0 16px">Nie mozna sprawdzic dostepu.</p><button id="rt" style="'+BTN+'">Ponow</button>');o.querySelector("#rt").onclick=()=>{o.remove();r();};});continue;}
+  if(a.member)return a;
+  await new Promise(res=>{
+   const o=overlay('<h2 style="margin:0 0 8px;letter-spacing:-.03em">Kod zaproszenia</h2><p style="color:#7a736a;margin:0 0 16px">To konto nie ma jeszcze dostepu. Wpisz kod otrzymany od administratora.</p>'+
+    '<input id="ic" placeholder="XXXX-XXXX-XXXX" autocomplete="off" style="width:100%;box-sizing:border-box;border:1px solid #e6e0d6;background:#f7f4ee;border-radius:12px;padding:11px 12px;font:16px ui-monospace,monospace;text-align:center;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">'+
+    '<button id="ib" style="'+BTN+';width:100%">Aktywuj dostep</button><p id="ie" style="color:#c23b3b;margin:10px 0 0;min-height:1em;font-size:13px"></p>'+
+    '<p style="color:#7a736a;font-size:11px;margin:14px 0 6px">Twoj identyfikator (dla administratora):</p><code id="ip" style="display:block;font-size:11px;word-break:break-all;background:#f7f4ee;border-radius:8px;padding:8px;cursor:pointer" title="Kliknij, aby skopiowac"></code>'+
+    '<button id="lo" style="margin-top:14px;border:1px solid #e6e0d6;background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer;font:inherit">Wyloguj</button>');
+   const ic=o.querySelector("#ic"),ib=o.querySelector("#ib"),ie=o.querySelector("#ie"),ip=o.querySelector("#ip");
+   ip.textContent=pr;ip.onclick=()=>{try{navigator.clipboard.writeText(pr);ie.style.color="#1a8a4a";ie.textContent="Skopiowano";}catch{}};
+   o.querySelector("#lo").onclick=async()=>{try{await client.signOut();}catch{}location.reload();};
+   const go=async()=>{const c=ic.value.trim();if(!c){ie.textContent="Wpisz kod";return;}ib.disabled=true;ie.style.color="#c23b3b";ie.textContent="Sprawdzanie…";
+    try{const r=await actor.redeemInvite(c);if("ok" in r){o.remove();res();}else{ie.textContent=r.err;ib.disabled=false;}}catch(e){ie.textContent="Blad: "+(e&&e.message||e);ib.disabled=false;}};
+   ib.onclick=go;ic.onkeydown=e=>{if(e.key==="Enter")go();};setTimeout(()=>ic.focus(),30);
+  });
+ }
+}
+
 async function loadRemote(){
  for(;;){
   try{
@@ -151,6 +183,8 @@ async function start(){
  NS="u:"+pr+":";
  const agent=await HttpAgent.create({identity,host:"https://icp-api.io"});
  actor=Actor.createActor(idl,{agent,canisterId:CANISTER});
+ const acc=await access(pr);
+ window.Auth.api=actor;window.Auth.admin=!!acc.admin;window.Auth.principal=pr;
  const wait=overlay('<p style="margin:0;color:#7a736a">Wczytywanie danych konta…</p>');
  const have=await loadRemote();
  // dane sprzed logowania trafiaja do pierwszego konta, ktore zaloguje sie w tej przegladarce
@@ -159,10 +193,10 @@ async function start(){
   for(const k of [...SYNC,"gielda-v1"]){const raw=gi.call(LS,k);if(raw&&!have.has(k)&&gi.call(LS,NS+k)==null){si.call(LS,NS+k,raw);if(SYNC.includes(k))schedule(k);}}
   if(!claim)si.call(LS,"auth-legacy-claimed",pr);
  }
- wait.remove();chipUi(pr);
+ wait.remove();chipUi(pr,acc.admin);
  try{const n=sessionStorage.getItem("auth-notice");if(n){sessionStorage.removeItem("auth-notice");toast(n);}}catch{}
  await runAfterAuth();
 }
-window.Auth={start};
+window.Auth={start,api:null,admin:false,principal:"",Principal};
 const go=()=>start().catch(e=>{document.body.append(Object.assign(document.createElement("pre"),{textContent:"Blad logowania: "+(e&&e.message||e),style:"position:fixed;top:40px;left:12px;color:#c23b3b;z-index:10001"}));});
 document.readyState==="loading"?addEventListener("DOMContentLoaded",go):go();

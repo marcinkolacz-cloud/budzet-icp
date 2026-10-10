@@ -55,6 +55,8 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 <label>Ilosc<div class="inl"><input id="fq" inputmode="decimal"><button type="button" id="fmax" hidden>Max</button></div></label>
 <label>Cena USD<div class="inl"><input id="fpr" inputmode="decimal"><button type="button" id="fcur">Aktualna</button></div></label>
 <label>Prowizja USD<input id="ff" inputmode="decimal" placeholder="0"></label>
+<label class="full" id="fsrcl">Zrodlo srodkow<select id="fsrc"><option value="u">Z salda USDC</option><option value="x">Doplata z zewnatrz</option></select></label>
+<div class="full note" id="fsn" hidden>Srodki ze sprzedazy trafia automatycznie do USDC w tym portfelu.</div>
 <label class="full">Uwagi<input id="fc" maxlength="120" placeholder="np. staking, zakup Marcin"></label>
 <div class="sum"><span id="fv">Wartosc: –</span><span id="fh"></span></div>
 <div class="err" id="fe"></div>
@@ -132,7 +134,7 @@ function render(){
   const op=el("span","pill",TN[t.typ]);op.style.color=t.typ==="s"?"var(--neg)":t.typ==="r"?"var(--pos)":"";td(tr,op);
   td(tr,qty(t.q));td(tr,price(t.p),null,1);td(tr,two(usd(t.v),t.v?pln(t.v):""));
   const c=td(tr,t.c||"","l",1);c.style.whiteSpace="normal";c.style.maxWidth="260px";
-  const a=el("div","acts"),eb=el("button","ib","Edytuj");eb.onclick=()=>openDlg({edit:t});a.append(eb);td(tr,a);H.append(tr);});
+  const a=el("div","acts"),eb=el("button","ib","Edytuj");if(t.auto){const m=all.find(x=>x.id===t.auto);eb.title="Transakcja automatyczna - edytujesz transakcje glowna";if(m)eb.onclick=()=>openDlg({edit:m});else eb.disabled=true;}else eb.onclick=()=>openDlg({edit:t});a.append(eb);td(tr,a);H.append(tr);});
  if(!hs.length)H.innerHTML='<tr><td class="note" colspan="9">Brak transakcji dla wybranych filtrow.</td></tr>';
  $("hsum").textContent=hs.length+" z "+all.length+" · kupno "+usd(sb)+(ss?" · sprzedaz "+usd(ss):"");
  heads();
@@ -152,15 +154,17 @@ function upd(){
  $("fv").textContent="Wartosc: "+usd(v)+(K.S.rate?" · "+money(v*K.S.rate,"PLN"):"");
  const h=t?held(pid,t,ed&&ed.id):0,cur=(K.S.prices[t]||{}).p;
  $("fh").textContent=t?("Posiadasz: "+qty(h)+" "+t+(cur?" · cena "+price(cur):"")):"";$("fe").textContent="";
+ $("fsrcl").hidden=!(ty==="b"&&t!=="USDC");$("fsn").hidden=!(ty==="s"&&t&&t!=="USDC");
+ $("fsrc").options[0].textContent="Z salda USDC ("+qty(held(pid,"USDC",ed&&ed.lk))+")";
 }
 function openDlg(o){
  const S=K.S,P=$("fp");P.innerHTML="";S.ps.forEach(p=>{const op=el("option",null,p.name);op.value=p.id;P.append(op);});
  ed=o.edit||null;$("fe").textContent="";
- if(ed){$("dt").textContent="Edytuj transakcje";P.value=ed.p0.id;$("fs").value=ed.t;$("fd").value=ed.d;$("fq").value=ed.q;$("fpr").value=ed.p;$("ff").value=ed.f||"";$("fc").value=ed.c||"";$("fdel").hidden=false;setTy(typeOf(ed));}
+ if(ed){$("dt").textContent="Edytuj transakcje";P.value=ed.p0.id;$("fs").value=ed.t;$("fd").value=ed.d;$("fq").value=ed.q;$("fpr").value=ed.p;$("ff").value=ed.f||"";$("fc").value=ed.c||"";$("fdel").hidden=false;$("fsrc").value=ed.lk&&ed.s>0?"u":"x";setTy(typeOf(ed));}
  else{const t=o.t||"",pid=o.pid||(K.isAgg()?(S.ps.find(p=>held(p.id,t)>0)||S.ps[0]).id:S.cur);
   $("dt").textContent=o.ty==="s"?"Sprzedaj "+t:o.ty==="b"&&t?"Kup "+t:"Nowa transakcja";P.value=pid;$("fs").value=t;$("fd").value=K.today();
   const cur=(S.prices[t]||{}).p;$("fpr").value=cur?+cur.toPrecision(6):"";$("ff").value="";$("fc").value="";$("fdel").hidden=true;
-  $("fq").value=o.ty==="s"?+held(pid,t).toFixed(8):"";setTy(o.ty||"b");}
+  $("fq").value=o.ty==="s"?+held(pid,t).toFixed(8):"";$("fsrc").value=held(pid,"USDC")>0?"u":"x";setTy(o.ty||"b");}
  upd();$("dlg").showModal();setTimeout(()=>($("fs").value?$("fq"):$("fs")).focus(),30);
 }
 [...$("dty").children].forEach(b=>b.onclick=()=>setTy(b.dataset.v));
@@ -168,7 +172,7 @@ function openDlg(o){
 $("fmax").onclick=()=>{$("fq").value=+held(+$("fp").value,$("fs").value.trim().toUpperCase(),ed&&ed.id).toFixed(8);upd();};
 $("fcur").onclick=async()=>{const t=$("fs").value.trim().toUpperCase();if(!t)return;$("fcur").disabled=true;try{const p=await K.quoteOne(t);$("fpr").value=+p.toPrecision(6);}catch(e){$("fe").textContent=e.message;}$("fcur").disabled=false;upd();};
 $("dx").onclick=$("fcan").onclick=()=>$("dlg").close();
-$("fdel").onclick=()=>{if(!ed||!confirm("Usunac transakcje "+ed.t+" z "+ed.d+"?"))return;const p=ed.p0,bk=p.trades;p.trades=bk.filter(x=>x.id!==ed.id);
+$("fdel").onclick=()=>{if(!ed||!confirm("Usunac transakcje "+ed.t+" z "+ed.d+"?"))return;const p=ed.p0,bk=p.trades;p.trades=bk.filter(x=>x.id!==ed.id&&x.id!==ed.lk);
  if(!K.validTrades(p.trades)){p.trades=bk;$("fe").textContent="Nie mozna - pozniejsza sprzedaz przekroczylaby stan.";return;}K.save();$("dlg").close();render();};
 $("fm").onsubmit=e=>{e.preventDefault();
  const t=$("fs").value.trim().toUpperCase(),q=num($("fq").value),p=ty==="r"?0:num($("fpr").value),f=num($("ff").value),d=$("fd").value||K.today(),pid=+$("fp").value,c=$("fc").value.trim();
@@ -176,9 +180,13 @@ $("fm").onsubmit=e=>{e.preventDefault();
  if(ty!=="r"&&!(p>0))return $("fe").textContent="Podaj cene (lub kliknij Aktualna)";
  const tr={id:ed?ed.id:K.uid(),d,t,s:ty==="s"?-1:1,q,p,f,c:ty==="r"&&!c?"staking":c};
  const P=K.S.ps.find(x=>x.id===pid),O=ed?ed.p0:null,bkP=P.trades.slice(),bkO=O?O.trades.slice():null;
- if(O)O.trades=O.trades.filter(x=>x.id!==ed.id);
+ if(O)O.trades=O.trades.filter(x=>x.id!==ed.id&&x.id!==ed.lk);
  if(O===P)P.trades=O.trades;P.trades.push(tr);
- if(!K.validTrades(P.trades)||(O&&O!==P&&!K.validTrades(O.trades))){P.trades=bkP;if(O)O.trades=bkO;return $("fe").textContent="Za mala ilosc "+t+" do sprzedazy w tym dniu.";}
+ const am=ty==="s"?q*p-f:q*p+f;
+ if(t!=="USDC"&&ty!=="r"&&am>0&&(ty==="s"||$("fsrc").value==="u")){const au={id:K.uid(),d,t:"USDC",s:ty==="s"?1:-1,q:+am.toFixed(6),p:1,f:0,c:"auto: "+(ty==="s"?"sprzedaz ":"zakup ")+t,auto:tr.id};
+  tr.lk=au.id;P.trades.push(au);}
+ if(!K.validTrades(P.trades)||(O&&O!==P&&!K.validTrades(O.trades))){P.trades=bkP;if(O)O.trades=bkO;
+  return $("fe").textContent=tr.lk&&ty==="b"?"Za malo USDC w portfelu na ten zakup - wybierz doplate z zewnatrz.":"Za mala ilosc "+t+" do sprzedazy w tym dniu (lub USDC wydane pozniej).";}
  K.save();$("dlg").close();render();if(!(K.S.prices[t]||{}).p)K.quoteOne(t).then(render,()=>{});
 };
 // --- filtry i sortowanie

@@ -14,8 +14,8 @@
 <div class="stat"><span>Wplaty netto</span><strong id="dn">0</strong><small id="dns"></small></div></div>
 <p class="note" id="hint">Widok zbiorczy (tylko odczyt) - wybierz konkretny portfel, aby ksiegowac wplaty, wymiany i transakcje.</p>
 <p class="note neg" id="wn"></p>
-<section id="f1"><h2>Transakcja (cena i prowizja w USD, platne z gotowki USD)</h2><div class="form">
-<input id="tk" placeholder="Ticker (AMZN, USDC, VWCE.DE, CDR.WA)"><select id="o2"><option value="b">Kupno</option><option value="s">Sprzedaz</option></select>
+<section id="f1"><h2>Transakcja (cena i prowizja w USD; sprzedaz zasila saldo USD)</h2><div class="form">
+<input id="tk" placeholder="Ticker (AMZN, USDC, VWCE.DE, CDR.WA)"><select id="o2"><option value="b">Kupno</option><option value="s">Sprzedaz</option></select><select id="src" title="Zrodlo srodkow na zakup"><option value="i">Z salda USD</option><option value="x">Doplata z zewnatrz</option></select>
 <input id="q" placeholder="Ilosc" inputmode="decimal"><input id="pr" placeholder="Cena (puste = biezaca)" inputmode="decimal"><input id="fe" placeholder="Prowizja" inputmode="decimal"><input id="td" type="date">
 <button id="sv" class="dark" type="button">Zapisz</button></div></section>
 <section><h2>Pozycje (otwarte i zamkniete)</h2><table><thead><tr><th>Ticker</th><th id="ph">Portfel</th><th>Ilosc</th><th>Sr. cena</th><th>Cena</th><th>Dzis</th><th>Wartosc</th><th>Zysk niezreal.</th><th>Zysk zreal.</th><th></th></tr></thead><tbody id="rows"></tbody><tfoot id="pf"></tfoot></table></section>
@@ -54,15 +54,15 @@ function render(){
   td(tr,r.open?String(+r.q.toFixed(6)):"0");td(tr,r.open?usd(r.avg):"–");td(tr,r.open&&r.p?usd(r.p):"–");
   td(tr,r.open&&r.pc?pct((r.p-r.pc)/r.pc*100):"–",r.open?cls(r.day):"");td(tr,r.open?usd(r.mv):"–");
   td(tr,r.open?usd(r.unreal)+(r.cost?" ("+pct(r.unreal/r.cost*100)+")":""):"–",r.open?cls(r.unreal):"");td(tr,usd(r.realized),cls(r.realized));
-  const e=document.createElement("td");if(!agg&&r.open){const b=document.createElement("button");b.textContent="Sprzedaj";b.onclick=()=>{$("tk").value=r.t;$("o2").value="s";$("q").value=+r.q.toFixed(6);$("pr").value="";$("q").focus();};e.append(b);}tr.append(e);B.append(tr);
+  const e=document.createElement("td");if(!agg&&r.open){const b=document.createElement("button");b.textContent="Sprzedaj";b.onclick=()=>{$("tk").value=r.t;$("o2").value="s";$("src").hidden=true;$("q").value=+r.q.toFixed(6);$("pr").value="";$("q").focus();};e.append(b);}tr.append(e);B.append(tr);
  });
  const PF=$("pf");PF.innerHTML="";const pr=document.createElement("tr");pr.style.fontWeight="700";td(pr,"Razem");if(agg)td(pr,"");td(pr,"");td(pr,"");td(pr,"");td(pr,"");
  td(pr,usd(s.mv));td(pr,usd(s.unreal),cls(s.unreal));td(pr,usd(s.realized),cls(s.realized));td(pr,"");PF.append(pr);
  const X=$("tx");X.innerHTML="";
  ps.flatMap(p=>p.tx.map(x=>({x,p}))).sort((a,b)=>G.byD(a.x,b.x)).forEach(({x,p})=>{
-  const tr=document.createElement("tr"),c=x.c||"PLN",a=x.a!=null?x.a:x.pln;td(tr,x.d);td(tr,p.name);td(tr,x.s>0?"Wplata":"Wyplata",x.s>0?"pos":"neg");td(tr,c);td(tr,money(x.s*a,c));
+  const tr=document.createElement("tr"),c=x.c||"PLN",a=x.a!=null?x.a:x.pln;td(tr,x.d);td(tr,p.name);td(tr,x.s>0?(x.tid?"Wplata (zakup)":"Wplata"):"Wyplata",x.s>0?"pos":"neg");td(tr,c);td(tr,money(x.s*a,c));
   td(tr,money(x.s*x.pln,"PLN"));td(tr,money(x.s*x.eur,"EUR"));td(tr,money(x.s*x.usd,"USD"));
-  del(tr,()=>{const i=p.tx.indexOf(x);if(!confirm("Usunac wplate/wyplate z "+x.d+" ("+money(a,c)+")?"))return;p.tx.splice(i,1);
+  del(tr,()=>{if(x.tid)return alert("Wplata powiazana z zakupem - usun transakcje kupna");const i=p.tx.indexOf(x);if(!confirm("Usunac wplate/wyplate z "+x.d+" ("+money(a,c)+")?"))return;p.tx.splice(i,1);
    if(x.s>0&&G.negWallets(p).length&&!confirm("Po usunieciu saldo bedzie ujemne ("+G.negWallets(p).join(", ")+"). Usunac mimo to?")){p.tx.splice(i,0,x);return;}G.save();render();});X.append(tr);});
  const F=$("tf");F.innerHTML="";const fr=document.createElement("tr");fr.style.fontWeight="700";td(fr,"Suma netto");td(fr,"");td(fr,"");td(fr,"");td(fr,"");
  [[s.dPln,"PLN"],[s.dEur,"EUR"],[s.dUsd,"USD"]].forEach(([n,c])=>{const e=td(fr,money(n,c));e.style.borderTop="2px solid var(--line)";});td(fr,"");F.append(fr);
@@ -74,10 +74,10 @@ function render(){
    if(G.negWallets(p).length&&!confirm("Po usunieciu saldo bedzie ujemne ("+G.negWallets(p).join(", ")+"). Usunac mimo to?")){p.fx.splice(i,0,x);return;}G.save();render();});FX.append(tr);});
  const H=$("hs");H.innerHTML="";
  ps.flatMap(p=>p.trades.map(t=>({t,p}))).sort((a,b)=>G.cmp(b.t,a.t)).slice(0,300).forEach(({t,p})=>{
-  const tr=document.createElement("tr");td(tr,t.d);td(tr,p.name);td(tr,t.t);td(tr,t.s>0?"Kupno":"Sprzedaz",t.s>0?"pos":"neg");td(tr,String(+t.q.toFixed(6)));
+  const tr=document.createElement("tr");td(tr,t.d);td(tr,p.name);td(tr,t.t);td(tr,t.s>0?(t.ext?"Kupno (doplata)":"Kupno"):"Sprzedaz",t.s>0?"pos":"neg");td(tr,String(+t.q.toFixed(6)));
   td(tr,usd(t.p));td(tr,t.f?usd(t.f):"–");td(tr,usd(t.q*t.p));
-  del(tr,()=>{if(!confirm("Usunac transakcje "+t.t+" z "+t.d+"?"))return;const i=p.trades.indexOf(t);p.trades.splice(i,1);
-   if(!G.validTrades(p.trades)){p.trades.splice(i,0,t);return alert("Nie mozna usunac - pozniejsza sprzedaz przekroczylaby stan");}G.save();render();});H.append(tr);});
+  del(tr,()=>{if(!confirm("Usunac transakcje "+t.t+" z "+t.d+"?"))return;const i=p.trades.indexOf(t),bt=p.tx;p.trades.splice(i,1);p.tx=bt.filter(x=>x.tid!==t.id);
+   if(!G.validTrades(p.trades)){p.trades.splice(i,0,t);p.tx=bt;return alert("Nie mozna usunac - pozniejsza sprzedaz przekroczylaby stan");}G.save();render();});H.append(tr);});
  $("uxl").hidden=$("cu").value==="USD"||$("op").value==="w";
 }
 let mode=null;
@@ -89,7 +89,7 @@ function closeBar(){mode=null;$("nb").hidden=true;}
 $("nbi").oninput=chk;$("nbc").onclick=closeBar;
 $("nbi").onkeydown=e=>{if(e.key==="Enter"&&!$("nbo").disabled)$("nbo").click();if(e.key==="Escape")closeBar();};
 $("nbo").onclick=()=>{const v=$("nbi").value.trim();if(mode==="new")G.addPortfolio(v);else if(mode==="rename")G.rename(v);else if(mode==="del"){const m=G.removePortfolio(G.P());if(m)alert(m);}closeBar();render();};
-$("np").onclick=()=>bar("new");$("rn").onclick=()=>bar("rename");$("dp").onclick=()=>bar("del");
+$("o2").onchange=()=>{$("src").hidden=$("o2").value==="s";};$("np").onclick=()=>bar("new");$("rn").onclick=()=>bar("rename");$("dp").onclick=()=>bar("del");
 $("rs").onclick=()=>{G.restore();render();};
 async function refresh(){$("st").textContent="Odswiezanie...";const e=await G.refreshAll();$("st").textContent=e||("Odswiezono "+new Date().toLocaleTimeString("pl-PL"));render();}
 $("sv").onclick=async()=>{
@@ -99,9 +99,13 @@ $("sv").onclick=async()=>{
   let pr=num($("pr").value);
   if(s>0||(pr<=0&&!G.S.prices[t])){const x=await G.quote(t);G.S.prices[t]={p:x.c,pc:x.pc};}
   if(pr<=0)pr=G.S.prices[t].p;
-  p.trades.push({id:G.uid(),d,t,s,q,p:pr,f});
+  const cost=q*pr+f,id=G.uid();let ext=s>0&&$("src").value==="x";
+  if(s>0&&!ext){const w=G.derive(p).w.USD;if(w<cost-0.005){if(!confirm("Saldo USD ("+money(w,"USD")+") nie wystarcza na "+money(cost,"USD")+". Zaksiegowac doplate z zewnatrz?"))return;ext=true;}}
+  const dv=ext?await G.depositValues(d,"USD",cost):null;
+  p.trades.push(ext?{id,d,t,s,q,p:pr,f,ext:1}:{id,d,t,s,q,p:pr,f});
   if(!G.validTrades(p.trades)){p.trades.pop();return alert("Za mala ilosc "+t+" do sprzedazy w tym dniu");}
-  G.save();$("tk").value=$("q").value=$("pr").value=$("fe").value="";$("o2").value="b";render();
+  if(ext){p.tx.push({id:G.uid(),d,s:1,c:"USD",a:+cost.toFixed(2),...dv,tid:id});p.tx.sort(G.byD);}
+  G.save();$("tk").value=$("q").value=$("pr").value=$("fe").value="";$("o2").value="b";$("src").hidden=false;render();
  }catch(e){alert(e.message);}
 };
 $("bk").onclick=async()=>{

@@ -26,7 +26,7 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 <header><div><h1>Krypto</h1><div class="sub" id="st">Ceny: CoinGecko · kurs USD/PLN: ECB</div>
 <div class="nav"><a class="on" href="krypto.html">Portfel</a><a href="krypto-analityka.html">Analityka</a><a href="terminal.html">Terminal</a></div></div>
 <div class="form"><select id="ps"></select><button id="np" type="button">Nowy portfel</button><button id="rn" type="button">Zmien nazwe</button><button id="dp" type="button">Usun portfel</button><button id="rs" type="button">Kosz</button>
-<button id="rf" class="dark" type="button">Odswiez ceny</button><button id="im" type="button">Import z innej aplikacji</button><button id="ex" type="button">Eksport JSON</button></div></header>
+<select id="cur" aria-label="Waluta"><option>USD</option><option>PLN</option></select><button id="rf" class="dark" type="button">Odswiez ceny</button><button id="im" type="button">Import z innej aplikacji</button><button id="ex" type="button">Eksport JSON</button></div></header>
 <div class="stats">
 <div class="stat"><span>Wartosc</span><strong id="v">–</strong><small id="vs"></small></div>
 <div class="stat"><span>24h</span><strong id="d">–</strong><small id="ds"></small></div>
@@ -40,11 +40,11 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 </div>
 <section><div class="sh"><h2>Aktywa</h2><div class="form"><button id="gh" type="button">Historia transakcji</button><button id="add" class="dark" type="button">+ Dodaj transakcje</button></div></div>
 <div class="flt"><input id="pq" placeholder="Szukaj aktywow..."><select id="pst"><option value="o">Otwarte</option><option value="c">Zamkniete</option><option value="">Wszystkie</option></select><select id="ppl"><option value="">Zysk i strata</option><option value="+">Tylko zysk</option><option value="-">Tylko strata</option></select></div>
-<table class="ct"><thead><tr><th data-k="name" class="l">Aktywo</th><th data-k="pn" id="ph">Portfel</th><th data-k="p">Cena $</th><th data-k="avg" class="hm">Sr. cena zakupu $</th><th data-k="q" class="hm">Posiadane</th><th data-k="mv">Wartosc $</th><th data-k="cost" class="hm">Wartosc zakupu $</th><th data-k="total">Zysk/Strata $</th><th data-k="pctU" class="hm">Niezreal. %</th><th data-k="pctR" class="hm">Zreal. %</th><th data-k="ch24" class="hm">24h</th><th class="hm">7 dni</th><th>Akcje</th></tr></thead><tbody id="rows"></tbody><tfoot id="pf"></tfoot></table>
+<table class="ct"><thead><tr><th data-k="name" class="l">Aktywo</th><th data-k="pn" id="ph">Portfel</th><th data-k="p">Cena <span class="cu">$</span></th><th data-k="avg" class="hm">Sr. cena zakupu <span class="cu">$</span></th><th data-k="q" class="hm">Posiadane</th><th data-k="mv">Wartosc <span class="cu">$</span></th><th data-k="cost" class="hm">Wartosc zakupu <span class="cu">$</span></th><th data-k="total">Zysk/Strata <span class="cu">$</span></th><th data-k="pctU" class="hm">Niezreal. %</th><th data-k="pctR" class="hm">Zreal. %</th><th data-k="ch24" class="hm">24h</th><th class="hm">7 dni</th><th>Akcje</th></tr></thead><tbody id="rows"></tbody><tfoot id="pf"></tfoot></table>
 <p class="note">K = kup, S = sprzedaj (formularz wstepnie wypelniony). ⋯ = cena reczna lub ID CoinGecko dla tokenow bez notowan.</p></section>
 <section id="hsec"><div class="sh"><h2>Historia transakcji</h2><span class="note" id="hsum"></span></div>
 <div class="flt"><input id="hq" placeholder="Szukaj symbolu lub uwag..."><select id="hty"><option value="">Wszystkie typy</option><option value="b">Kupno</option><option value="s">Sprzedaz</option><option value="r">Nagroda / staking</option></select><select id="has"><option value="">Wszystkie aktywa</option></select><input id="hd1" type="date" title="Od"><input id="hd2" type="date" title="Do"><button id="hcl" type="button">Wyczysc</button></div>
-<table class="ct"><thead><tr><th data-h="d">Data</th><th data-h="pn" id="ph2">Portfel</th><th data-h="t" class="l">Aktywo</th><th data-h="typ">Typ</th><th data-h="q">Ilosc</th><th data-h="p" class="hm">Cena $</th><th data-h="v">Wartosc $</th><th class="hm l">Uwagi</th><th>Akcje</th></tr></thead><tbody id="hs"></tbody></table></section>
+<table class="ct"><thead><tr><th data-h="d">Data</th><th data-h="pn" id="ph2">Portfel</th><th data-h="t" class="l">Aktywo</th><th data-h="typ">Typ</th><th data-h="q">Ilosc</th><th data-h="p" class="hm">Cena <span class="cu">$</span></th><th data-h="v">Wartosc <span class="cu">$</span></th><th class="hm l">Uwagi</th><th>Akcje</th></tr></thead><tbody id="hs"></tbody></table></section>
 </div>
 <dialog id="dlg"><form method="dialog" id="fm">
 <div class="dh"><h3 id="dt">Nowa transakcja</h3><button type="button" id="dx" aria-label="Zamknij">✕</button></div>
@@ -71,7 +71,10 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 <script type="text/x-after-auth" src="kchart.js"></script>
 <script type="text/x-after-auth">
 ;(function(){
-const $=id=>document.getElementById(id),{money,price,qty,pct,num,cls}=K,usd=n=>money(n,"USD"),pln=n=>K.S.rate?money(n*K.S.rate,"PLN"):"";
+const $=id=>document.getElementById(id),{money,qty,pct,num,cls}=K;
+let kcur="USD";try{if(localStorage.getItem("krypto-cur")==="PLN")kcur="PLN";}catch{}
+const XR=()=>kcur==="PLN"&&K.S.rate?K.S.rate:0,usd=n=>XR()?money(n*XR(),"PLN"):money(n,"USD"),pln=n=>XR()?money(n,"USD"):(K.S.rate?money(n*K.S.rate,"PLN"):""),
+ alt0=n=>XR()?money(n,"USD",0):(K.S.rate?money(n*K.S.rate,"PLN",0):""),price=x=>{if(!x)return "–";const r=XR()||1,v=x*r;return money(v,XR()?"PLN":"USD",v<0.01?6:v<1?4:2);};
 const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;};
 const td=(tr,t,c,hide)=>{const e=el("td",c);if(t instanceof Node)e.append(t);else e.textContent=t;if(hide)e.classList.add("hm");tr.append(e);return e;};
 const two=(a,b,c)=>{const s=el("span","two"+(c?" "+c:""),a);if(b){s.append(el("small",null,b));}return s;};
@@ -86,16 +89,16 @@ function heads(){
 }
 function render(){
  K.mountSelect($("ps"),render);const agg=K.isAgg(),S=K.S,s=K.summary(K.sel()),pl=S.rate||0;
- $("dp").disabled=agg;$("ph").hidden=$("ph2").hidden=!agg;
- $("v").textContent=usd(s.mv);$("vs").textContent=pl?money(s.mv*pl,"PLN",0):"";
+ document.querySelectorAll(".cu").forEach(x=>x.textContent=XR()?"zl":"$");$("dp").disabled=agg;$("ph").hidden=$("ph2").hidden=!agg;
+ $("v").textContent=usd(s.mv);$("vs").textContent=alt0(s.mv);
  $("d").textContent=(s.day>=0?"+":"")+usd(s.day);$("d").className=cls(s.day);$("ds").textContent=pct(s.dayPct);$("ds").className=cls(s.day);
- $("c").textContent=usd(s.cost);$("cs").textContent=pl?money(s.cost*pl,"PLN",0):"";
- $("u").textContent=(s.unreal>=0?"+":"")+usd(s.unreal);$("u").className=cls(s.unreal);$("us").textContent=pct(s.unrealPct)+" · otwarte pozycje"+(pl?" · "+money(s.unreal*pl,"PLN",0):"");$("us").className=cls(s.unreal);
- $("w").textContent=(s.total>=0?"+":"")+usd(s.total);$("w").className=cls(s.total);$("ws").textContent=pct(s.totPct)+" od "+usd(s.basis)+" · zreal. "+(s.realized>=0?"+":"")+usd(s.realized)+(pl?" · "+money(s.total*pl,"PLN",0):"");
+ $("c").textContent=usd(s.cost);$("cs").textContent=alt0(s.cost);
+ $("u").textContent=(s.unreal>=0?"+":"")+usd(s.unreal);$("u").className=cls(s.unreal);$("us").textContent=pct(s.unrealPct)+" · otwarte pozycje"+(alt0(s.unreal)?" · "+alt0(s.unreal):"");$("us").className=cls(s.unreal);
+ $("w").textContent=(s.total>=0?"+":"")+usd(s.total);$("w").className=cls(s.total);$("ws").textContent=pct(s.totPct)+" od "+usd(s.basis)+" · zreal. "+(s.realized>=0?"+":"")+usd(s.realized)+(alt0(s.total)?" · "+alt0(s.total):"");
  $("wn").textContent=s.missing.length?"Brak ceny: "+s.missing.join(", ")+" - wyceniono po koszcie zakupu. Odswiez lub ustaw cene / ID (⋯).":"";
  $("st").textContent="Ceny: CoinGecko"+(S.ts?" · "+new Date(S.ts).toLocaleString("pl-PL"):" · nie odswiezono")+(pl?" · USD/PLN "+pl.toFixed(4):"");
  const open=s.rows.filter(r=>r.open);
- $("alloc").innerHTML=KC.donut(open.map(r=>({label:r.t,value:r.mv})),KC.kfmt(s.mv)+" $",open.length+" aktywow");
+ $("alloc").innerHTML=KC.donut(open.map(r=>({label:r.t,value:r.mv})),KC.kfmt(s.mv*(XR()||1))+(XR()?" zl":" $"),open.length+" aktywow");
  const M=$("mv");M.innerHTML="";const mvs=open.filter(r=>r.ch24!=null).sort((a,b)=>b.ch24-a.ch24),pick=mvs.length>8?[...mvs.slice(0,4),...mvs.slice(-4)]:mvs;
  pick.forEach(r=>{const tr=el("tr");td(tr,coin(r));td(tr,pct(r.ch24),cls(r.ch24));td(tr,(r.day>=0?"+":"")+usd(r.day),cls(r.day));M.append(tr);});
  if(!pick.length)M.innerHTML='<tr><td class="note">Odswiez ceny, aby zobaczyc zmiany.</td></tr>';
@@ -153,9 +156,9 @@ function held(pid,t,excl){const p=K.S.ps.find(x=>x.id===pid);if(!p)return 0;cons
 function setTy(v){ty=v;[...$("dty").children].forEach(b=>b.classList.toggle("on",b.dataset.v===v));$("fmax").hidden=v!=="s";$("fpr").disabled=v==="r";$("fcur").disabled=v==="r";if(v==="r")$("fpr").value="0";upd();}
 function upd(){
  const q=num($("fq").value),p=num($("fpr").value),f=num($("ff").value),t=$("fs").value.trim().toUpperCase(),pid=+$("fp").value,v=q*p+(ty==="s"?-f:f);
- $("fv").textContent="Wartosc: "+usd(v)+(K.S.rate?" · "+money(v*K.S.rate,"PLN"):"");
+ $("fv").textContent="Wartosc: "+money(v,"USD")+(K.S.rate?" · "+money(v*K.S.rate,"PLN"):"");
  const h=t?held(pid,t,ed&&ed.id):0,cur=(K.S.prices[t]||{}).p;
- $("fh").textContent=t?("Posiadasz: "+qty(h)+" "+t+(cur?" · cena "+price(cur):"")):"";$("fe").textContent="";
+ $("fh").textContent=t?("Posiadasz: "+qty(h)+" "+t+(cur?" · cena "+K.price(cur):"")):"";$("fe").textContent="";
  $("fsrcl").hidden=!(ty==="b"&&t!=="USDC");$("fsn").hidden=!(ty==="s"&&t&&t!=="USDC");
  $("fsrc").options[0].textContent="Z salda USDC ("+qty(held(pid,"USDC",ed&&ed.lk))+")";
 }
@@ -214,6 +217,7 @@ $("im").onclick=()=>{const i=el("input");i.type="file";i.accept=".json,applicati
  const mode=dup&&confirm("Portfel o tej nazwie juz istnieje.\nOK = zastap jego transakcje, Anuluj = dodaj jako nowy portfel")?"replace":"add";
  K.applyImport(l,mode);render();refresh();};i.click();};
 $("ex").onclick=()=>{const a=el("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(K.exportJson(),null,1)],{type:"application/json"}));a.download="krypto-"+K.today()+".json";document.body.append(a);a.click();a.remove();};
+$("cur").value=kcur;$("cur").onchange=()=>{kcur=$("cur").value;try{localStorage.setItem("krypto-cur",kcur);}catch{}render();};
 render();
 if(!K.S.ts||Date.now()-K.S.ts>10*60e3)refresh();
 })();

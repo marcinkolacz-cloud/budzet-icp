@@ -13,7 +13,7 @@ table.ct th,table.ct td{text-align:center;vertical-align:middle}table.ct th.l,ta
 <p class="note neg" id="deny" hidden>Brak uprawnien administratora.</p>
 <div id="main" hidden>
 <section><h2>Nowy kod zaproszenia</h2>
-<div class="form"><input id="nn" placeholder="Dla kogo (notatka)" maxlength="80" style="width:260px"><select id="nd"><option value="1">Wazny 1 dzien</option><option value="7" selected>Wazny 7 dni</option><option value="30">Wazny 30 dni</option></select><button id="nc" class="dark" type="button">Generuj kod</button></div>
+<div class="form"><input id="nn" placeholder="Dla kogo (notatka)" maxlength="80" style="width:260px"><select id="nd"><option value="1">Wazny 1 dzien</option><option value="7" selected>Wazny 7 dni</option><option value="30">Wazny 30 dni</option><option value="365">Wazny 1 rok</option><option value="0">Bezterminowy</option></select><button id="nc" class="dark" type="button">Generuj kod</button></div>
 <div class="newc" id="nbox"><span>Kod:</span><span class="code" id="ncode"></span><button id="ncp" class="ib" type="button">Kopiuj</button><span class="note" style="margin:0">Jednorazowy. Przekaz go osobie, ktora ma sie zalogowac.</span></div>
 <p class="note neg" id="ne"></p></section>
 <section><h2>Kody zaproszen</h2><table class="ct"><thead><tr><th class="l">Kod</th><th class="l">Notatka</th><th>Utworzony</th><th>Wygasa</th><th>Status</th><th>Akcje</th></tr></thead><tbody id="inv"></tbody></table></section>
@@ -42,8 +42,8 @@ async function load(){
  const [inv,mem]=await Promise.all([api.listInvites(),api.listMembers()]);const now=Date.now()*1e6;
  const I=$("inv");I.innerHTML="";
  inv.slice().sort((a,b)=>Number(b.created-a.created)).forEach(v=>{const tr=el("tr");
-  const c=el("span","code",v.code);c.style.cursor="pointer";c.title="Kopiuj";c.onclick=()=>copy(v.code);td(tr,c,"l");td(tr,v.note||"–","l");td(tr,dt(v.created));td(tr,dt(v.expires));
-  const used=v.usedBy.length>0,exp=Number(v.expires)<now;
+  const c=el("span","code",v.code);c.style.cursor="pointer";c.title="Kopiuj";c.onclick=()=>copy(v.code);td(tr,c,"l");td(tr,v.note||"–","l");td(tr,dt(v.created));td(tr,Number(v.expires)?dt(v.expires):"bez terminu");
+  const used=v.usedBy.length>0,exp=Number(v.expires)>0&&Number(v.expires)<now;
   td(tr,el("span","pill "+(used?"ok":exp?"bad":""),used?"uzyty "+dt(v.usedAt):exp?"wygasl":"aktywny"));
   const a=el("div","acts");a.append(ib("Kopiuj",()=>copy(v.code)),ib("Usun",async()=>{if(!confirm("Usunac kod "+v.code+"?"))return;res(await api.deleteInvite(v.code));load();},"var(--neg)"));td(tr,a);I.append(tr);});
  if(!inv.length)I.innerHTML='<tr><td class="note" colspan="6">Brak kodow.</td></tr>';
@@ -61,7 +61,7 @@ async function load(){
     ib("Odbierz dostep",async()=>{if(!confirm("Odebrac dostep dla "+short(p)+"? Dane zostana zachowane."))return;res(await api.removeMember(m.p));load();},"var(--neg)"));}
   }
   td(tr,a);M.append(tr);});
- $("st").textContent=mem.filter(m=>m.note!=="BEZ DOSTEPU").length+" uzytkownikow · "+inv.filter(v=>!v.usedBy.length&&Number(v.expires)>now).length+" aktywnych kodow";
+ $("st").textContent=mem.filter(m=>m.note!=="BEZ DOSTEPU").length+" uzytkownikow · "+inv.filter(v=>!v.usedBy.length&&(Number(v.expires)===0||Number(v.expires)>now)).length+" aktywnych kodow";
 }
 $("nc").onclick=async()=>{$("nc").disabled=true;$("ne").textContent="";
  try{const r=await api.createInvite($("nn").value.trim(),BigInt(+$("nd").value));if("ok" in r){$("ncode").textContent=r.ok;$("nbox").classList.add("on");$("nn").value="";copy(r.ok);load();}else $("ne").textContent=r.err;}

@@ -22,33 +22,7 @@ persistent actor Budget {
   var nextId : Nat = 1;
   var entries : [Entry] = [];
 
-  public shared (msg) func addEntry(kind : Kind, title : Text, description : Text, amountGrosze : Nat) : async Result.Result<Entry, Text> {
-    if (title == "") return #err("Tytul jest wymagany");
-    if (amountGrosze == 0) return #err("Kwota musi byc wieksza od 0");
-    let entry : Entry = {
-      id = nextId;
-      owner = msg.caller;
-      kind = kind;
-      title = title;
-      description = description;
-      amountGrosze = amountGrosze;
-      created = Time.now();
-    };
-    nextId += 1;
-    entries := Array.append(entries, [entry]);
-    #ok(entry)
-  };
-
-  public shared query (msg) func listMine() : async [Entry] {
-    Array.filter<Entry>(entries, func(e) { e.owner == msg.caller })
-  };
-
-  public shared (msg) func deleteEntry(id : Nat) : async Result.Result<Text, Text> {
-    let before = entries.size();
-    entries := Array.filter<Entry>(entries, func(e) { not (e.id == id and e.owner == msg.caller) });
-    if (entries.size() == before) #err("Nie znaleziono wpisu") else #ok("usunieto")
-  };
-
+  // stare metody addEntry/listMine/deleteEntry usuniete (nieuzywane); dane `entries` zostaja w pamieci stabilnej
 
   // --- Magazyn klucz-wartosc per konto (Internet Identity) ---
   public type Rec = { owner : Principal; key : Text; value : Text; rev : Nat };
@@ -139,17 +113,30 @@ persistent actor Budget {
         i += 1;
       };
     };
-    let d = if (days == 0 or days > 365) 7 else days;
+    if (days > 3650) return #err("Maksymalnie 3650 dni");
     let now = Time.now();
-    invites := Array.append(invites, [{ code = code; note = note; created = now; expires = now + d * 86_400_000_000_000; usedBy = null; usedAt = 0 }]);
+    let exp : Int = if (days == 0) 0 else now + days * 86_400_000_000_000;
+    invites := Array.append(invites, [{ code = code; note = note; created = now; expires = exp; usedBy = null; usedAt = 0 }]);
     #ok(code)
   };
 
   func Nat8toNat(x : Nat8) : Nat { Nat8.toNat(x) };
 
+  transient var failHour : Int = 0;
+  transient var failCount : Nat = 0;
+  let HOUR : Int = 3_600_000_000_000;
+  func redeemLocked() : Bool { Time.now() / HOUR == failHour and failCount >= 30 };
+  func noteFail() {
+    let h = Time.now() / HOUR;
+    if (h != failHour) { failHour := h; failCount := 0 };
+    failCount += 1;
+  };
+
   public shared (msg) func redeemInvite(code : Text) : async Result.Result<Text, Text> {
+    if (redeemLocked()) return #err("Za duzo prob - sprobuj za godzine");
     if (Principal.isAnonymous(msg.caller)) return #err("Wymagane logowanie");
     if (isMember(msg.caller)) return #ok("Masz juz dostep");
+    if (code.size() > 40) { noteFail(); return #err("Nieprawidlowy kod") };
     let c = Text.toUppercase(Text.trim(code, #char ' '));
     let now = Time.now();
     var found = false;
@@ -158,15 +145,15 @@ persistent actor Budget {
     invites := Array.map<Invite, Invite>(invites, func(v) {
       if (v.code == c) {
         found := true;
-        if (v.usedBy == null and v.expires > now) {
+        if (v.usedBy == null and (v.expires == 0 or v.expires > now)) {
           okUse := true;
           note := v.note;
           { v with usedBy = ?msg.caller; usedAt = now }
         } else v
       } else v
     });
-    if (not found) return #err("Nieprawidlowy kod");
-    if (not okUse) return #err("Kod zostal juz uzyty lub wygasl");
+    if (not found) { noteFail(); return #err("Nieprawidlowy kod") };
+    if (not okUse) { noteFail(); return #err("Kod zostal juz uzyty lub wygasl") };
     addMemberInt(msg.caller, note, msg.caller);
     #ok("Dostep przyznany")
   };
@@ -220,4 +207,34 @@ persistent actor Budget {
   };
 
   public query func health() : async Text { "ok" };
+
+  system func inspect({
+    caller : Principal;
+    arg : Blob;
+    msg : {
+      #addAdmin : () -> Principal;
+      #addMember : () -> (Principal, Text);
+      #createInvite : () -> (Text, Nat);
+      #deleteInvite : () -> Text;
+      #health : () -> ();
+      #kvGetAll : () -> ();
+      #kvPut : () -> (Text, Text, Nat);
+      #listInvites : () -> ();
+      #listMembers : () -> ();
+      #myAccess : () -> ();
+      #redeemInvite : () -> Text;
+      #removeAdmin : () -> Principal;
+      #removeMember : () -> Principal;
+    };
+  }) : Bool {
+    if (Principal.isAnonymous(caller)) return false;
+    switch (msg) {
+      case (#redeemInvite _) { arg.size() <= 64 and not redeemLocked() };
+      case (#addAdmin _ or #removeAdmin _) { Principal.isController(caller) or isAdmin(caller) };
+      case (#addMember _ or #createInvite _ or #deleteInvite _ or #removeMember _ or #listInvites _ or #listMembers _) { isAdmin(caller) };
+      case (#kvPut _) { isMember(caller) and arg.size() <= 1_100_000 };
+      case (#kvGetAll _) { isMember(caller) };
+      case (_) { true };
+    }
+  };
 };

@@ -1,0 +1,15 @@
+[
+  {
+    "match": "**/*",
+    "security_policy": "hardened",
+    "allow_raw_access": false,
+    "headers": {
+      "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; connect-src 'self' https://icp-api.io https://id.ai https://*.id.ai https://identity.ic0.app https://identity.internetcomputer.org https://*.icp0.io https://*.ic0.app https://api.coingecko.com https://api.frankfurter.app https://api.frankfurter.dev https://cdn.jsdelivr.net https://finnhub.io https://gielda-quote.marcinkolacz.workers.dev; img-src 'self' data: blob: https://*.coingecko.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+      "X-Frame-Options": "DENY",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "same-origin",
+      "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+    }
+  }
+]

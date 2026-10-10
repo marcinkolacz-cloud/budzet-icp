@@ -344,7 +344,7 @@ function showPeriod(){
   document.getElementById("preview").className="open";
   document.getElementById("previewTitle").textContent="Okres "+(state.rows[a].data||"")+" – "+(state.rows[b].data||"")+" · "+slice.length+" mies.";
   const host=document.getElementById("previewList"); host.innerHTML="";
-  const add=(name,val)=>{ const d=document.createElement("div"); d.innerHTML="<span>"+name+"</span><strong>"+zl(val)+"</strong>"; host.append(d); };
+  const add=(name,val)=>{ const d=document.createElement("div"),a=document.createElement("span"),b=document.createElement("strong"); a.textContent=name; b.textContent=zl(val); d.append(a,b); host.append(d); };
   add("Przychod", inn); add("Wydatki", out); add("Zostaje", inn-out);
   state.expenses.forEach(k=>{ const v=sumKey(k,"ex"); if(v||slice.some(r=>passes("ex",k,r))) add(k, v); });
 }

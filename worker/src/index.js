@@ -1,4 +1,5 @@
-const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET,OPTIONS" };
+const ORIGINS = ["https://57a6w-kiaaa-aaaam-qjmvq-cai.icp0.io", "https://57a6w-kiaaa-aaaam-qjmvq-cai.ic0.app"];
+let CORS = {};
 const UA = { "User-Agent": "Mozilla/5.0 (gielda-quote)" };
 const ok = t => /^[A-Z0-9.\-^=]{1,20}$/.test(t);
 
@@ -40,6 +41,10 @@ async function search(q) {
 
 export default {
   async fetch(req) {
+    const origin = req.headers.get("Origin") || "";
+    if (!ORIGINS.includes(origin)) return new Response("Forbidden", { status: 403 });
+    CORS = { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "GET,OPTIONS", "Vary": "Origin" };
+    if (req.method !== "GET" && req.method !== "OPTIONS") return new Response("Method not allowed", { status: 405, headers: CORS });
     if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
     const u = new URL(req.url), J = (o, s = 200) => new Response(JSON.stringify(o),
       { status: s, headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "max-age=60" } });

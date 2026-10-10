@@ -184,7 +184,7 @@ async function start(){
  const agent=await HttpAgent.create({identity,host:"https://icp-api.io"});
  actor=Actor.createActor(idl,{agent,canisterId:CANISTER});
  const acc=await access(pr);
- window.Auth.api=actor;window.Auth.admin=!!acc.admin;window.Auth.principal=pr;
+ window.Auth.api=actor;window.Auth.mk=f=>Actor.createActor(f,{agent,canisterId:CANISTER});window.Auth.admin=!!acc.admin;window.Auth.principal=pr;
  const wait=overlay('<p style="margin:0;color:var(--muted,#7a736a)">Wczytywanie danych konta…</p>');
  const have=await loadRemote();
  // dane sprzed logowania trafiaja do pierwszego konta, ktore zaloguje sie w tej przegladarce

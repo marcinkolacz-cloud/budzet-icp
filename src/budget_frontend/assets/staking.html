@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Staking</title><link rel="stylesheet" href="base.css"><link rel="stylesheet" href="theme.css"><script src="theme.js"></script>
+<style>
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0}.chips span{font-size:12px;color:var(--muted);background:var(--field,#f7f4ee);border-radius:999px;padding:3px 10px}
+.chips .bad{color:var(--neg)}.chips .ok{color:var(--pos)}
+.tag{font-size:11px;border-radius:999px;padding:2px 8px;background:var(--field,#f7f4ee);color:var(--muted)}
+.tag.ok{color:var(--pos)}.tag.bad{color:var(--neg)}
+.row-act button{padding:3px 9px;font-size:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+dialog{border:1px solid var(--line);border-radius:20px;padding:0;width:min(520px,calc(100vw - 24px));background:var(--card);color:var(--ink);box-shadow:0 24px 60px #0003}
+dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
+dialog form{padding:20px 22px;display:grid;gap:10px}dialog h3{margin:0 0 4px}dialog label{font-size:12px;color:var(--muted);display:grid;gap:4px}
+dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.sub b{color:var(--ink);font-weight:600}
+</style></head>
+<body><div class="app">
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html" class="on">Staking</a><a href="kosz.html">Kosz</a></nav>
+<header><div><h1>Staking</h1><div class="sub" id="st">Wczytywanie…</div><div class="chips" id="chips"></div></div>
+<div class="form"><button id="bn" type="button">Synchronizuj neurony</button><button id="bs" class="dark" type="button">Synchronizuj ceny, NEAR, INJ</button><button id="bi" type="button">Import kopii Rewards</button><button id="be" type="button">Eksport JSON</button></div></header>
+<p class="note" id="prog"></p>
+<div class="stats">
+<div class="stat"><span>Wartosc stakingu</span><strong id="t1">–</strong><small id="t1s"></small></div>
+<div class="stat"><span>Nagrody dzis</span><strong id="t2">–</strong><small id="t2s"></small></div>
+<div class="stat"><span>Nagrody w tym miesiacu</span><strong id="t3">–</strong><small id="t3s"></small></div>
+<div class="stat"><span>Nagrody lacznie</span><strong id="t4">–</strong><small id="t4s"></small></div></div>
+
+<section><h2>Nagrody miesiecznie (PLN)</h2><div id="mb"></div>
+<div class="legend" style="margin-top:6px"><span>Wycena nagrod po cenie z dnia otrzymania (ICP: cena z dnia syncu lub biezaca)</span></div></section>
+
+<section><h2>Aktywa</h2><table><thead><tr><th>Aktywo</th><th>Stake</th><th class="hm">Dzis</th><th class="hm">Sr. 7d</th><th class="hm">Sr. 30d</th><th>APY 30d</th><th>Nagrody lacznie</th><th>Wartosc PLN</th></tr></thead><tbody id="ta"></tbody></table></section>
+
+<section><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">Neurony ICP</h2><button id="an" type="button">Dodaj neuron</button></div>
+<p class="note">Sync czyta neuron z NNS Governance - canister backendu Budzetu (<code>tj3o4-rqaaa-aaaac-bgdmq-cai</code>) musi byc hotkeyem neuronu.</p>
+<table style="margin-top:8px"><thead><tr><th>Neuron</th><th>Stake ICP</th><th>Dojrzalosc</th><th class="hm">Kapital</th><th>Nagrody</th><th class="hm">Sr. dzienna</th><th>APY 30d</th><th>Sync</th><th></th></tr></thead><tbody id="tn"></tbody></table></section>
+
+<section><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">WaterNeuron (nICP)</h2><div class="form"><button id="aw" type="button">Dodaj pozycje</button><button id="as" class="dark" type="button">Dodaj odczyt</button></div></div>
+<table style="margin-top:8px"><thead><tr><th>Pozycja</th><th>nICP</th><th>Wplacono ICP</th><th>Wartosc ICP</th><th>Zarobione ICP</th><th>Zwrot</th><th>APY 30d</th><th></th></tr></thead><tbody id="tw"></tbody></table></section>
+
+<section><h2>Historia dzienna</h2><div class="tabs" id="tabs"></div><table><thead id="hh"></thead><tbody id="hb"></tbody></table><p class="note" id="hn"></p></section>
+</div>
+
+<dialog id="dn"><form method="dialog"><h3 id="dnt">Neuron</h3>
+<label>ID neuronu<input id="nid" inputmode="numeric" required></label><label>Nazwa<input id="nnm" maxlength="80"></label>
+<label>Data rozpoczecia<input id="nst" type="date"></label>
+<div class="act"><button value="x" formnovalidate>Anuluj</button><button value="ok" class="dark">Zapisz</button></div></form></dialog>
+<dialog id="dw"><form method="dialog"><h3>Pozycja WaterNeuron</h3>
+<label>Nazwa<input id="wnm" maxlength="80" required></label><label>Data rozpoczecia<input id="wst" type="date"></label>
+<div class="act"><button value="x" formnovalidate>Anuluj</button><button value="ok" class="dark">Zapisz</button></div></form></dialog>
+<dialog id="ds"><form method="dialog"><h3>Odczyt WaterNeuron</h3>
+<label>Pozycja<select id="spid"></select></label><label>Data<input id="sdt" type="date" required></label>
+<label>nICP posiadane<input id="sn" inputmode="decimal" required></label><label>Wplacono lacznie (ICP)<input id="sp" inputmode="decimal" required></label>
+<label>Wartosc do wyplaty (ICP)<input id="sr" inputmode="decimal" required></label>
+<div class="act"><button value="x" formnovalidate>Anuluj</button><button value="ok" class="dark">Zapisz</button></div></form></dialog>
+
+<script src="auth.js"></script>
+<script type="text/x-after-auth" src="kchart.js"></script>
+<script type="text/x-after-auth">
+;(function(){
+const $=id=>document.getElementById(id);
+const idl=({IDL})=>{
+ const N=IDL.Record({id:IDL.Nat64,name:IDL.Text,start:IDL.Int,dissolve:IDL.Nat64,initStake:IDL.Nat64,stake:IDL.Nat64});
+ const R=IDL.Record({nid:IDL.Nat64,ts:IDL.Int,un:IDL.Nat64,sm:IDL.Nat64,auto:IDL.Bool,delta:IDL.Int,sd:IDL.Nat64,ev:IDL.Text});
+ const WP=IDL.Record({id:IDL.Nat,name:IDL.Text,start:IDL.Int});
+ const W=IDL.Record({pid:IDL.Nat,date:IDL.Int,nicp:IDL.Float64,paid:IDL.Float64,red:IDL.Float64});
+ const E=IDL.Record({chain:IDL.Text,day:IDL.Text,staked:IDL.Nat,pending:IDL.Nat,reward:IDL.Int,usd:IDL.Float64,pln:IDL.Float64,at:IDL.Int});
+ const P=IDL.Record({day:IDL.Text,icpUsd:IDL.Float64,icpPln:IDL.Float64,nearUsd:IDL.Float64,nearPln:IDL.Float64,injUsd:IDL.Float64,injPln:IDL.Float64});
+ const S=IDL.Record({nid:IDL.Nat64,ok:IDL.Bool,err:IDL.Text,at:IDL.Int});
+ const All=IDL.Record({neurons:IDL.Vec(N),rewards:IDL.Vec(R),wtnPos:IDL.Vec(WP),wtn:IDL.Vec(W),ext:IDL.Vec(E),prices:IDL.Vec(P),sync:IDL.Vec(S),lastRun:IDL.Int,log:IDL.Text,nextRunSec:IDL.Nat,hasKey:IDL.Bool});
+ const RT=IDL.Variant({ok:IDL.Text,err:IDL.Text}),RN=IDL.Variant({ok:IDL.Nat,err:IDL.Text});
+ return IDL.Service({stAll:IDL.Func([],[All],["query"]),stNeuronPut:IDL.Func([N],[RT],[]),stNeuronRemove:IDL.Func([IDL.Nat64],[RT],[]),
+  stRewardsImport:IDL.Func([IDL.Vec(R)],[RN],[]),stRewardDelete:IDL.Func([IDL.Nat64,IDL.Int],[RT],[]),
+  stWtnPosPut:IDL.Func([IDL.Nat,IDL.Text,IDL.Int],[RN],[]),stWtnPosRemove:IDL.Func([IDL.Nat],[RT],[]),
+  stWtnPut:IDL.Func([IDL.Vec(W)],[RN],[]),stWtnDelete:IDL.Func([IDL.Nat,IDL.Int],[RT],[]),
+  stExtImport:IDL.Func([IDL.Vec(E)],[RN],[]),stSyncNow:IDL.Func([],[RT],[]),stSyncNeurons:IDL.Func([],[RT],[])});
+};
+const A=Auth.mk(idl);
+let D=null,live={},tab="all";
+const TZ="Europe/Warsaw",day=ns=>new Date(Number(BigInt(ns)/1000000n)).toLocaleDateString("sv",{timeZone:TZ});
+const today=new Date().toLocaleDateString("sv",{timeZone:TZ}),month=today.slice(0,7);
+const f=(v,d=2)=>new Intl.NumberFormat("pl-PL",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v||0);
+const zl=v=>new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN",maximumFractionDigits:0}).format(v||0);
+const zl2=v=>new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN",minimumFractionDigits:2,maximumFractionDigits:2}).format(v||0);
+const pct=v=>v?f(v,2)+"%":"–";
+const e8=v=>Number(v)/1e8,esc=KC.esc;
+const unwrap=r=>{if("err" in r)throw new Error(r.err);return r.ok;};
+const prog=t=>{$("prog").textContent=t||"";};
+
+// --- obliczenia
+// nagroda = wzrost dojrzalosci (takze w odczycie z dopłata do stake)
+const isRew=r=>(r.ev==="normalGrowth"||r.ev==="externalTopUp")&&r.delta>0n;
+function neuronStats(n){
+ const h=D.rewards.filter(r=>r.nid===n.id);let cap=Number(n.initStake),rew=0,pos=0,cnt=0,todayR=0,rates=[];
+ for(const r of h){
+  if(r.ev==="externalTopUp")cap+=Number(r.sd);
+  const g=isRew(r);
+  if(g){rew+=Number(r.delta);cnt++;if(day(r.ts)===today)todayR+=Number(r.delta);}
+  rates.push(g&&cap>0?Number(r.delta)/cap:0);
+ }
+ const last=h[h.length-1],mat=last?Number(last.un)+Number(last.sm):0;
+ const apy=rates.length>=30?(Math.pow(1+rates.slice(-30).reduce((a,x)=>a+x,0)/30,365)-1)*100:0;
+ return {h,cap:cap/1e8,rew:rew/1e8,avg:cnt?rew/cnt/1e8:0,today:todayR/1e8,mat:mat/1e8,stake:e8(n.stake),apy};
+}
+function wtnStats(p){
+ const s=D.wtn.filter(x=>x.pid===p.id).sort((a,b)=>Number(a.date-b.date));let earned=0,todayR=0;const ev=[];
+ s.forEach((x,i)=>{const pv=s[i-1];const t=!pv?"firstReading":x.nicp>pv.nicp?"capitalAdded":x.nicp<pv.nicp?"withdrawal":"organicGrowth";ev.push(t);
+  if(t==="organicGrowth"){const g=x.red-pv.red;earned+=g;if(day(x.date)===today)todayR+=g;}});
+ let apy=0;
+ if(s.length>=2&&(Number(s[s.length-1].date-s[0].date)/864e11)>=30){
+  const w0=Number(s[s.length-1].date)-30*864e11;let sum=0,c=0;
+  s.forEach((x,i)=>{if(i&&ev[i]==="organicGrowth"&&x.red>s[i-1].red&&Number(x.date)>=w0){const dd=Math.max(1,Number(x.date-s[i-1].date)/864e11);sum+=(x.red-s[i-1].red)/s[i-1].red/dd;c++;}});
+  if(c)apy=(Math.pow(1+sum/c,365)-1)*100;
+ }
+ const l=s[s.length-1]||{nicp:0,paid:0,red:0};
+ return {s,ev,earned,today:todayR,nicp:l.nicp,paid:l.paid,red:l.red,ret:l.paid?earned/l.paid*100:0,apy};
+}
+function extStats(chain){
+ const dec=chain==="near"?1e24:1e18,rows=D.ext.filter(x=>x.chain===chain).sort((a,b)=>a.day<b.day?-1:1);
+ const r=x=>Number(x.reward)/dec,l=rows[rows.length-1];
+ const avg=n=>{if(rows.length<2)return 0;const t=rows.slice(-n);return t.reduce((a,x)=>a+r(x),0)/t.length;};
+ const tot=rows.reduce((a,x)=>a+r(x),0),staked=l?Number(l.staked)/dec:0,a30=avg(30);
+ return {rows,dec,r,staked,today:l&&l.day===today?r(l):0,avg7:avg(7),avg30:a30,tot,apy:staked?(Math.pow(1+a30/staked,365)-1)*100:0,
+  pln:live[chain]?.pln||l?.pln||0,usd:live[chain]?.usd||l?.usd||0,last:l};
+}
+const priceOn=(d,k)=>{const p=D.prices.find(x=>x.day===d);return p&&p[k]>0?p[k]:0;};
+function icpPln(){return live.icp?.pln||(D.prices.length?D.prices[D.prices.length-1].icpPln:0);}
+
+// dzienna mapa nagrod (jednostki + PLN)
+function dailyMap(){
+ const m=new Map(),at=d=>{if(!m.has(d))m.set(d,{icp:0,nicp:0,near:0,inj:0,pln:0});return m.get(d);},ip=icpPln();
+ for(const r of D.rewards)if(isRew(r)){const d=day(r.ts),v=e8(r.delta),o=at(d);o.icp+=v;o.pln+=v*(priceOn(d,"icpPln")||ip);}
+ for(const p of D.wtnPos){const w=wtnStats(p);w.s.forEach((x,i)=>{if(i&&w.ev[i]==="organicGrowth"){const g=x.red-w.s[i-1].red;if(g>0){const d=day(x.date),o=at(d);o.nicp+=g;o.pln+=g*(priceOn(d,"icpPln")||ip);}}});}
+ for(const c of ["near","inj"]){const e=extStats(c);for(const x of e.rows){const v=e.r(x),o=at(x.day);o[c]+=v;o.pln+=v*(x.pln||e.pln);}}
+ return m;
+}
+
+// --- render
+function render(){
+ const ip=icpPln(),N=D.neurons.map(n=>({n,s:neuronStats(n)})),W=D.wtnPos.map(p=>({p,s:wtnStats(p)})),near=extStats("near"),inj=extStats("inj");
+ const icpStake=N.reduce((a,x)=>a+x.s.stake+x.s.mat,0),wtnV=W.reduce((a,x)=>a+x.s.red,0);
+ const vIcp=icpStake*ip,vW=wtnV*ip,vN=near.staked*near.pln,vI=inj.staked*inj.pln;
+ const dm=dailyMap(),td=dm.get(today)||{pln:0,icp:0,nicp:0,near:0,inj:0};
+ let mon=0,tot=0;const months=new Map();
+ for(const [d,o] of dm){tot+=o.pln;if(d.startsWith(month))mon+=o.pln;months.set(d.slice(0,7),(months.get(d.slice(0,7))||0)+o.pln);}
+ $("t1").textContent=zl(vIcp+vW+vN+vI);$("t1s").textContent=`ICP ${f(icpStake+wtnV,1)} · NEAR ${f(near.staked,0)} · INJ ${f(inj.staked,1)}`;
+ $("t2").textContent=zl2(td.pln);$("t2s").textContent=[td.icp&&f(td.icp,3)+" ICP",td.nicp&&f(td.nicp,3)+" nICP",td.near&&f(td.near,2)+" NEAR",td.inj&&f(td.inj,3)+" INJ"].filter(Boolean).join(" · ")||"brak odczytow z dzis";
+ $("t3").textContent=zl(mon);$("t3s").textContent=month;
+ try{localStorage.setItem("staking-sum",JSON.stringify({v:vIcp+vW+vN+vI,td:td.pln,mon,at:Date.now()}));}catch{}
+ $("t4").textContent=zl(tot);$("t4s").textContent=dm.size+" dni z nagrodami";
+ const ml=[...months.entries()].sort(([a],[b])=>a<b?-1:1).slice(-24).map(([k,v])=>({label:k.slice(2).replace("-","/"),value:Math.round(v)}));
+ $("mb").innerHTML=KC.bars(ml,{label:"Nagrody miesiecznie PLN",w:$("mb").clientWidth,color:"#1a8a4a"});
+ // aktywa
+ const nRew=N.reduce((a,x)=>a+x.s.rew,0),nAvg=N.reduce((a,x)=>a+x.s.avg,0),capN=N.reduce((a,x)=>a+x.s.cap,0),apyN=capN?N.reduce((a,x)=>a+x.s.apy*x.s.cap,0)/capN:0;
+ const capW=W.reduce((a,x)=>a+x.s.paid,0),apyW=capW?W.reduce((a,x)=>a+x.s.apy*x.s.paid,0)/capW:0;
+ const row=(nm,stake,u,t,a7,a30,apy,tr,v)=>`<tr><td><b>${nm}</b></td><td>${f(stake,2)} ${u}</td><td class="hm">${t?f(t,4):"–"}</td><td class="hm">${a7?f(a7,4):"–"}</td><td class="hm">${a30?f(a30,4):"–"}</td><td>${pct(apy)}</td><td>${f(tr,3)} ${u}</td><td>${zl(v)}</td></tr>`;
+ $("ta").innerHTML=row("ICP neurony",icpStake,"ICP",td.icp,0,nAvg,apyN,nRew,vIcp)+row("WaterNeuron",wtnV,"ICP",td.nicp,0,0,apyW,W.reduce((a,x)=>a+x.s.earned,0),vW)+
+  row("NEAR",near.staked,"NEAR",near.today,near.avg7,near.avg30,near.apy,near.tot,vN)+row("INJ",inj.staked,"INJ",inj.today,inj.avg7,inj.avg30,inj.apy,inj.tot,vI);
+ // neurony
+ const syn=id=>D.sync.find(x=>x.nid===id);
+ $("tn").innerHTML=N.length?N.map(({n,s})=>{const y=syn(n.id),tg=!y?'<span class="tag">brak</span>':y.ok?`<span class="tag ok" title="${esc(day(y.at))}">OK</span>`:`<span class="tag bad" title="${esc(y.err)}">blad</span>`;
+  return `<tr><td><b>${esc(n.name||"Neuron")}</b><br><small class="note">${n.id}</small></td><td>${f(s.stake,2)}</td><td>${f(s.mat,3)}</td><td class="hm">${f(s.cap,2)}</td><td>${f(s.rew,3)}</td><td class="hm">${f(s.avg,4)}</td><td>${pct(s.apy)}</td><td>${tg}</td>
+  <td class="row-act"><button data-en="${n.id}">Edytuj</button> <button data-rn="${n.id}">Usun</button></td></tr>`;}).join(""):'<tr><td colspan="9" class="note">Brak neuronow - dodaj lub zaimportuj kopie.</td></tr>';
+ const errs=D.sync.filter(x=>!x.ok);if(errs.length)$("tn").insertAdjacentHTML("beforeend",`<tr><td colspan="9" class="note neg">${errs.map(x=>esc(x.nid+": "+x.err)).join("<br>")}</td></tr>`);
+ // wtn
+ $("tw").innerHTML=W.length?W.map(({p,s})=>`<tr><td><b>${esc(p.name)}</b><br><small class="note">${s.s.length} odczytow</small></td><td>${f(s.nicp,4)}</td><td>${f(s.paid,4)}</td><td>${f(s.red,4)}</td><td>${f(s.earned,4)}</td><td>${pct(s.ret)}</td><td>${pct(s.apy)}</td>
+  <td class="row-act"><button data-ew="${p.id}">Edytuj</button> <button data-rw="${p.id}">Usun</button></td></tr>`).join(""):'<tr><td colspan="8" class="note">Brak pozycji.</td></tr>';
+ renderHist(dm,N,W);
+ // status
+ const nx=Number(D.nextRunSec),h=Math.floor(nx/3600),mi=Math.floor(nx%3600/60);
+ $("st").innerHTML=`Ostatni sync: <b>${D.lastRun?new Date(Number(D.lastRun/1000000n)).toLocaleString("pl-PL",{timeZone:TZ}):"–"}</b> · auto 08:00 ceny/NEAR/INJ (za ${h} h ${mi} min) · neurony recznie`;
+ $("chips").innerHTML=(D.hasKey?"":'<span class="bad">Brak klucza CoinGecko (stSetKey)</span>')+(D.log?`<span class="${D.log==="OK"?"ok":"bad"}">${esc(D.log)}</span>`:"")+(live.icp?`<span>ICP ${zl2(live.icp.pln)}</span><span>NEAR ${zl2(near.pln)}</span><span>INJ ${zl2(inj.pln)}</span>`:"");
+}
+function renderHist(dm,N,W){
+ const T=[["all","Wszystko"],["icp","ICP neurony"],["wtn","WaterNeuron"],["near","NEAR"],["inj","INJ"]];
+ $("tabs").innerHTML=T.map(([k,l])=>`<button type="button" data-tab="${k}" class="${tab===k?"on":""}">${l}</button>`).join("");
+ let head="",rows="",note="";
+ if(tab==="all"){
+  head="<tr><th>Dzien</th><th>ICP</th><th>nICP (ICP)</th><th>NEAR</th><th>INJ</th><th>PLN</th></tr>";
+  rows=[...dm.entries()].sort(([a],[b])=>a<b?1:-1).slice(0,90).map(([d,o])=>`<tr><td>${d}</td><td>${o.icp?f(o.icp,4):"–"}</td><td>${o.nicp?f(o.nicp,4):"–"}</td><td>${o.near?f(o.near,3):"–"}</td><td>${o.inj?f(o.inj,4):"–"}</td><td>${zl2(o.pln)}</td></tr>`).join("");
+  note="Ostatnie 90 dni.";
+ }else if(tab==="icp"){
+  head="<tr><th>Data</th><th>Neuron</th><th>Zdarzenie</th><th>Zmiana</th><th>Dojrzalosc</th><th class=\"hm\">Stake +</th><th></th></tr>";
+  const nm=id=>(D.neurons.find(n=>n.id===id)||{}).name||String(id);
+  rows=[...D.rewards].sort((a,b)=>Number(b.ts-a.ts)).slice(0,200).map(r=>`<tr><td>${day(r.ts)}</td><td>${esc(nm(r.nid))}</td><td><span class="tag">${esc(r.ev)}</span></td><td class="${r.delta<0n?"neg":"pos"}">${f(e8(r.delta),4)}</td><td>${f(e8(r.un+r.sm),3)}</td><td class="hm">${r.sd?f(e8(r.sd),3):"–"}</td>
+   <td class="row-act"><button data-dr="${r.nid}|${r.ts}">Usun</button></td></tr>`).join("");
+  note="Ostatnie 200 odczytow.";
+ }else if(tab==="wtn"){
+  head="<tr><th>Data</th><th>Pozycja</th><th>Zdarzenie</th><th>nICP</th><th>Wplacono</th><th>Wartosc</th><th></th></tr>";
+  rows=W.flatMap(({p,s})=>s.s.map((x,i)=>({p,x,ev:s.ev[i]}))).sort((a,b)=>Number(b.x.date-a.x.date)).map(({p,x,ev})=>`<tr><td>${day(x.date)}</td><td>${esc(p.name)}</td><td><span class="tag">${ev}</span></td><td>${f(x.nicp,4)}</td><td>${f(x.paid,4)}</td><td>${f(x.red,4)}</td>
+   <td class="row-act"><button data-dw="${p.id}|${x.date}">Usun</button></td></tr>`).join("");
+ }else{
+  const e=extStats(tab),u=tab.toUpperCase();
+  head=`<tr><th>Dzien</th><th>Stake ${u}</th>${tab==="inj"?"<th>Do odebrania</th>":""}<th>Nagroda</th><th>Cena PLN</th><th>PLN</th></tr>`;
+  rows=[...e.rows].reverse().map(x=>`<tr><td>${x.day}</td><td>${f(Number(x.staked)/e.dec,3)}</td>${tab==="inj"?`<td>${f(Number(x.pending)/e.dec,4)}</td>`:""}<td>${f(e.r(x),4)}</td><td>${zl2(x.pln)}</td><td>${zl2(e.r(x)*(x.pln||e.pln))}</td></tr>`).join("");
+  note=e.rows.length<2?"Zbieranie danych bazowych (min. 2 odczyty).":"";
+ }
+ $("hh").innerHTML=head;$("hb").innerHTML=rows||'<tr><td colspan="7" class="note">Brak danych.</td></tr>';$("hn").textContent=note;
+}
+
+async function load(){D=await A.stAll();render();}
+async function livePrices(){
+ try{const r=await fetch("https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,near,injective-protocol&vs_currencies=usd,pln");const j=await r.json();
+  live={icp:j["internet-computer"],near:j.near,inj:j["injective-protocol"]};if(D)render();}catch{}
+}
+async function act(fn,msg){try{prog(msg||"Zapisywanie…");await fn();await load();prog("");}catch(e){prog("Blad: "+(e&&e.message||e));}}
+
+// --- formularze
+const nsOf=d=>BigInt(Date.parse(d+"T08:00:00"))*1000000n,dOf=ns=>day(ns);
+function dlg(id,init){return new Promise(res=>{const d=$(id);init&&init();d.returnValue="";d.onclose=()=>res(d.returnValue==="ok");d.showModal();});}
+$("an").onclick=()=>editNeuron(null);
+async function editNeuron(n){
+ $("dnt").textContent=n?"Edytuj neuron":"Dodaj neuron";
+ const ok=await dlg("dn",()=>{$("nid").value=n?String(n.id):"";$("nid").disabled=!!n;$("nnm").value=n?n.name:"";$("nst").value=n?dOf(n.start):today;});
+ if(!ok)return;let id;try{id=BigInt($("nid").value.trim());}catch{prog("Nieprawidlowe ID");return;}
+ act(async()=>unwrap(await A.stNeuronPut({id,name:$("nnm").value.trim(),start:nsOf($("nst").value||today),dissolve:n?n.dissolve:0n,initStake:n?n.initStake:0n,stake:n?n.stake:0n})));
+}
+$("aw").onclick=()=>editWtn(null);
+async function editWtn(p){
+ const ok=await dlg("dw",()=>{$("wnm").value=p?p.name:"";$("wst").value=p?dOf(p.start):today;});
+ if(ok)act(async()=>unwrap(await A.stWtnPosPut(p?p.id:0n,$("wnm").value.trim(),nsOf($("wst").value||today))));
+}
+$("as").onclick=async()=>{
+ if(!D.wtnPos.length){prog("Najpierw dodaj pozycje WaterNeuron.");return;}
+ const ok=await dlg("ds",()=>{$("spid").innerHTML=D.wtnPos.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("");$("sdt").value=today;["sn","sp","sr"].forEach(k=>$(k).value="");
+  const l=D.wtn.filter(x=>x.pid===D.wtnPos[0].id).slice(-1)[0];if(l){$("sn").value=l.nicp;$("sp").value=l.paid;}});
+ if(!ok)return;const n=v=>Number(String(v).replace(/\s/g,"").replace(",","."));
+ const r={pid:BigInt($("spid").value),date:nsOf($("sdt").value),nicp:n($("sn").value),paid:n($("sp").value),red:n($("sr").value)};
+ if(![r.nicp,r.paid,r.red].every(Number.isFinite)){prog("Nieprawidlowe liczby");return;}
+ act(async()=>unwrap(await A.stWtnPut([r])));
+};
+document.addEventListener("click",e=>{
+ const b=e.target.closest("button");if(!b)return;const ds=b.dataset;
+ if(ds.tab){tab=ds.tab;render();}
+ else if(ds.en)editNeuron(D.neurons.find(n=>String(n.id)===ds.en));
+ else if(ds.rn&&confirm("Usunac neuron "+ds.rn+" razem z cala historia?"))act(async()=>unwrap(await A.stNeuronRemove(BigInt(ds.rn))));
+ else if(ds.ew)editWtn(D.wtnPos.find(p=>String(p.id)===ds.ew));
+ else if(ds.rw&&confirm("Usunac pozycje WaterNeuron razem z historia?"))act(async()=>unwrap(await A.stWtnPosRemove(BigInt(ds.rw))));
+ else if(ds.dr&&confirm("Usunac odczyt?")){const [a,c]=ds.dr.split("|");act(async()=>unwrap(await A.stRewardDelete(BigInt(a),BigInt(c))));}
+ else if(ds.dw&&confirm("Usunac odczyt?")){const [a,c]=ds.dw.split("|");act(async()=>unwrap(await A.stWtnDelete(BigInt(a),BigInt(c))));}
+});
+$("bs").onclick=async()=>{$("bs").disabled=true;try{prog("Synchronizacja (CoinGecko, NEAR, INJ)…");const r=await A.stSyncNow();prog("err" in r?r.err:"Sync: "+r.ok);await load();}catch(e){prog("Blad: "+(e&&e.message||e));}$("bs").disabled=false;};
+$("bn").onclick=async()=>{$("bn").disabled=true;try{prog("Synchronizacja neuronow (NNS)…");const r=await A.stSyncNeurons();prog("err" in r?r.err:"Neurony: "+r.ok);await load();}catch(e){prog("Blad: "+(e&&e.message||e));}$("bn").disabled=false;};
+
+// --- import kopii NeuronRewardsTracker (rewards-backup-*.json) lub wlasnego eksportu
+const B=v=>BigInt(String(v??0).split(".")[0]),vk=v=>typeof v==="string"?v:v&&typeof v==="object"?Object.keys(v)[0]:"";
+function compact(rows){
+ // usun puste odczyty (delta 0) i scal wiele odczytow normalGrowth z jednego dnia
+ const out=[];
+ for(const r of rows.sort((a,b)=>a.ts<b.ts?-1:1)){
+  if(r.ev==="normalGrowth"&&r.delta===0n)continue;
+  const p=out[out.length-1];
+  if(p&&p.nid===r.nid&&p.ev==="normalGrowth"&&r.ev==="normalGrowth"&&day(p.ts)===day(r.ts)){out[out.length-1]={...r,delta:p.delta+r.delta};continue;}
+  out.push(r);
+ }
+ return out;
+}
+async function batches(list,size,fn,label){let n=0;for(let i=0;i<list.length;i+=size){prog(`${label}: ${Math.min(i+size,list.length)}/${list.length}`);n+=Number(unwrap(await fn(list.slice(i,i+size))));}return n;}
+async function importJson(j){
+ const own=j.version==="staking-1";
+ const neurons=own?j.neurons.map(x=>({n:x,r:j.rewards.filter(r=>String(r.nid)===String(x.id))})):(j.neurons||[]).map(x=>({n:x.neuron,r:x.rewards||[]}));
+ const wtn=own?j.wtnPos.map(p=>({p,s:j.wtn.filter(s=>String(s.pid)===String(p.id))})):(j.wtn||[]).map(x=>({p:x.position,s:x.snapshots||[]}));
+ const ext=own?j.ext:[...(j.near||[]).map(x=>({...x,chain:"near"})),...(j.inj||[]).map(x=>({...x,chain:"inj"}))];
+ let raw=0;const rew=[];
+ for(const {n,r} of neurons){const id=B(n.id);raw+=r.length;
+  rew.push(...r.map(x=>own?{nid:id,ts:B(x.ts),un:B(x.un),sm:B(x.sm),auto:!!x.auto,delta:B(x.delta),sd:B(x.sd),ev:x.ev}:
+   {nid:id,ts:B(x.timestamp),un:B(x.unstakedMaturityE8s),sm:B(x.stakedMaturityE8s),auto:!!x.autoStakeMaturity,delta:B(x.deltaE8s),sd:B(x.stakeDeltaE8s),ev:vk(x.eventType)}));}
+ const cr=[];for(const {n} of neurons){const id=B(n.id);cr.push(...compact(rew.filter(r=>r.nid===id)));}
+ const snaps=wtn.flatMap(({p,s})=>s.map(x=>own?{pid:B(x.pid),date:B(x.date),nicp:+x.nicp,paid:+x.paid,red:+x.red}:{pid:B(p.id),date:B(x.date),nicp:+x.nicpHeld,paid:+x.totalIcpPaid,red:+x.redeemableIcpValue}));
+ const er=ext.map(x=>own?{chain:x.chain,day:x.day,staked:B(x.staked),pending:B(x.pending),reward:B(x.reward),usd:+x.usd,pln:+x.pln,at:B(x.at)}:
+  {chain:vk(x.chain)||x.chain,day:x.day,staked:B(x.stakedBaseUnits),pending:B(x.pendingBaseUnits),reward:B(x.rewardBaseUnits),usd:+x.priceUsd||0,pln:+x.pricePln||0,at:B(x.fetchedAtNanos)});
+ if(!confirm(`Import: ${neurons.length} neuronow, ${raw} odczytow ICP (po kompaktacji ${cr.length}), ${wtn.length} pozycji WTN / ${snaps.length} odczytow, ${er.filter(x=>x.chain==="near").length} dni NEAR, ${er.filter(x=>x.chain==="inj").length} dni INJ.\nIstniejace wpisy sa pomijane. Kontynuowac?`))return;
+ for(const {n} of neurons){prog("Neuron "+n.id);
+  unwrap(await A.stNeuronPut(own?{id:B(n.id),name:n.name,start:B(n.start),dissolve:B(n.dissolve),initStake:B(n.initStake),stake:B(n.stake)}:
+   {id:B(n.id),name:n.name||"",start:B(n.startDate),dissolve:B(n.dissolveDelaySeconds),initStake:B(n.initialStakeE8s),stake:B(n.stakedE8s)}));}
+ const a=await batches(cr,1500,x=>A.stRewardsImport(x),"Odczyty ICP");
+ // id pozycji WTN: istniejaca o tej samej nazwie albo nowa (id 0 z Rewards = nowe id w Budzecie)
+ const pmap=new Map();
+ for(const {p} of wtn){prog("WTN "+p.name);const nm=p.name||"WTN",ex=D.wtnPos.find(x=>x.name===nm);
+  const nid=ex?ex.id:unwrap(await A.stWtnPosPut(B(p.id)>0n&&!D.wtnPos.some(x=>x.id===B(p.id))?B(p.id):0n,nm,B(own?p.start:p.startDate)));
+  pmap.set(String(B(p.id)),nid);}
+ snaps.forEach(x=>{x.pid=pmap.get(String(x.pid))??x.pid;});
+ const b=await batches(snaps,1500,x=>A.stWtnPut(x),"Odczyty WTN");
+ const c=await batches(er,1500,x=>A.stExtImport(x),"NEAR/INJ");
+ await load();prog(`Zaimportowano: ICP ${a}, WTN ${b}, NEAR/INJ ${c}.`);
+}
+$("bi").onclick=()=>{const i=document.createElement("input");i.type="file";i.accept=".json,application/json";
+ i.onchange=async()=>{const file=i.files[0];if(!file)return;try{prog("Wczytywanie "+file.name+" ("+Math.round(file.size/1024)+" KB)…");await importJson(JSON.parse(await file.text()));}catch(e){prog("Blad importu: "+(e&&e.message||e));}};i.click();};
+$("be").onclick=()=>{
+ const j=JSON.stringify({version:"staking-1",exportedAt:new Date().toISOString(),...D},(_k,v)=>typeof v==="bigint"?v.toString():v,1);
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([j],{type:"application/json"}));a.download=`staking-backup-${today}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+addEventListener("resize",()=>{clearTimeout(window.__rz);window.__rz=setTimeout(()=>D&&render(),200);});
+load().then(livePrices).catch(e=>prog("Blad wczytywania: "+(e&&e.message||e)));
+})();
+</script></body></html>

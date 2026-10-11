@@ -107,81 +107,80 @@ async function sendMail(env, txt) {
 }
 
 
-// ===== Etap 2: prawdziwe zlecenia Kraken (spot, MARKET). Klucze tylko w sekretach workera. =====
-// sekrety: KR_KEY, KR_SECRET; zmienne: LIVE=1 (wylacznik), MAX_ORDER_USD, MAX_DAY_USD, QUOTE (USDC lub USD)
-const KRB = "https://api.kraken.com", TRAD = ["ETH", "NEAR", "ICP", "INJ"];
-const KA = { ETH: "XETH", USD: "ZUSD", EUR: "ZEUR" }, ka = a => KA[a] || a;
-const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0)), b64e = b => btoa(String.fromCharCode(...new Uint8Array(b)));
+// ===== Etap 2: prawdziwe zlecenia OKX EEA (spot, MARKET, pary *-USDC). Klucze tylko w sekretach workera. =====
+// sekrety: OKX_KEY, OKX_SECRET, OKX_PASS; zmienne: LIVE=1 (wylacznik), MAX_ORDER_USD, MAX_DAY_USD, QUOTE (domyslnie USDC)
+const OKB = "https://eea.okx.com", TRAD = ["ETH", "NEAR", "ICP", "INJ"];
+const b64e = b => btoa(String.fromCharCode(...new Uint8Array(b)));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function krPub(path, params = {}) {
-  const r = await fetch(`${KRB}/0/public/${path}?${new URLSearchParams(params)}`, { headers: UA }), j = await r.json();
-  if (j.error && j.error.length) throw new Error("kraken " + j.error.join(","));
-  return j.result;
+const QT = env => env.QUOTE || "USDC", iid = (s, q) => `${s}-${q}`;
+const hasK = env => env.OKX_KEY && env.OKX_SECRET && env.OKX_PASS;
+async function okx(env, method, path, q = null, body = null) {
+  const rp = path + (q ? "?" + new URLSearchParams(q) : ""), bs = body ? JSON.stringify(body) : "", ts = new Date().toISOString();
+  const h = { "Content-Type": "application/json", ...UA };
+  if (env) {
+    const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.OKX_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    Object.assign(h, { "OK-ACCESS-KEY": env.OKX_KEY, "OK-ACCESS-PASSPHRASE": env.OKX_PASS, "OK-ACCESS-TIMESTAMP": ts,
+      "OK-ACCESS-SIGN": b64e(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(ts + method + rp + bs))) });
+  }
+  const r = await fetch(OKB + rp, { method, headers: h, body: bs || undefined }), j = await r.json().catch(() => ({ code: "HTTP" + r.status }));
+  if (j.code !== "0") throw new Error("okx " + j.code + " " + (j.data?.[0]?.sMsg || j.msg || ""));
+  return j.data;
 }
-async function kr(env, method, params = {}) {
-  const path = `/0/private/${method}`, nonce = String(Date.now() * 1000 + Math.floor(Math.random() * 1000));
-  const body = new URLSearchParams({ nonce, ...params }).toString();
-  const sha = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nonce + body));
-  const msg = new Uint8Array([...new TextEncoder().encode(path), ...new Uint8Array(sha)]);
-  const k = await crypto.subtle.importKey("raw", b64d(env.KR_SECRET), { name: "HMAC", hash: "SHA-512" }, false, ["sign"]);
-  const r = await fetch(KRB + path, { method: "POST", headers: { "API-Key": env.KR_KEY, "API-Sign": b64e(await crypto.subtle.sign("HMAC", k, msg)),
-    "Content-Type": "application/x-www-form-urlencoded", ...UA }, body });
-  const j = await r.json().catch(() => ({ error: ["HTTP " + r.status] }));
-  if (j.error && j.error.length) throw new Error("kraken " + j.error.join(","));
-  return j.result;
-}
-const QT = env => env.QUOTE || "USDC";
+const dec = x => (String(x).split(".")[1] || "").replace(/0+$/, "").length;
 async function pairInfo(sym, q) {
-  const r = await fetch(`${KRB}/0/public/AssetPairs`, { headers: UA, cf: { cacheTtl: 3600, cacheEverything: true } }), j = await r.json();
-  if (j.error && j.error.length) throw new Error("kraken " + j.error.join(","));
-  const ws = `${sym}/${q}`, key = Object.keys(j.result).find(k => j.result[k].wsname === ws || j.result[k].altname === sym + q), p = j.result[key];
-  if (!p || (p.status && p.status !== "online")) throw new Error(`brak pary ${sym}${q}`);
-  return { key, lot: p.lot_decimals ?? 8, omin: +(p.ordermin || 0), cmin: +(p.costmin || 0.5) };
+  const d = await okx(null, "GET", "/api/v5/public/instruments", { instType: "SPOT", instId: iid(sym, q) }).catch(() => []), p = d[0];
+  if (!p || p.state !== "live") throw new Error(`brak pary ${sym}-${q}`);
+  return { id: p.instId, lot: dec(p.lotSz), lsz: +p.lotSz, omin: +p.minSz };
 }
 async function balances(env) {
-  const r = await kr(env, "BalanceEx"), m = {};
-  for (const a of [QT(env), ...TRAD]) { const x = r[ka(a)]; m[a] = x ? +x.balance - +(x.hold_trade || 0) : 0; }
+  const d = await okx(env, "GET", "/api/v5/account/balance", { ccy: [QT(env), ...TRAD].join(",") }), m = {};
+  for (const a of [QT(env), ...TRAD]) m[a] = 0;
+  for (const x of d[0]?.details || []) if (x.ccy in m) m[x.ccy] = +x.availBal || 0;
   return m;
 }
-// userref (int32) z identyfikatora zlecenia canistra -> idempotencja
-async function uref(cid) { const h = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cid))); return ((h[0] << 24 | h[1] << 16 | h[2] << 8 | h[3]) & 0x7fffffff) || 1; }
-async function findOrd(env, ur) {
-  const o = await kr(env, "OpenOrders", { userref: ur }), c = await kr(env, "ClosedOrders", { userref: ur, start: Math.floor(Date.now() / 1000) - 14 * 86400 });
-  const all = { ...(o.open || {}), ...(c.closed || {}) }, id = Object.keys(all)[0];
-  return id ? { id, ...all[id] } : null;
+// clOrdId (alfanum. <=32) z identyfikatora zlecenia canistra -> idempotencja
+async function clid(cid) { const h = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cid))); return "c" + [...h].map(x => x.toString(16).padStart(2, "0")).join("").slice(0, 31); }
+async function findOrd(env, inst, cl) {
+  try { return (await okx(env, "GET", "/api/v5/trade/order", { instId: inst, clOrdId: cl }))[0] || null; }
+  catch (e) { if (/51603/.test(e.message)) return null; throw e; }
 }
-function ordLine(cid, o) {
-  if (o.status === "open" || o.status === "pending") return `WAIT|${cid}|${o.status}`;
-  const q = +o.vol_exec, cost = +o.cost, fee = +o.fee;
-  if (!(q > 0)) return `OK|${cid}|${o.status.toUpperCase()}|0|0|0|${o.id}`;
-  return ["OK", cid, "FILLED", P6(q), P6(o.descr?.type === "sell" ? cost : cost), P6(fee), o.id].join("|");
+function ordLine(cid, o, sym) {
+  if (o.state === "live" || o.state === "partially_filled") return `WAIT|${cid}|${o.state}`;
+  const q = +o.accFillSz, px = +o.avgPx || 0, fee = Math.abs(+o.fee || 0) * (o.feeCcy === sym ? px : 1);
+  if (!(q > 0)) return `OK|${cid}|${o.state.toUpperCase()}|0|0|0|${o.ordId}`;
+  return ["OK", cid, "FILLED", P6(q), P6(q * px), P6(fee), o.ordId].join("|");
 }
 async function placeOrder(env, body) {
   const [cid, sym, side, amt] = body.trim().split("|");
   if (env.LIVE !== "1") return "ERR live wylaczony";
-  if (!env.KR_KEY || !env.KR_SECRET) return "ERR brak kluczy";
+  if (!hasK(env)) return "ERR brak kluczy";
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid || "") || !TRAD.includes(sym) || !["BUY", "SELL"].includes(side) || !(+amt > 0)) return "ERR zle dane";
-  const ur = await uref(cid);
-  let o = await findOrd(env, ur);
-  if (o) return ordLine(cid, o);
-  const pi = await pairInfo(sym, QT(env)), t = (await krPub("Ticker", { pair: pi.key }))[pi.key], ask = +t.a[0], bid = +t.b[0];
-  const maxO = +(env.MAX_ORDER_USD || 50), maxD = +(env.MAX_DAY_USD || 200), f = 10 ** pi.lot, bal = await balances(env);
-  let vol;
+  const pi = await pairInfo(sym, QT(env)), cl = await clid(cid);
+  let o = await findOrd(env, pi.id, cl);
+  if (o) return ordLine(cid, o, sym);
+  const t = (await okx(null, "GET", "/api/v5/market/ticker", { instId: pi.id }))[0], ask = +t.askPx, bid = +t.bidPx;
+  const maxO = +(env.MAX_ORDER_USD || 50), maxD = +(env.MAX_DAY_USD || 200), bal = await balances(env);
+  let ord;
   if (side === "BUY") {
-    const usd = +amt;
+    const usd = Math.floor(+amt * 100) / 100;
     if (usd > maxO) return `ERR limit zlecenia ${maxO} USD`;
-    const c = await kr(env, "ClosedOrders", { start: Math.floor(Date.now() / 864e5) * 86400 });
-    let day = 0; for (const x of Object.values(c.closed || {})) if (x.descr?.type === "buy") day += +x.cost;
+    const d0 = Math.floor(Date.now() / 864e5) * 864e5;
+    const h = await okx(env, "GET", "/api/v5/trade/orders-history", { instType: "SPOT", begin: String(d0), limit: "100" });
+    let day = 0; for (const x of h) if (x.side === "buy" && +x.cTime >= d0) day += +x.accFillSz * (+x.avgPx || 0);
     if (day + usd > maxD) return `ERR limit dzienny ${maxD} USD (dzis ${day.toFixed(2)})`;
     if (bal[QT(env)] < usd * 1.005) return `ERR brak ${QT(env)} (${bal[QT(env)].toFixed(2)})`;
-    vol = Math.floor(usd / ask * 0.995 * f) / f;
-  } else vol = Math.floor(Math.min(+amt, bal[sym]) * f) / f;
-  const px = side === "BUY" ? ask : bid;
-  if (!(vol > 0)) return `SKIP|${cid}|brak ${sym} na gieldzie`;
-  if (vol < pi.omin || vol * px < pi.cmin) return `SKIP|${cid}|ponizej minimum (${pi.omin} ${sym})`;
-  await kr(env, "AddOrder", { pair: pi.key, type: side.toLowerCase(), ordertype: "market", volume: vol.toFixed(pi.lot), userref: ur });
-  for (let i = 0; i < 4; i++) { await sleep(1500); o = await findOrd(env, ur); if (o && o.status === "closed") break; }
-  return o ? ordLine(cid, o) : `WAIT|${cid}|wyslane`;
+    if (usd / ask < pi.omin) return `SKIP|${cid}|ponizej minimum (${pi.omin} ${sym})`;
+    ord = { sz: usd.toFixed(2), tgtCcy: "quote_ccy" };
+  } else {
+    const vol = Math.floor(Math.min(+amt, bal[sym]) / pi.lsz) * pi.lsz;
+    if (!(vol > 0)) return `SKIP|${cid}|brak ${sym} na gieldzie`;
+    if (vol < pi.omin) return `SKIP|${cid}|ponizej minimum (${pi.omin} ${sym})`;
+    if (vol * bid > maxO * 4) return `ERR sprzedaz > ${maxO * 4} USD`;
+    ord = { sz: vol.toFixed(pi.lot), tgtCcy: "base_ccy" };
+  }
+  await okx(env, "POST", "/api/v5/trade/order", null, { instId: pi.id, tdMode: "cash", side: side.toLowerCase(), ordType: "market", clOrdId: cl, ...ord });
+  for (let i = 0; i < 4; i++) { await sleep(1500); o = await findOrd(env, pi.id, cl); if (o && o.state === "filled") break; }
+  return o ? ordLine(cid, o, sym) : `WAIT|${cid}|wyslane`;
 }
 
 async function canister(req, env, u) {
@@ -196,16 +195,18 @@ async function canister(req, env, u) {
   }
   if (u.pathname === "/ord" && req.method === "POST") { try { return T(await placeOrder(env, (await req.text()).slice(0, 200))); } catch (e) { return T("ERR " + e.message); } }
   if (u.pathname === "/bal") {
-    if (!env.KR_KEY || !env.KR_SECRET) return T("ERR brak kluczy");
+    if (!hasK(env)) return T("ERR brak kluczy");
     const m = await balances(env);
     return T(["L|" + (env.LIVE === "1" ? 1 : 0) + "|" + (env.MAX_ORDER_USD || 50) + "|" + (env.MAX_DAY_USD || 200) + "|" + (req.cf?.colo || ""),
       QT(env) + "|" + P6(m[QT(env)] || 0),
-      ...(await Promise.all(TRAD.map(async a => a + "|" + P6(m[a] || 0) + " (para " + a + QT(env) + ": " + await pairInfo(a, QT(env)).then(() => "OK", () => "BRAK") + ")")))].join("\n"));
+      ...(await Promise.all(TRAD.map(async a => a + "|" + P6(m[a] || 0) + " (para " + iid(a, QT(env)) + ": " + await pairInfo(a, QT(env)).then(() => "OK", () => "BRAK") + ")")))].join("\n"));
   }
   return T("not found", 404);
 }
 
 export default {
+  // codzienne zapytanie o saldo: klucz OKX bez IP nie wygasa (nieaktywnosc 14 dni)
+  async scheduled(ev, env, ctx) { if (hasK(env)) ctx.waitUntil(balances(env).catch(() => 0)); },
   async fetch(req, env) {
     const sk = req.headers.get("x-sig-key");
     if (sk) {

@@ -35,7 +35,7 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 <nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html" class="on">Krypto</a><a href="staking.html">Staking</a><a href="kosz.html">Kosz</a></nav>
 <header><div><h1>Terminal sprzedazy</h1><div class="sub" id="st">Cykliczna sprzedaz na zadanych poziomach cen · ceny: CoinGecko</div>
 <div class="nav"><a href="krypto.html">Portfel</a><a href="krypto-analityka.html">Analityka</a><a class="on" href="terminal.html">Terminal</a></div></div>
-<div class="form"><button id="rf" type="button">Odswiez ceny</button><button id="np" class="dark" type="button">+ Nowy plan</button></div></header>
+<div class="form"><select id="cur" aria-label="Waluta"><option>USD</option><option>PLN</option></select><button id="rf" type="button">Odswiez ceny</button><button id="np" class="dark" type="button">+ Nowy plan</button></div></header>
 <div class="stats">
 <div class="stat"><span>Do sprzedania w cyklu</span><strong id="s1">–</strong><small id="s1s"></small></div>
 <div class="stat"><span>Sprzedano w cyklu</span><strong id="s2">–</strong><small id="s2s"></small></div>
@@ -79,9 +79,12 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 <script type="text/x-after-auth" src="ccore.js"></script>
 <script type="text/x-after-auth">
 ;(function(){
-const $=id=>document.getElementById(id),S=K.S,{num,money,price,qty,pct,today,uid}=K;
+const $=id=>document.getElementById(id),S=K.S,{num,money,qty,pct,today,uid}=K;
 const T=()=>(S.term=S.term||{coins:[]});T();
-const usd=(x,d)=>money(x,"USD",d??0);
+let kcur="USD";try{if(localStorage.getItem("krypto-cur")==="PLN")kcur="PLN";}catch{}
+const XR=()=>kcur==="PLN"&&S.rate?S.rate:0,CU=()=>XR()?"PLN":"USD",F=()=>XR()||1;
+const usd=(x,d)=>money(x*F(),CU(),d??0),price=x=>{if(!x)return "–";const v=x*F();return money(v,CU(),v<0.01?6:v<1?4:2);};
+const ch24=t=>{const c=(S.prices[t]||{}).ch24;if(c==null)return null;return XR()&&S.fx24!=null?((1+c/100)*(1+S.fx24/100)-1)*100:c;};
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 // --- cykle
 const pd=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d);};
@@ -116,7 +119,7 @@ function render(){
   const badge=!x.p?'<span class="bd">brak ceny</span>':x.ai<0?'<span class="bd">ponizej progu</span>':done?'<span class="bd ok">wykonane</span>':'<span class="bd go">sprzedawaj</span>';
   const d=document.createElement("div");d.className="card";
   d.innerHTML='<div class="ch"><div><b>'+esc(c.t)+'</b><span class="bd">'+(c.cy==="d"?"dzienny":"tygodniowy")+'</span>'+badge+'<div class="note">'+cl(c.cy,today())+'</div></div>'+
-  '<div class="px"><strong>'+price(x.p)+'</strong><small>'+(x.nx?"do progu "+price(x.nx.p)+": "+pct(x.toNx):x.ai>=0?"najwyzszy prog":"")+'</small></div></div>'+
+  '<div class="px"><strong>'+price(x.p)+'</strong>'+(ch24(c.t)!=null?'<small class="'+(ch24(c.t)>=0?"pos":"neg")+'">24h '+pct(ch24(c.t))+'</small>':'')+'<small>'+(x.nx?"do progu "+price(x.nx.p)+": "+pct(x.toNx):x.ai>=0?"najwyzszy prog":"")+'</small></div></div>'+
   '<div class="kv"><div><span>Cel cyklu</span><strong>'+qty(x.tgt)+'</strong></div><div><span>Sprzedano</span><strong>'+qty(x.sq)+'</strong></div><div><span>Zostalo</span><strong class="'+(x.rem>0?"pos":"")+'">'+qty(x.rem)+'</strong><small class="note" style="display:block;margin:0">'+usd(x.rem*x.p)+'</small></div></div>'+
   '<div class="bar" title="'+pr.toFixed(0)+'%"><i style="width:'+pr+'%"></i></div>'+
   (c.tot>0?'<div class="pool"><div class="r"><span>Pula: <b>'+qty(c.tot)+'</b></span><span>Sprzedano: <b>'+qty(x.tq)+'</b> ('+(x.tq/c.tot*100).toFixed(1)+'%)</span></div><div class="bar"><i style="width:'+Math.min(100,x.tq/c.tot*100)+'%"></i></div><div class="r"><span>Zostalo w puli: <b class="'+(x.left>0?"":"pos")+'">'+qty(x.left)+'</b> · '+usd(x.left*x.p)+'</span><span>'+(x.left>0&&x.tgt>0?"≈ "+Math.ceil(x.left/x.tgt)+" "+cyU(c)+" przy obecnym progu":x.left>0?"":"pula sprzedana")+'</span></div></div>':'')+
@@ -202,9 +205,10 @@ function delSale(c,s){
 document.querySelectorAll("dialog .x").forEach(b=>b.onclick=()=>b.closest("dialog").close());
 // --- ceny
 let busy=false;
-async function prices(force){if(busy)return;busy=true;$("rf").disabled=true;const ts=[...new Set(T().coins.map(c=>c.t))].filter(t=>force||!P(t)),er=[];
+async function prices(force){if(busy)return;busy=true;$("rf").disabled=true;if(force)try{await K.fx();}catch{}const ts=[...new Set(T().coins.map(c=>c.t))].filter(t=>force||!P(t)),er=[];
  for(let i=0;i<ts.length;i++){$("st").textContent="Pobieranie cen "+(i+1)+"/"+ts.length+"…";try{await K.quoteOne(ts[i]);}catch(e){er.push(e.message);if(/limit/.test(e.message))break;}render();if(i<ts.length-1)await new Promise(r=>setTimeout(r,1300));}
  $("st").textContent=er.length?er.join(" · "):"Ceny: CoinGecko · "+new Date().toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"});busy=false;$("rf").disabled=false;}
+$("cur").value=kcur;$("cur").onchange=()=>{kcur=$("cur").value;try{localStorage.setItem("krypto-cur",kcur);}catch{}render();};
 $("rf").onclick=()=>prices(true);$("np").onclick=()=>openPlan();$("tcy").onchange=ladder;
 ["hf","hd1","hd2"].forEach(i=>$(i).onchange=hist);$("hcl").onclick=()=>{$("hf").value="";$("hd1").value="";$("hd2").value="";hist();};
 render();prices(false);

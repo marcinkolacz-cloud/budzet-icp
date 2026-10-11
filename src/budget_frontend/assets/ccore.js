@@ -86,11 +86,13 @@ async function refresh(){
     S.meta[t]={...(S.meta[t]||{}),name:(S.meta[t]||{}).name||x.name,img:x.image};});}
  }catch(e){errs.push(e.message);}
  ts.forEach(t=>{if(S.manual[t]>0)S.prices[t]={p:S.manual[t],manual:true};});
- await rate();
- try{const j=(await cg("simple/price?ids=tether&vs_currencies=usd,pln&include_24hr_change=true")).tether;S.fx24=((1+(j.pln_24h_change||0)/100)/(1+(j.usd_24h_change||0)/100)-1)*100;}catch{}
+ await fx();
  S.ts=Date.now();save();
  if(!errs.length)snap();return errs.join(" · ");
 }
+async function fx(){await rate();
+ try{const j=(await cg("simple/price?ids=tether&vs_currencies=usd,pln&include_24hr_change=true")).tether;S.fx24=((1+(j.pln_24h_change||0)/100)/(1+(j.usd_24h_change||0)/100)-1)*100;}catch{}
+ save();return S.rate||0;}
 async function quoteOne(t){
  if(S.manual[t]>0)return S.manual[t];const id=await resolve(t);if(!id)throw new Error(t+": brak w CoinGecko");
  const m=await cg("coins/markets?vs_currency=usd&ids="+id+"&sparkline=true&price_change_percentage=24h,7d,30d"),x=m[0];if(!x)throw new Error("Brak ceny "+t);
@@ -152,6 +154,6 @@ function applyImport(list,mode){
  S.cur=S.ps[S.ps.length-1].id;save();
 }
 function exportJson(){return {app:"budzet-icp-krypto",v:1,exported:new Date().toISOString(),krypto:S,snaps:snaps()};}
-return {get S(){return S},save,P,isAgg,sel,derive,summary,posRows,validTrades,refresh,quoteOne,resolve,history,series,snaps,mountSelect,addPortfolio,rename,removePortfolio,restore,toBin,
+return {get S(){return S},save,P,isAgg,sel,derive,summary,posRows,validTrades,refresh,fx,quoteOne,resolve,history,series,snaps,mountSelect,addPortfolio,rename,removePortfolio,restore,toBin,
  parseExport,applyImport,exportJson,isReward,today,uid,num,money,price,qty,pct,cls,cmp};
 })();

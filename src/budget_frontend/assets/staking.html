@@ -148,7 +148,9 @@ function render(){
  const dm=dailyMap(),td=dm.get(today)||{v:0,icp:0,nicp:0,near:0,inj:0};
  let mon=0,tot=0;const months=new Map();
  for(const [d,o] of dm){tot+=o.v;if(d.startsWith(month))mon+=o.v;months.set(d.slice(0,7),(months.get(d.slice(0,7))||0)+o.v);}
- $("t1").textContent=zl(vIcp+vW+vN+vI);$("t1s").textContent=`ICP ${f(icpStake+wtnV,1)} · NEAR ${f(near.staked,0)} · INJ ${f(inj.staked,1)}`;
+ const ch=a=>{const c=live[a]?.[K()+"_24h_change"];return c==null?null:c;},dd=(v,a)=>{const c=ch(a);return c==null?0:v-v/(1+c/100);},
+  d24=dd(vIcp+vW,"icp")+dd(vN,"near")+dd(vI,"inj"),b24=vIcp+vW+vN+vI-d24,has24=["icp","near","inj"].some(a=>ch(a)!=null);
+ $("t1").textContent=zl(vIcp+vW+vN+vI);$("t1s").className=has24?(d24>=0?"pos":"neg"):"";$("t1s").textContent=(has24?"24h "+(d24>=0?"+":"")+zl2(d24)+(b24>0?" ("+(d24>=0?"+":"")+(d24/b24*100).toFixed(2)+"%)":"")+" · ":"")+`ICP ${f(icpStake+wtnV,1)} · NEAR ${f(near.staked,0)} · INJ ${f(inj.staked,1)}`;
  $("t2").textContent=zl2(td.v);$("t2s").textContent=[td.icp&&f(td.icp,3)+" ICP",td.nicp&&f(td.nicp,3)+" nICP",td.near&&f(td.near,2)+" NEAR",td.inj&&f(td.inj,3)+" INJ"].filter(Boolean).join(" · ")||"brak odczytow z dzis";
  $("t3").textContent=zl(mon);$("t3s").textContent=month;
  if(cur==="PLN")try{localStorage.setItem("staking-sum",JSON.stringify({v:vIcp+vW+vN+vI,td:td.v,mon,at:Date.now()}));}catch{}
@@ -232,7 +234,7 @@ function renderHist(dm,N,W){
 
 async function load(){D=await A.stAll();render();}
 async function livePrices(){
- try{const r=await fetch("https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,near,injective-protocol&vs_currencies=usd,pln");const j=await r.json();
+ try{const r=await fetch("https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,near,injective-protocol&vs_currencies=usd,pln&include_24hr_change=true");const j=await r.json();
   live={icp:j["internet-computer"],near:j.near,inj:j["injective-protocol"]};if(D)render();}catch{}
 }
 async function act(fn,msg){try{prog(msg||"Zapisywanie…");await fn();await load();prog("");}catch(e){prog("Blad: "+(e&&e.message||e));}}

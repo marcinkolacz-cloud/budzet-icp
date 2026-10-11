@@ -4,7 +4,7 @@
 <nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html" class="on">Krypto</a><a href="staking.html">Staking</a><a href="kosz.html">Kosz</a></nav>
 <header><div><h1>Analityka krypto</h1><div class="sub" id="st"></div>
 <div class="nav"><a href="krypto.html">Portfel</a><a class="on" href="krypto-analityka.html">Analityka</a><a href="terminal.html">Terminal</a></div></div>
-<div class="form"><select id="ps"></select><button id="rf" type="button">Odswiez ceny</button><button id="hb" class="dark" type="button">Pobierz historie cen</button></div></header>
+<div class="form"><select id="ps"></select><select id="cur" aria-label="Waluta"><option>USD</option><option>PLN</option></select><button id="rf" type="button">Odswiez ceny</button><button id="hb" class="dark" type="button">Pobierz historie cen</button></div></header>
 <p class="note" id="prog"></p>
 <div class="stats">
 <div class="stat"><span>Zainwestowano netto</span><strong id="a1">–</strong><small id="a1s"></small></div>
@@ -17,10 +17,10 @@
 <div id="ch"></div><p class="note" id="chn"></p>
 <table style="margin-top:8px"><tbody id="pr"></tbody></table></section>
 <div class="g2">
-<section><h2>Wynik na aktywach (USD)</h2><div id="pl"></div></section>
+<section><h2>Wynik na aktywach (<span class="cu">USD</span>)</h2><div id="pl"></div></section>
 <section><h2>Struktura kosztu vs wartosci</h2><div id="cv"></div></section>
 </div>
-<section><h2>Zakupy netto miesiecznie (USD)</h2><div id="mb"></div><p class="note">Kupno minus sprzedaz w danym miesiacu, bez nagrod.</p></section>
+<section><h2>Zakupy netto miesiecznie (<span class="cu">USD</span>)</h2><div id="mb"></div><p class="note">Kupno minus sprzedaz w danym miesiacu, bez nagrod.</p></section>
 <div class="g3">
 <section><h2>Najlepsze i najslabsze (% od sredniej ceny)</h2><table><thead><tr><th>Aktywo</th><th>Sr. cena</th><th>Cena</th><th>Zmiana</th><th>30d</th></tr></thead><tbody id="bw"></tbody></table></section>
 <section><h2>Nagrody i staking</h2><table><thead><tr><th>Aktywo</th><th>Ilosc</th><th>Wartosc</th><th>% pozycji</th></tr></thead><tbody id="rw"></tbody></table></section>
@@ -34,12 +34,16 @@
 <script type="text/x-after-auth" src="kchart.js"></script>
 <script type="text/x-after-auth">
 ;(function(){
-const $=id=>document.getElementById(id),{money,price,qty,pct,cls}=K,usd=n=>money(n,"USD"),usd0=n=>money(n,"USD",0);
+const $=id=>document.getElementById(id),{money,qty,pct,cls}=K;
+let kcur="USD";try{if(localStorage.getItem("krypto-cur")==="PLN")kcur="PLN";}catch{}
+const XR=()=>kcur==="PLN"&&K.S.rate?K.S.rate:0,CU=()=>XR()?"PLN":"USD",F=()=>XR()||1,
+ usd=n=>money(n*F(),CU()),usd0=n=>money(n*F(),CU(),0),alt=n=>XR()?money(n,"USD",0):(K.S.rate?money(n*K.S.rate,"PLN",0):""),
+ price=x=>{if(!x)return "–";const v=x*F();return money(v,CU(),v<0.01?6:v<1?4:2);};
 const row=(host,cells)=>{const tr=document.createElement("tr");cells.forEach(([t,c])=>{const e=document.createElement("td");e.textContent=t;if(c)e.className=c;tr.append(e);});host.append(tr);};
 const PER=[["30 dni",30],["90 dni",90],["6 mies.",180],["1 rok",365]];let days=+(localStorage.getItem("krypto-per")||180);
 function chart(){
  const ps=K.sel(),ser=K.series(ps,days),hasH=ser.some(x=>x.ok&&x.d<K.today());
- $("ch").innerHTML=KC.line([{name:"Koszt",color:"#1c1915",pts:ser.map(x=>[Date.parse(x.d),x.c]),dash:true,w:1.6},{name:"Wartosc",color:"#1a8a4a",pts:ser.map(x=>[Date.parse(x.d),x.v]),fill:true,w:2.4}],{label:"Wartosc portfela a koszt",w:$("ch").clientWidth});
+ $("ch").innerHTML=KC.line([{name:"Koszt",color:"#1c1915",pts:ser.map(x=>[Date.parse(x.d),x.c*F()]),dash:true,w:1.6},{name:"Wartosc",color:"#1a8a4a",pts:ser.map(x=>[Date.parse(x.d),x.v*F()]),fill:true,w:2.4}],{label:"Wartosc portfela a koszt",w:$("ch").clientWidth});
  $("chn").textContent=hasH?"":"Brak historii cen - kliknij „Pobierz historie cen” (CoinGecko, ok. 1-2 s na token). Bez niej wartosc liczona po sredniej cenie zakupu.";
  const a=ser[0],b=ser[ser.length-1],P=$("pr");P.innerHTML="";
  if(a&&b){const dv=b.v-a.v,dc=b.c-a.c,g=dv-dc;
@@ -48,9 +52,10 @@ function chart(){
 }
 function render(){
  K.mountSelect($("ps"),render);const agg=K.isAgg(),S=K.S,s=K.summary(K.sel()),pl=S.rate||0,open=s.rows.filter(r=>r.open);
- $("st").textContent=S.ts?"Ceny z "+new Date(S.ts).toLocaleString("pl-PL"):"Ceny nieodswiezone";
- $("a1").textContent=usd0(s.inv);$("a1s").textContent=pl?money(s.inv*pl,"PLN",0)+" · kupno - sprzedaz":"kupno - sprzedaz";
- $("a2").textContent=usd0(s.mv);$("a2s").textContent=pl?money(s.mv*pl,"PLN",0):"";
+ $("st").textContent=(S.ts?"Ceny z "+new Date(S.ts).toLocaleString("pl-PL"):"Ceny nieodswiezone")+(pl?" · USD/PLN "+pl.toFixed(4)+(S.fx24!=null?" ("+pct(S.fx24)+" 24h)":""):"");
+ document.querySelectorAll(".cu").forEach(x=>x.textContent=CU());
+ $("a1").textContent=usd0(s.inv);$("a1s").textContent=(alt(s.inv)?alt(s.inv)+" · ":"")+"kupno - sprzedaz";
+ $("a2").textContent=usd0(s.mv);{const dv=XR()?s.dayPln:s.day;$("a2s").textContent="24h "+(dv>=0?"+":"")+money(dv,CU(),0)+" ("+pct(XR()?s.dayPctPln:s.dayPct)+")"+(alt(s.mv)?" · "+alt(s.mv):"");$("a2s").className=cls(dv);}
  const tot=s.mv-s.inv;$("a3").textContent=(tot>=0?"+":"")+usd0(tot);$("a3").className=cls(tot);$("a3s").textContent=(s.inv>0?pct(tot/s.inv*100):"–")+" · zreal. "+usd0(s.realized);
  $("a4").textContent=usd0(s.rewV);$("a4s").textContent=s.mv>0?(s.rewV/s.mv*100).toFixed(1)+"% wartosci portfela":"";
  $("per").innerHTML="";PER.forEach(([l,d])=>{const b=document.createElement("button");b.type="button";b.textContent=l;if(d===days)b.className="on";b.onclick=()=>{days=d;try{localStorage.setItem("krypto-per",d);}catch{}render();};$("per").append(b);});
@@ -59,7 +64,7 @@ function render(){
  $("pl").innerHTML=KC.hbars(pls,v=>(v>=0?"+":"")+usd0(v));
  const cv=open.slice().sort((a,b)=>b.mv-a.mv),mx=Math.max(1,...cv.flatMap(r=>[r.mv,r.cost]));
  $("cv").innerHTML='<div class="hb">'+cv.map(r=>`<div class="hbr" style="grid-template-columns:70px 1fr 110px"><span>${KC.esc(r.t)}</span><div style="display:grid;gap:3px"><div class="hbt" style="height:7px"><i style="left:0;width:${(r.cost/mx*100).toFixed(1)}%;background:var(--acc,#1c1915)"></i></div><div class="hbt" style="height:7px"><i style="left:0;width:${(r.mv/mx*100).toFixed(1)}%;background:var(--pos,#1a8a4a)"></i></div></div><b class="${cls(r.unreal)}">${pct(r.pctU)}</b></div>`).join("")+'</div><div class="legend" style="margin-top:10px"><span><i style="background:var(--acc,#1c1915)"></i>Koszt</span><span><i style="background:var(--pos,#1a8a4a)"></i>Wartosc</span></div>';
- const mm={};K.sel().forEach(p=>p.trades.forEach(t=>{if(K.isReward(t))return;const k=t.d.slice(0,7);mm[k]=(mm[k]||0)+t.s*t.q*t.p;}));
+ const mm={};K.sel().forEach(p=>p.trades.forEach(t=>{if(K.isReward(t))return;const k=t.d.slice(0,7);mm[k]=(mm[k]||0)+t.s*t.q*t.p*F();}));
  const ks=Object.keys(mm).sort();if(ks.length){const out=[];let [y,m]=ks[0].split("-").map(Number);const [ye,me]=K.today().slice(0,7).split("-").map(Number);
   while(y<ye||(y===ye&&m<=me)){const k=y+"-"+String(m).padStart(2,"0");out.push({label:String(m).padStart(2,"0")+"."+String(y).slice(2),value:mm[k]||0});m++;if(m>12){m=1;y++;}}
   $("mb").innerHTML=KC.bars(out.slice(-36),{label:"Zakupy netto miesiecznie",w:$("mb").clientWidth});}else $("mb").innerHTML='<p class="note">Brak transakcji.</p>';
@@ -72,6 +77,7 @@ function render(){
  const RZ=$("rz");RZ.innerHTML="";s.rows.filter(r=>r.sold>0).sort((a,b)=>b.realized-a.realized).forEach(r=>row(RZ,[[r.t],[usd(r.sold)],[(r.realized>=0?"+":"")+usd(r.realized),cls(r.realized)]]));
  if(!RZ.children.length)RZ.innerHTML='<tr><td class="note">Brak sprzedazy.</td></tr>';
 }
+$("cur").value=kcur;$("cur").onchange=()=>{kcur=$("cur").value;try{localStorage.setItem("krypto-cur",kcur);}catch{}render();};
 $("rf").onclick=async()=>{$("prog").textContent="Odswiezanie cen...";const e=await K.refresh();$("prog").textContent=e||"";render();};
 $("hb").onclick=async()=>{$("hb").disabled=true;try{await K.history(Math.max(days,365),(i,n,t)=>$("prog").textContent="Historia cen: "+t+" ("+i+"/"+n+")...");$("prog").textContent="Historia cen pobrana.";}catch(e){$("prog").textContent=e.message;}$("hb").disabled=false;render();};
 render();

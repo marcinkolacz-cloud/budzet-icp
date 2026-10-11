@@ -71,11 +71,11 @@ dialog select{width:100%}
 <table><thead><tr><th>Token</th><th>Status</th><th>Otwarcie</th><th>Wejscie</th><th class="hm">Ilosc</th><th class="hm">Stop</th><th>Teraz / wyjscie</th><th>Wynik</th><th class="hm">Sygnal</th><th class="hm">Notatka</th><th></th></tr></thead><tbody id="tp"></tbody></table></section>
 
 <section id="botS"><div class="bar"><h2>Boty</h2><button id="bn" class="dark" type="button">Nowy bot</button></div>
-<div class="demo"><b>DEMO</b>Boty wykonuja symulowane transakcje wg reguly po cenie zamkniecia swiecy dziennej (sprawdzenie 02:30), prowizja 0,1%. Boty <b style="color:#b91c1c">REAL</b> skladaja prawdziwe zlecenia MARKET na Binance (para USDC) przez worker, z limitem kwoty na zlecenie i dzien.</div>
+<div class="demo"><b>DEMO</b>Boty wykonuja symulowane transakcje wg reguly po cenie zamkniecia swiecy dziennej (sprawdzenie 02:30), prowizja 0,1%. Boty <b style="color:#b91c1c">REAL</b> skladaja prawdziwe zlecenia MARKET na Krakenie przez worker, z limitem kwoty na zlecenie i dzien.</div>
 <div class="bots" id="bots"></div>
 <table><thead><tr><th>Dzien</th><th>Bot</th><th>Token</th><th>Strona</th><th>Cena</th><th class="hm">Ilosc</th><th>Kwota</th><th>Wynik</th></tr></thead><tbody id="tb"></tbody></table></section>
 
-<section id="ordS"><div class="bar"><h2>Zlecenia na gieldzie <span class="tag" style="color:#b91c1c">REAL</span></h2><span><button type="button" id="oBal">Saldo Binance</button> <button type="button" id="oRt">Ponow oczekujace</button></span></div>
+<section id="ordS"><div class="bar"><h2>Zlecenia na gieldzie <span class="tag" style="color:#b91c1c">REAL</span></h2><span><button type="button" id="oBal">Saldo Kraken</button> <button type="button" id="oRt">Ponow oczekujace</button></span></div>
 <p class="note" id="oInf" style="margin:0 0 8px"></p><pre class="note" id="oBl" hidden style="margin:0 0 8px"></pre>
 <table><thead><tr><th>Dzien</th><th>Bot</th><th>Token</th><th>Strona</th><th>Zlecenie</th><th>Status</th><th class="hm">Proby</th><th>Wynik</th></tr></thead><tbody id="to"></tbody></table></section>
 
@@ -96,7 +96,7 @@ dialog select{width:100%}
 <div class="w" id="bQtL" hidden><label id="bQtH">Ilosc tokenow</label><div class="tg" id="bQt"></div></div>
 <label id="bScL">Wielkosc pozycji<select id="bSc"><option value="1">Wg reguly (x waga zmiennosci)</option><option value="0">Zawsze pelna kwota</option></select></label>
 <label>Wejscie<select id="bFr"><option value="0">Od razu, gdy sygnal ON</option><option value="1">Tylko na nowym sygnale OFF→ON</option></select></label>
-<label>Tryb<select id="bMd"><option value="demo">DEMO (symulacja)</option><option value="real" disabled>PRAWDZIWE (Binance)</option></select></label>
+<label>Tryb<select id="bMd"><option value="demo">DEMO (symulacja)</option><option value="real" disabled>PRAWDZIWE (Kraken)</option></select></label>
 <label>Dzialaj do (puste = bez terminu)<input id="bEd" type="date"></label>
 <label>Max liczba wejsc (0 = bez limitu)<input id="bMx" type="number" min="0" step="1" value="0"></label>
 <label class="w">Notatka<input id="bNo" maxlength="300"></label>
@@ -330,7 +330,7 @@ function renderBots(){
  const act=async(fn,msg)=>{try{const r=await fn();prog("err" in r?r.err:r.ok);}catch(e){prog("Blad: "+e.message);}await loadBots();};
  $("bots").querySelectorAll("[data-be]").forEach(x=>x.onclick=()=>openBot(BT.bots.find(b=>String(b.id)===x.dataset.be)));
  $("bots").querySelectorAll("[data-bs]").forEach(x=>x.onclick=()=>act(()=>A.sgBotStop(BigInt(x.dataset.bs),false)));
- $("bots").querySelectorAll("[data-bc]").forEach(x=>x.onclick=()=>{const rb=BT.bots.find(b=>String(b.id)===x.dataset.bc);if(confirm(rb&&rb.mode==="real"?"Zatrzymac bota REAL i SPRZEDAC jego tokeny na Binance po cenie rynkowej?":"Zatrzymac bota i zamknac pozycje po ostatniej cenie zamkniecia?"))act(()=>A.sgBotStop(BigInt(x.dataset.bc),true));});
+ $("bots").querySelectorAll("[data-bc]").forEach(x=>x.onclick=()=>{const rb=BT.bots.find(b=>String(b.id)===x.dataset.bc);if(confirm(rb&&rb.mode==="real"?"Zatrzymac bota REAL i SPRZEDAC jego tokeny na Krakenie po cenie rynkowej?":"Zatrzymac bota i zamknac pozycje po ostatniej cenie zamkniecia?"))act(()=>A.sgBotStop(BigInt(x.dataset.bc),true));});
  $("bots").querySelectorAll("[data-bd]").forEach(x=>x.onclick=()=>{if(confirm("Usunac bota razem z historia jego transakcji?"))act(()=>A.sgBotDelete(BigInt(x.dataset.bd)));});
 }
 $("bSy").innerHTML=SYMS.map(s=>`<label><input type="checkbox" value="${s}" checked>${s}</label>`).join("");
@@ -343,7 +343,7 @@ function bMode(){const r=$("bMd").value==="real",o=$("bKd").querySelector('[valu
 $("bMd").onchange=bMode;$("bKd").onchange=bKind;$("bSy").onchange=bKind;
 function openBot(b){
  bEdit=b||null;const e=!!b;$("dbt").textContent=e?"Edytuj bota":"Nowy bot DEMO";$("bOk").textContent=e?"Zapisz":"Uruchom bota";
- $("bNm").value=e?b.name:"";$("bAm").value=e?b.amount:100;$("bSc").value=e?(b.scale?"1":"0"):"1";$("bFr").value=e?(b.fresh?"1":"0"):"0";$("bMd").value=e?b.mode:"demo";{const o=$("bMd").querySelector('[value="real"]');o.disabled=!(LV&&LV.live);o.textContent=LV&&LV.live?"PRAWDZIWE (Binance, max $"+LV.max+"/zlecenie)":"PRAWDZIWE - wylaczone";}
+ $("bNm").value=e?b.name:"";$("bAm").value=e?b.amount:100;$("bSc").value=e?(b.scale?"1":"0"):"1";$("bFr").value=e?(b.fresh?"1":"0"):"0";$("bMd").value=e?b.mode:"demo";{const o=$("bMd").querySelector('[value="real"]');o.disabled=!(LV&&LV.live);o.textContent=LV&&LV.live?"PRAWDZIWE (Kraken, max $"+LV.max+"/zlecenie)":"PRAWDZIWE - wylaczone";}
  $("bEd").value=e?b.endDay:"";$("bMx").value=e?Number(b.maxEntries):0;$("bNo").value=e?b.note:"";
  $("bSy").querySelectorAll("input").forEach(i=>{i.checked=e?b.syms.includes(i.value):true;i.disabled=e;});["bAm","bSc","bFr","bMd","bKd"].forEach(id=>$(id).disabled=e);
  const c=e?cfgOf(b):{kind:"usd",qty:[]};$("bKd").value=c.kind;$("bQt").querySelectorAll("[data-qq]").forEach(i=>{const x=c.qty.find(q=>q[0]===i.dataset.qq);i.value=x?x[1]:"";i.disabled=e;});bMode();
@@ -359,7 +359,7 @@ $("fb").onsubmit=async ev=>{ev.preventDefault();
  const kind=bEdit?cfgOf(b).kind:$("bKd").value,cfg=bEdit?cfgOf(b):{kind,qty:kind==="usd"?[]:syms.map(s=>[s,Math.max(0,parseFloat($("bQt").querySelector(`[data-qq="${s}"]`).value)||0)])};
  if(!bEdit&&kind!=="usd"&&cfg.qty.some(q=>!(q[1]>0))){prog("Podaj ilosc dla kazdego wybranego tokena");return;}
  if(kind!=="usd")x.amount=0;
- if(!bEdit&&x.mode==="real"&&!confirm("Bot REAL bedzie skladal PRAWDZIWE zlecenia na Binance ("+syms.join(", ")+"). Kontynuowac?"))return;
+ if(!bEdit&&x.mode==="real"&&!confirm("Bot REAL bedzie skladal PRAWDZIWE zlecenia na Krakenie ("+syms.join(", ")+"). Kontynuowac?"))return;
  $("bOk").disabled=true;try{const r=await A.sgBotPut2(x,cfg);if("err" in r){prog(r.err);return;}$("db").close();prog(bEdit?"Zapisano":"Bot uruchomiony");await loadBots();}catch(e){prog("Blad: "+e.message);}finally{$("bOk").disabled=false;}};
 async function loadBots(){try{[BT,LV]=await Promise.all([A.sgBotsAll(),A.sgLiveAll()]);}catch(e){prog("Boty: "+e.message);}renderBots();renderOrd();}
 let LV=null;

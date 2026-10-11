@@ -107,73 +107,79 @@ async function sendMail(env, txt) {
 }
 
 
-// ===== Etap 2: prawdziwe zlecenia Binance (spot, MARKET). Klucze tylko w sekretach workera. =====
-// sekrety: BN_KEY, BN_SECRET; zmienne: LIVE=1 (wylacznik), MAX_ORDER_USD, MAX_DAY_USD, QUOTE (USDC)
-const BN = "https://api.binance.com", TRAD = ["ETH", "NEAR", "ICP", "INJ"];
-const hex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
-async function bn(env, method, path, params = {}, signed = true) {
-  const q = new URLSearchParams(params);
-  if (signed) {
-    q.set("recvWindow", "10000"); q.set("timestamp", String(Date.now()));
-    const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.BN_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    q.set("signature", hex(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(q.toString()))));
-  }
-  const r = await fetch(`${BN}${path}?${q}`, { method, headers: { "X-MBX-APIKEY": env.BN_KEY || "", ...UA } });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(`binance ${r.status} ${j.code ?? ""} ${j.msg ?? ""}`.trim()); e.code = j.code; e.st = r.status; throw e; }
-  return j;
+// ===== Etap 2: prawdziwe zlecenia Kraken (spot, MARKET). Klucze tylko w sekretach workera. =====
+// sekrety: KR_KEY, KR_SECRET; zmienne: LIVE=1 (wylacznik), MAX_ORDER_USD, MAX_DAY_USD, QUOTE (USDC lub USD)
+const KRB = "https://api.kraken.com", TRAD = ["ETH", "NEAR", "ICP", "INJ"];
+const KA = { ETH: "XETH", USD: "ZUSD", EUR: "ZEUR" }, ka = a => KA[a] || a;
+const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0)), b64e = b => btoa(String.fromCharCode(...new Uint8Array(b)));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function krPub(path, params = {}) {
+  const r = await fetch(`${KRB}/0/public/${path}?${new URLSearchParams(params)}`, { headers: UA }), j = await r.json();
+  if (j.error && j.error.length) throw new Error("kraken " + j.error.join(","));
+  return j.result;
+}
+async function kr(env, method, params = {}) {
+  const path = `/0/private/${method}`, nonce = String(Date.now() * 1000 + Math.floor(Math.random() * 1000));
+  const body = new URLSearchParams({ nonce, ...params }).toString();
+  const sha = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nonce + body));
+  const msg = new Uint8Array([...new TextEncoder().encode(path), ...new Uint8Array(sha)]);
+  const k = await crypto.subtle.importKey("raw", b64d(env.KR_SECRET), { name: "HMAC", hash: "SHA-512" }, false, ["sign"]);
+  const r = await fetch(KRB + path, { method: "POST", headers: { "API-Key": env.KR_KEY, "API-Sign": b64e(await crypto.subtle.sign("HMAC", k, msg)),
+    "Content-Type": "application/x-www-form-urlencoded", ...UA }, body });
+  const j = await r.json().catch(() => ({ error: ["HTTP " + r.status] }));
+  if (j.error && j.error.length) throw new Error("kraken " + j.error.join(","));
+  return j.result;
 }
 const QT = env => env.QUOTE || "USDC";
-const floorStep = (x, st) => { const d = Math.max(0, (st.split(".")[1] || "").replace(/0+$/, "").length); return Math.floor(x / +st + 1e-9) * +st > 0 ? (Math.floor(x / +st + 1e-9) * +st).toFixed(d) : "0"; };
-async function filters(sym) {
-  const j = await bn({}, "GET", "/api/v3/exchangeInfo", { symbol: sym }, false), f = j.symbols?.[0];
-  if (!f || f.status !== "TRADING") throw new Error(sym + " niedostepny");
-  const g = t => f.filters.find(x => x.filterType === t) || {};
-  return { step: g("LOT_SIZE").stepSize || "0.00000001", minN: +(g("NOTIONAL").minNotional || g("MIN_NOTIONAL").minNotional || 5) };
+async function pairInfo(sym, q) {
+  const res = await krPub("AssetPairs", { pair: sym + q }), key = Object.keys(res)[0], p = res[key];
+  if (!p || (p.status && p.status !== "online")) throw new Error(`brak pary ${sym}${q}`);
+  return { key, lot: p.lot_decimals ?? 8, omin: +(p.ordermin || 0), cmin: +(p.costmin || 0.5) };
 }
 async function balances(env) {
-  const a = await bn(env, "GET", "/api/v3/account", { omitZeroBalances: "true" }), m = {};
-  for (const b of a.balances || []) m[b.asset] = +b.free;
+  const r = await kr(env, "BalanceEx"), m = {};
+  for (const a of [QT(env), ...TRAD]) { const x = r[ka(a)]; m[a] = x ? +x.balance - +(x.hold_trade || 0) : 0; }
   return m;
 }
-function orderLine(o, base, env) {
-  const qty = +o.executedQty, quote = +o.cummulativeQuoteQty, px = qty > 0 ? quote / qty : 0;
-  let feeB = 0, feeQ = 0, est = false;
-  for (const f of o.fills || []) { if (f.commissionAsset === base) feeB += +f.commission; else if (f.commissionAsset === QT(env)) feeQ += +f.commission; else est = true; }
-  if (!o.fills || est) feeQ += quote * 0.001;
-  const net = o.side === "BUY" ? qty - feeB : qty;
-  return ["OK", o.clientOrderId, o.status, P6(net), P6(quote), P6(feeQ + feeB * px), o.orderId].join("|");
+// userref (int32) z identyfikatora zlecenia canistra -> idempotencja
+async function uref(cid) { const h = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cid))); return ((h[0] << 24 | h[1] << 16 | h[2] << 8 | h[3]) & 0x7fffffff) || 1; }
+async function findOrd(env, ur) {
+  const o = await kr(env, "OpenOrders", { userref: ur }), c = await kr(env, "ClosedOrders", { userref: ur, start: Math.floor(Date.now() / 1000) - 14 * 86400 });
+  const all = { ...(o.open || {}), ...(c.closed || {}) }, id = Object.keys(all)[0];
+  return id ? { id, ...all[id] } : null;
+}
+function ordLine(cid, o) {
+  if (o.status === "open" || o.status === "pending") return `WAIT|${cid}|${o.status}`;
+  const q = +o.vol_exec, cost = +o.cost, fee = +o.fee;
+  if (!(q > 0)) return `OK|${cid}|${o.status.toUpperCase()}|0|0|0|${o.id}`;
+  return ["OK", cid, "FILLED", P6(q), P6(o.descr?.type === "sell" ? cost : cost), P6(fee), o.id].join("|");
 }
 async function placeOrder(env, body) {
   const [cid, sym, side, amt] = body.trim().split("|");
   if (env.LIVE !== "1") return "ERR live wylaczony";
-  if (!env.BN_KEY || !env.BN_SECRET) return "ERR brak kluczy";
-  if (!/^[A-Za-z0-9_-]{1,36}$/.test(cid || "") || !TRAD.includes(sym) || !["BUY", "SELL"].includes(side) || !(+amt > 0)) return "ERR zle dane";
-  const pair = sym + QT(env);
-  try { const o = await bn(env, "GET", "/api/v3/order", { symbol: pair, origClientOrderId: cid }); return orderLine(o, sym, env); }
-  catch (e) { if (e.code !== -2013) throw e; }
-  const f = await filters(pair), maxO = +(env.MAX_ORDER_USD || 50), maxD = +(env.MAX_DAY_USD || 200);
-  const p = { symbol: pair, side, type: "MARKET", newClientOrderId: cid, newOrderRespType: "FULL" };
+  if (!env.KR_KEY || !env.KR_SECRET) return "ERR brak kluczy";
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid || "") || !TRAD.includes(sym) || !["BUY", "SELL"].includes(side) || !(+amt > 0)) return "ERR zle dane";
+  const ur = await uref(cid);
+  let o = await findOrd(env, ur);
+  if (o) return ordLine(cid, o);
+  const pi = await pairInfo(sym, QT(env)), t = (await krPub("Ticker", { pair: pi.key }))[pi.key], ask = +t.a[0], bid = +t.b[0];
+  const maxO = +(env.MAX_ORDER_USD || 50), maxD = +(env.MAX_DAY_USD || 200), f = 10 ** pi.lot, bal = await balances(env);
+  let vol;
   if (side === "BUY") {
     const usd = +amt;
     if (usd > maxO) return `ERR limit zlecenia ${maxO} USD`;
-    if (usd < f.minN) return `SKIP|${cid}|ponizej minimum ${f.minN}`;
-    const t0 = Math.floor(Date.now() / 864e5) * 864e5;
-    let day = 0;
-    for (const s of TRAD) for (const o of await bn(env, "GET", "/api/v3/allOrders", { symbol: s + QT(env), startTime: t0 }))
-      if (o.side === "BUY") day += +o.cummulativeQuoteQty;
+    const c = await kr(env, "ClosedOrders", { start: Math.floor(Date.now() / 864e5) * 86400 });
+    let day = 0; for (const x of Object.values(c.closed || {})) if (x.descr?.type === "buy") day += +x.cost;
     if (day + usd > maxD) return `ERR limit dzienny ${maxD} USD (dzis ${day.toFixed(2)})`;
-    const free = (await balances(env))[QT(env)] || 0;
-    if (free < usd) return `ERR brak ${QT(env)} (${free.toFixed(2)})`;
-    p.quoteOrderQty = usd.toFixed(2);
-  } else {
-    const free = (await balances(env))[sym] || 0, q = floorStep(Math.min(+amt, free), f.step);
-    if (!(+q > 0)) return `SKIP|${cid}|brak ${sym} na gieldzie`;
-    const px = +(await bn(env, "GET", "/api/v3/ticker/price", { symbol: pair }, false)).price;
-    if (+q * px < f.minN) return `SKIP|${cid}|ponizej minimum ${f.minN}`;
-    p.quantity = q;
-  }
-  return orderLine(await bn(env, "POST", "/api/v3/order", p), sym, env);
+    if (bal[QT(env)] < usd * 1.005) return `ERR brak ${QT(env)} (${bal[QT(env)].toFixed(2)})`;
+    vol = Math.floor(usd / ask * 0.995 * f) / f;
+  } else vol = Math.floor(Math.min(+amt, bal[sym]) * f) / f;
+  const px = side === "BUY" ? ask : bid;
+  if (!(vol > 0)) return `SKIP|${cid}|brak ${sym} na gieldzie`;
+  if (vol < pi.omin || vol * px < pi.cmin) return `SKIP|${cid}|ponizej minimum (${pi.omin} ${sym})`;
+  await kr(env, "AddOrder", { pair: pi.key, type: side.toLowerCase(), ordertype: "market", volume: vol.toFixed(pi.lot), userref: ur });
+  for (let i = 0; i < 4; i++) { await sleep(1500); o = await findOrd(env, ur); if (o && o.status === "closed") break; }
+  return o ? ordLine(cid, o) : `WAIT|${cid}|wyslane`;
 }
 
 async function canister(req, env, u) {
@@ -188,10 +194,11 @@ async function canister(req, env, u) {
   }
   if (u.pathname === "/ord" && req.method === "POST") { try { return T(await placeOrder(env, (await req.text()).slice(0, 200))); } catch (e) { return T("ERR " + e.message); } }
   if (u.pathname === "/bal") {
-    if (!env.BN_KEY || !env.BN_SECRET) return T("ERR brak kluczy");
+    if (!env.KR_KEY || !env.KR_SECRET) return T("ERR brak kluczy");
     const m = await balances(env);
     return T(["L|" + (env.LIVE === "1" ? 1 : 0) + "|" + (env.MAX_ORDER_USD || 50) + "|" + (env.MAX_DAY_USD || 200) + "|" + (req.cf?.colo || ""),
-      ...[QT(env), ...TRAD].map(a => a + "|" + P6(m[a] || 0))].join("\n"));
+      QT(env) + "|" + P6(m[QT(env)] || 0),
+      ...(await Promise.all(TRAD.map(async a => a + "|" + P6(m[a] || 0) + " (para " + a + QT(env) + ": " + await pairInfo(a, QT(env)).then(() => "OK", () => "BRAK") + ")")))].join("\n"));
   }
   return T("not found", 404);
 }

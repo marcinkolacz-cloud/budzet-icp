@@ -1010,6 +1010,7 @@ persistent actor Budget {
           sgNextId += 1;
           st := "done"; m := f[2] # " " # f[3] # " @ " # Float.format(#fix 4, usd / q) # " (#" # f[6] # ")";
         } else if (f.size() >= 1 and f[0] == "SKIP") { st := "skip" }
+        else if (f.size() >= 1 and f[0] == "WAIT") { st := if (o.tries + 1 >= 10) "error" else "pending" }
         else if (f.size() >= 3 and f[0] == "OK") { st := "error"; m := "Status " # f[2] # " bez wykonania" }
         else if (o.tries + 1 >= 3) { st := "error" };
         sgOrders := Array.map<SgOrd, SgOrd>(sgOrders, func(x) { if (x.cid == o.cid) { { x with status = st; tries = x.tries + 1; msg = m; at = Time.now() } } else x });

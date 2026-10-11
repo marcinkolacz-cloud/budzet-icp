@@ -29,15 +29,26 @@ dialog form{padding:20px 22px;display:grid;gap:10px;grid-template-columns:1fr 1f
 dialog .w{grid-column:1/-1}dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:6px;grid-column:1/-1}
 dialog select{width:100%}
 .empty{color:var(--muted);font-size:13px;padding:10px 0}
+.demo{background:rgba(245,165,36,.14);color:#b45309;border:1px solid rgba(245,165,36,.45);border-radius:12px;padding:8px 12px;font-weight:600;font-size:13px;margin:0 0 10px;display:flex;gap:8px;align-items:center}
+.demo b{background:#f5a524;color:#1c1915;border-radius:999px;padding:1px 8px;font-size:11px;letter-spacing:.08em}
+#pfS.isdemo{border-color:rgba(245,165,36,.6);box-shadow:0 0 0 3px rgba(245,165,36,.12)}
+#pfb input{width:110px}.ch24{font-size:11px;margin-left:4px}
 @media (max-width:760px){.cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card{padding:12px;border-radius:14px}.card .sym{font-size:17px}.card .px{font-size:19px}.badge .lt{display:none}.kv{font-size:10.5px;gap:2px 4px}.kv span,.kv b{white-space:nowrap}dialog form{grid-template-columns:1fr}}
 </style></head>
 <body><div class="app">
 <nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html">Staking</a><a href="signals.html" class="on">Signals</a><a href="kosz.html">Kosz</a></nav>
 <header><div><h1>Trading Signals</h1><div class="sub">Regula: cena &gt; EMA200 +2% i BTC &gt; EMA200 · wyjscie ponizej EMA200 -2% · pozycja = min(1, 60% / zmiennosc 30d) · swieca 1D · BTC tylko jako filtr rezimu (nie handlowany)</div><div class="chips" id="chips"></div></div>
-<div class="form"><button id="bm" type="button">Maile: …</button><button id="bt" type="button">Test maila</button><button id="br" type="button">Odswiez sygnal</button><button id="bp" class="dark" type="button">Dodaj pozycje</button></div></header>
+<div class="form"><button id="bc" type="button">Odswiez ceny</button><button id="bm" type="button">Maile: …</button><button id="bt" type="button">Test maila</button><button id="br" type="button">Odswiez sygnal</button><button id="bp" class="dark" type="button">Dodaj pozycje</button></div></header>
 <p class="note" id="prog"></p>
 
 <div class="cards" id="cards"></div>
+
+<section id="pfS"><div class="bar"><h2>Portfel</h2><div class="seg" id="pft"></div></div>
+<div class="demo" id="pfDemo" hidden><b>DEMO</b>Tryb demo - srodki symulowane, nie sa to prawdziwe aktywa</div>
+<div class="stats" id="pfst" style="margin-bottom:10px"></div>
+<table><thead><tr><th>Token</th><th>Ilosc</th><th class="hm">Sr. cena zakupu</th><th>Cena</th><th>Wartosc</th><th>Wynik</th><th>Sygnal</th></tr></thead><tbody id="pfb"></tbody></table>
+<div class="form" style="margin-top:10px;justify-content:flex-end"><button id="pfx" type="button" hidden>Anuluj</button><button id="pfe" class="dark" type="button">Edytuj ilosci</button></div>
+<p class="note">Tylko ETH, NEAR, ICP, INJ. Ceny na zywo z CoinGecko; dane portfeli synchronizowane z kontem.</p></section>
 
 <section><div class="bar"><h2>Cena i sygnal: <span id="csym">BTC</span></h2><div class="seg" id="sp"></div></div>
 <div class="ch" id="c1"></div>
@@ -153,9 +164,9 @@ function trades(i0){
 
 /* ---------- render ---------- */
 function renderCards(){
- const n=N();$("cards").innerHTML=CARDS.map(s=>{const o=S[s],c=o.c[n-1],e=o.e[n-1],on=o.on[n-1],sn=since(s),b=Math.max(0,n-180);
+ const n=N();$("cards").innerHTML=CARDS.map(s=>{const o=S[s],c=LP[s]?LP[s].usd:o.c[n-1],e=o.e[n-1],on=o.on[n-1],sn=since(s),b=Math.max(0,n-180);
   return `<div class="card${s===sel?" sel":""}" data-s="${s}"><div class="top"><span class="sym">${s}</span><span class="badge${on?" on":""}">${s==="BTC"?(on?'REZIM<span class="lt"> · HOSSA</span>':'REZIM<span class="lt"> · BESSA</span>'):on?'ON<span class="lt"> · TRZYMAJ</span>':'OFF<span class="lt"> · POZA RYNKIEM</span>'}</span></div>
-  <div class="px">${px(c)}</div><div class="kv"><span>Od EMA200</span><b class="${cls(c/e-1)}">${e?pc(c/e-1):"–"}</b><span>${s==="BTC"?"Rola":"Pozycja (slot)"}</span><b>${s==="BTC"?(on?"alty dozwolone":"alty zablokowane"):on?Math.round(o.w[n-1]*100)+"%":"0%"}</b>
+  <div class="px">${px(c)}${LP[s]&&LP[s].ch!=null?`<span class="ch24 ${cls(LP[s].ch)}">${pc(LP[s].ch/100)}</span>`:""}</div><div class="kv"><span>Od EMA200</span><b class="${cls(c/e-1)}">${e?pc(c/e-1):"–"}</b><span>${s==="BTC"?"Rola":"Pozycja (slot)"}</span><b>${s==="BTC"?(on?"alty dozwolone":"alty zablokowane"):on?Math.round(o.w[n-1]*100)+"%":"0%"}</b>
   <span>ER30 (trend)</span><b>${o.er[n-1]!=null?o.er[n-1].toFixed(2):"–"}</b><span>Stan od</span><b>${sn} (${dd(sn,S.t[n-1])} d)</b></div>
   ${spark(o.c.slice(b),o.e.slice(b),o.on.slice(b))}</div>`;}).join("");
  $("cards").querySelectorAll(".card").forEach(d=>d.onclick=()=>{sel=d.dataset.s;save();renderCards();renderPrice();});
@@ -184,7 +195,7 @@ function renderHist(){
  $("hs").textContent=cl.length?`Zamkniete: ${cl.length} · trafne ${Math.round(w.length/cl.length*100)}% · sr. zysk ${pc(avg(w))} · sr. strata ${pc(avg(l))}`:"";
  $("th").innerHTML=t.length?t.map(x=>`<tr><td><b>${x.s}</b></td><td>${S.t[x.a]}</td><td>${px(S[x.s].c[x.a])}</td><td>${x.b==null?'<span class="tag ok">otwarta</span>':S.t[x.b]}</td><td>${x.b==null?px(S[x.s].c[N()-1]):px(S[x.s].c[x.b])}</td><td class="${cls(x.r)}">${pc(x.r)}</td><td class="hm">${dd(S.t[x.a],S.t[x.b==null?N()-1:x.b])}</td></tr>`).join(""):`<tr><td colspan="7" class="empty">Brak sygnalow w okresie</td></tr>`;
 }
-const last=s=>S&&S[s]?S[s].c[N()-1]:null;
+const last=s=>LP[s]?LP[s].usd:S&&S[s]?S[s].c[N()-1]:null;
 function renderPos(){
  seg($("sf"),[["all","Wszystkie"],["active","Aktywne"],["closed","Zamkniete"]],pf,k=>{pf=k;save();renderPos();});
  const P=(B?B.pos:[]).filter(p=>pf==="all"||(pf==="closed")===(p.status==="closed")).sort((a,b)=>b.opened.localeCompare(a.opened));
@@ -214,10 +225,44 @@ function renderChips(){
  if(!B){$("chips").innerHTML="";return;}
  const lr=Number(B.lastRun/1000000n),h=Math.round(Number(B.nextRunSec)/360)/10;
  $("chips").innerHTML=[`<span>Ostatni zapis: ${lr?new Date(lr).toLocaleString("pl-PL"):"–"}</span>`,`<span class="${/^OK/.test(B.log)?"ok":B.log?"bad":""}">${esc(B.log||"brak")}</span>`,
-  `<span>Nastepny: za ${h} h</span>`,B.hasKey?`<span class="ok">klucz workera OK</span>`:`<span class="bad">brak klucza workera (sgSetKey)</span>`,S?`<span>Swieca: ${S.t[N()-1]} · zrodlo: ${esc([...new Set(Object.values(S.src||{}))].join(", "))}</span>`:""].join("");
+  `<span>Nastepny: za ${h} h</span>`,B.hasKey?`<span class="ok">klucz workera OK</span>`:`<span class="bad">brak klucza workera (sgSetKey)</span>`,(LPts?`<span>Ceny: ${new Date(LPts).toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})}</span>`:"")+(S?`<span>Swieca: ${S.t[N()-1]} · zrodlo: ${esc([...new Set(Object.values(S.src||{}))].join(", "))}</span>`:"")].join("");
  $("bm").textContent="Maile: "+(B.mail?"wlaczone":"wylaczone");
 }
-function render(){if(S){renderCards();renderPrice();renderEq();renderHist();}renderPos();renderEvents();renderChips();}
+/* ---------- portfele demo / realny ---------- */
+const PK="signals-v1",CGID={BTC:"bitcoin",ETH:"ethereum",NEAR:"near",ICP:"internet-computer",INJ:"injective-protocol"};
+let LP={},LPts=0,pfEdit=false;
+const pfLoad=()=>{let o={};try{o=JSON.parse(localStorage.getItem(PK)||"{}")||{};}catch(e){}o.demo=o.demo||{};o.real=o.real||{};o.tab=o.tab==="real"?"real":"demo";return o;};
+let PF=pfLoad();const pfSave=()=>{try{localStorage.setItem(PK,JSON.stringify(PF));}catch(e){prog("Zapis portfela: "+e.message);}};
+async function prices(){
+ try{const r=await fetch("https://api.coingecko.com/api/v3/simple/price?ids="+Object.values(CGID).join(",")+"&vs_currencies=usd,pln&include_24hr_change=true");
+  if(!r.ok)throw new Error("CoinGecko "+r.status);const j=await r.json();
+  Object.entries(CGID).forEach(([s,id])=>{if(j[id]&&j[id].usd>0)LP[s]={usd:j[id].usd,pln:j[id].pln,ch:j[id].usd_24h_change};});LPts=Date.now();
+ }catch(e){prog("Ceny: "+e.message);}
+}
+function renderPf(){
+ seg($("pft"),[["demo","Demo"],["real","Prawdziwe srodki"]],PF.tab,k=>{PF.tab=k;pfEdit=false;pfSave();renderPf();});
+ const d=PF.tab==="demo",H=PF[PF.tab],n=S?N():0;$("pfDemo").hidden=!d;$("pfS").classList.toggle("isdemo",d);
+ let tv=0,tp=0,tc=0,tvc=0,ton=0,hasC=false;const usd=v=>"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+ const rows=SYMS.map(s=>{const h=H[s]||{q:0,p:0},pu=last(s),v=h.q*(pu||0),vp=h.q*(LP[s]?LP[s].pln:0),on=S?S[s].on[n-1]:null,w=S?S[s].w[n-1]:0;
+  tv+=v;tp+=vp;if(on)ton+=v;if(h.p>0&&h.q>0){tc+=h.q*h.p;tvc+=v;hasC=true;}
+  const res=h.p>0&&pu?pu/h.p-1:null;
+  return `<tr><td><b>${s}</b></td><td>${pfEdit?`<input type="number" step="any" min="0" data-q="${s}" value="${h.q||""}">`:h.q?h.q.toLocaleString("pl-PL",{maximumFractionDigits:6}):"–"}</td>
+  <td class="hm">${pfEdit?`<input type="number" step="any" min="0" data-p="${s}" value="${h.p||""}">`:h.p?px(h.p):"–"}</td><td>${px(pu)}</td><td>${v?usd(v):"–"}</td>
+  <td class="${cls(res)}">${res==null?"–":pc(res)+" <span class='note'>"+usd(h.q*(pu-h.p))+"</span>"}</td>
+  <td>${on==null?"–":on?`<span class="tag ok">ON · cel ${Math.round(w*100)}% slotu</span>`:'<span class="tag bad">OFF · poza rynkiem</span>'}</td></tr>`;}).join("");
+ $("pfb").innerHTML=rows;
+ const tile=(t,v,sub,c="")=>`<div class="stat"><span>${t}</span><strong class="${c}">${v}</strong><small>${sub}</small></div>`;
+ $("pfst").innerHTML=tile(d?"Wartosc (demo)":"Wartosc",usd(tv),tp?tp.toLocaleString("pl-PL",{style:"currency",currency:"PLN",maximumFractionDigits:0}):"–")
+  +tile("Wynik",hasC?usd(tvc-tc):"–",hasC?pc(tvc/tc-1)+" od kosztu (pozycje z cena zakupu)":"podaj sr. cene zakupu",hasC?cls(tvc-tc):"")
+  +tile("Zgodnosc z regula",tv?Math.round(ton/tv*100)+"%":"–","wartosci w tokenach z sygnalem ON");
+ $("pfe").textContent=pfEdit?"Zapisz":"Edytuj ilosci";$("pfx").hidden=!pfEdit;
+}
+$("pfe").onclick=()=>{if(pfEdit){const H={};SYMS.forEach(s=>{const q=Math.max(0,parseFloat($("pfb").querySelector(`[data-q="${s}"]`).value)||0),p=Math.max(0,parseFloat($("pfb").querySelector(`[data-p="${s}"]`).value)||0);if(q||p)H[s]={q,p};});PF[PF.tab]=H;pfSave();}pfEdit=!pfEdit;renderPf();};
+$("pfx").onclick=()=>{pfEdit=false;renderPf();};
+$("bc").onclick=async()=>{$("bc").disabled=true;prog("Odswiezanie cen…");await Promise.all([prices(),loadS()]);render();$("bc").disabled=false;if(/^Odswiezanie/.test($("prog").textContent))prog("");};
+setInterval(async()=>{if(document.visibilityState==="visible"&&!pfEdit){await prices();render();}},300000);
+
+function render(){if(S){renderCards();renderPrice();renderEq();renderHist();}renderPf();renderPos();renderEvents();renderChips();}
 
 /* ---------- dialog pozycji ---------- */
 $("pSym").innerHTML=SYMS.map(s=>`<option>${s}</option>`).join("");
@@ -244,6 +289,6 @@ $("bm").onclick=async()=>{if(!B)return;const r=await A.sgSetMail(!B.mail);prog("
 async function loadB(){try{B=await A.sgAll();}catch(e){prog("Canister: "+e.message);}render();}
 async function loadS(){try{const r=await fetch(WK+"/k");const j=await r.json();if(j.err)throw new Error(j.err);S=j;}catch(e){prog("Dane cen: "+e.message);}render();}
 let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(S){renderPrice();renderEq();}},150);});
-prog("Wczytywanie…");Promise.all([loadS(),loadB()]).then(()=>{if(!/Blad|Canister|Dane/.test($("prog").textContent))prog("");});
+prog("Wczytywanie…");Promise.all([loadS(),loadB(),prices()]).then(()=>{render();if(!/Blad|Canister|Dane/.test($("prog").textContent))prog("");});
 })();
 </script></body></html>

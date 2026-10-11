@@ -32,6 +32,13 @@ dialog select{width:100%}
 .demo{background:rgba(245,165,36,.14);color:#b45309;border:1px solid rgba(245,165,36,.45);border-radius:12px;padding:8px 12px;font-weight:600;font-size:13px;margin:0 0 10px;display:flex;gap:8px;align-items:center}
 .demo b{background:#f5a524;color:#1c1915;border-radius:999px;padding:1px 8px;font-size:11px;letter-spacing:.08em}
 #pfS.isdemo{border-color:rgba(245,165,36,.6);box-shadow:0 0 0 3px rgba(245,165,36,.12)}
+.bots{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:12px}
+.bot{border:1px solid var(--line);border-radius:16px;padding:14px 16px;background:var(--card)}.bot.off{opacity:.7}
+.bot .top{display:flex;justify-content:space-between;align-items:center;gap:8px}.bot .nm{font-weight:700;font-size:16px}
+.bot .chips2{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0}.bot .res{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.bot .res div{background:var(--field,#f7f4ee);border-radius:10px;padding:6px 9px;font-size:11px;color:var(--muted)}.bot .res b{display:block;font-size:15px;color:var(--ink)}
+.bot .act{display:flex;gap:6px;flex-wrap:wrap}.bot .act button{padding:4px 10px;font-size:12px}
+.tg{display:flex;gap:10px;flex-wrap:wrap}.tg label{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink)}.tg input{width:auto}
 #pfb input{width:110px}.ch24{font-size:11px;margin-left:4px}
 @media (max-width:760px){.cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card{padding:12px;border-radius:14px}.card .sym{font-size:17px}.card .px{font-size:19px}.badge .lt{display:none}.kv{font-size:10.5px;gap:2px 4px}.kv span,.kv b{white-space:nowrap}dialog form{grid-template-columns:1fr}}
 </style></head>
@@ -63,6 +70,11 @@ dialog select{width:100%}
 <div class="stats" id="ps" style="margin-bottom:10px"></div>
 <table><thead><tr><th>Token</th><th>Status</th><th>Otwarcie</th><th>Wejscie</th><th class="hm">Ilosc</th><th class="hm">Stop</th><th>Teraz / wyjscie</th><th>Wynik</th><th class="hm">Sygnal</th><th class="hm">Notatka</th><th></th></tr></thead><tbody id="tp"></tbody></table></section>
 
+<section id="botS"><div class="bar"><h2>Boty</h2><button id="bn" class="dark" type="button">Nowy bot</button></div>
+<div class="demo"><b>DEMO</b>Boty wykonuja symulowane transakcje wg reguly po cenie zamkniecia swiecy dziennej (sprawdzenie 02:30), prowizja 0,1%. Prawdziwe zlecenia - kolejny etap.</div>
+<div class="bots" id="bots"></div>
+<table><thead><tr><th>Dzien</th><th>Bot</th><th>Token</th><th>Strona</th><th>Cena</th><th class="hm">Ilosc</th><th>Kwota</th><th>Wynik</th></tr></thead><tbody id="tb"></tbody></table></section>
+
 <section><h2>Zdarzenia sygnalu (zapis canistra)</h2>
 <table><thead><tr><th>Dzien</th><th>Token</th><th>Sygnal</th><th>Cena</th><th class="hm">Pozycja</th><th>Mail</th><th></th></tr></thead><tbody id="te"></tbody></table>
 <p class="note">Canister sprawdza sygnal codziennie o 02:30 (PL) po zamknieciu swiecy dziennej i wysyla mail tylko przy zmianie ON/OFF.</p></section>
@@ -72,6 +84,18 @@ dialog select{width:100%}
 
 <p class="note">Narzedzie badawcze (paper trading). Wyniki historyczne nie gwarantuja przyszlych - to nie jest rekomendacja inwestycyjna.</p>
 
+<dialog id="db"><form method="dialog" id="fb"><h3 id="dbt">Nowy bot DEMO</h3>
+<label class="w">Nazwa<input id="bNm" maxlength="40" placeholder="np. Alty 100$"></label>
+<div class="w"><label>Tokeny</label><div class="tg" id="bSy"></div></div>
+<label>Kwota na wejscie (USD)<input id="bAm" type="number" step="any" min="1" value="100"></label>
+<label>Wielkosc pozycji<select id="bSc"><option value="1">Wg reguly (x waga zmiennosci)</option><option value="0">Zawsze pelna kwota</option></select></label>
+<label>Wejscie<select id="bFr"><option value="0">Od razu, gdy sygnal ON</option><option value="1">Tylko na nowym sygnale OFF→ON</option></select></label>
+<label>Tryb<select id="bMd"><option value="demo">DEMO (symulacja)</option><option value="real" disabled>Prawdziwe - wkrotce</option></select></label>
+<label>Dzialaj do (puste = bez terminu)<input id="bEd" type="date"></label>
+<label>Max liczba wejsc (0 = bez limitu)<input id="bMx" type="number" min="0" step="1" value="0"></label>
+<label class="w">Notatka<input id="bNo" maxlength="300"></label>
+<p class="note w" id="bInfo" style="margin:0">Bot startuje od ostatniej zapisanej swiecy. Po osiagnieciu limitu wejsc zamyka otwarte pozycje wg sygnalu i konczy dzialanie.</p>
+<div class="act"><button type="button" id="bX">Anuluj</button><button class="dark" type="submit" id="bOk">Uruchom bota</button></div></form></dialog>
 <dialog id="dp"><form method="dialog" id="fp"><h3 id="dpt">Pozycja</h3>
 <label>Token<select id="pSym"></select></label>
 <label>Status<select id="pSt"><option value="trigger">Trigger ustawiony</option><option value="open">Otwarta</option><option value="closed">Zamknieta</option></select></label>
@@ -94,8 +118,11 @@ const idl=({IDL})=>{
  const P=IDL.Record({id:IDL.Nat,sym:IDL.Text,status:IDL.Text,opened:IDL.Text,entry:IDL.Float64,qty:IDL.Float64,stop:IDL.Float64,closed:IDL.Text,exit:IDL.Float64,note:IDL.Text,evId:IDL.Nat,at:IDL.Int});
  const All=IDL.Record({days:IDL.Vec(D),events:IDL.Vec(E),pos:IDL.Vec(P),lastRun:IDL.Int,log:IDL.Text,nextRunSec:IDL.Nat,hasKey:IDL.Bool,mail:IDL.Bool});
  const RT=IDL.Variant({ok:IDL.Text,err:IDL.Text}),RN=IDL.Variant({ok:IDL.Nat,err:IDL.Text});
+ const Bot=IDL.Record({id:IDL.Nat,name:IDL.Text,syms:IDL.Vec(IDL.Text),amount:IDL.Float64,scale:IDL.Bool,fresh:IDL.Bool,mode:IDL.Text,start:IDL.Text,endDay:IDL.Text,maxEntries:IDL.Nat,entries:IDL.Nat,active:IDL.Bool,note:IDL.Text,created:IDL.Int});
+ const Tr=IDL.Record({id:IDL.Nat,bot:IDL.Nat,day:IDL.Text,sym:IDL.Text,buy:IDL.Bool,price:IDL.Float64,qty:IDL.Float64,usd:IDL.Float64,fee:IDL.Float64});
  return IDL.Service({sgAll:IDL.Func([],[All],["query"]),sgPosPut:IDL.Func([P],[RN],[]),sgPosDelete:IDL.Func([IDL.Nat],[RT],[]),
-  sgRunNow:IDL.Func([],[RT],[]),sgSetMail:IDL.Func([IDL.Bool],[RT],[]),sgTestMail:IDL.Func([],[RT],[])});
+  sgRunNow:IDL.Func([],[RT],[]),sgSetMail:IDL.Func([IDL.Bool],[RT],[]),sgTestMail:IDL.Func([],[RT],[]),
+  sgBotsAll:IDL.Func([],[IDL.Record({bots:IDL.Vec(Bot),trades:IDL.Vec(Tr)})],["query"]),sgBotPut:IDL.Func([Bot],[RN],[]),sgBotStop:IDL.Func([IDL.Nat,IDL.Bool],[RT],[]),sgBotDelete:IDL.Func([IDL.Nat],[RT],[])});
 };
 const A=Auth.mk(idl);
 const WK="https://gielda-quote.marcinkolacz.workers.dev",CARDS=["BTC","ETH","NEAR","ICP","INJ"],SYMS=["ETH","NEAR","ICP","INJ"],FEE=0.001,FREEZE="2026-10-11";
@@ -262,7 +289,55 @@ $("pfx").onclick=()=>{pfEdit=false;renderPf();};
 $("bc").onclick=async()=>{$("bc").disabled=true;prog("Odswiezanie cen…");await Promise.all([prices(),loadS()]);render();$("bc").disabled=false;if(/^Odswiezanie/.test($("prog").textContent))prog("");};
 setInterval(async()=>{if(document.visibilityState==="visible"&&!pfEdit){await prices();render();}},300000);
 
-function render(){if(S){renderCards();renderPrice();renderEq();renderHist();}renderPf();renderPos();renderEvents();renderChips();}
+/* ---------- boty DEMO ---------- */
+let BT=null,bEdit=null;
+const usd2=v=>(v<0?"-$":"$")+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+function botStats(b){
+ const T=BT.trades.filter(t=>t.bot===b.id).sort((x,y)=>Number(x.id-y.id)),pos={};let real=0,closed=0,wins=0;const per=new Map();
+ T.forEach(t=>{const p=pos[t.sym]||(pos[t.sym]={q:0,c:0});
+  if(t.buy){p.q+=t.qty;p.c+=t.usd+t.fee;}else{const share=p.q>0?Math.min(1,t.qty/p.q):1,cost=p.c*share,pl=t.usd-t.fee-cost;real+=pl;closed++;if(pl>0)wins++;per.set(t.id,{pl,r:cost>0?pl/cost:null});p.q-=t.qty;p.c-=cost;if(p.q<1e-12){p.q=0;p.c=0;}}});
+ let openV=0,openC=0;Object.entries(pos).forEach(([s,p])=>{if(p.q>0){openV+=p.q*(last(s)||0)*(1-FEE);openC+=p.c;}});
+ return {T,real,closed,wins,openV,openC,unreal:openV-openC,per,open:Object.entries(pos).filter(([,p])=>p.q>0).map(([s,p])=>s+" "+p.q.toLocaleString("pl-PL",{maximumFractionDigits:4}))};
+}
+function renderBots(){
+ if(!BT){$("bots").innerHTML="";$("tb").innerHTML="";return;}
+ const names=new Map(BT.bots.map(b=>[b.id,b.name])),per=new Map();
+ $("bots").innerHTML=BT.bots.length?BT.bots.slice().sort((a,b)=>Number(b.id-a.id)).map(b=>{const st=botStats(b);st.per.forEach((v,k)=>per.set(k,v));const tot=st.real+st.unreal;
+  return `<div class="bot${b.active?"":" off"}"><div class="top"><span class="nm">${esc(b.name)}</span><span>${b.active?'<span class="tag ok">aktywny</span>':'<span class="tag">zakonczony</span>'} <span class="tag" style="color:#b45309">DEMO</span></span></div>
+  <div class="chips2">${b.syms.map(s=>`<span class="tag">${esc(s)}</span>`).join("")}<span class="tag">${usd2(b.amount)}${b.scale?" x waga":""}</span><span class="tag">${b.fresh?"nowy sygnal":"od razu"}</span></div>
+  <div class="res"><div>Wynik lacznie<b class="${cls(tot)}">${usd2(tot)}</b></div><div>Zrealizowany<b class="${cls(st.real)}">${usd2(st.real)}</b></div>
+  <div>Otwarte<b class="${cls(st.unreal)}">${st.openC?usd2(st.unreal):"–"}</b></div><div>Transakcje<b>${st.closed} zamkn. · ${st.closed?Math.round(st.wins/st.closed*100)+"% traf.":"–"}</b></div></div>
+  <div class="note" style="margin:0 0 8px">Start ${esc(b.start)} · wejscia ${b.entries}${Number(b.maxEntries)?"/"+b.maxEntries:""}${b.endDay?" · do "+esc(b.endDay):""}${st.open.length?" · trzyma: "+esc(st.open.join(", ")):""}${b.note?" · "+esc(b.note):""}</div>
+  <div class="act"><button type="button" data-be="${b.id}">Edytuj</button>${b.active?`<button type="button" data-bs="${b.id}">Zatrzymaj</button><button type="button" data-bc="${b.id}">Zatrzymaj i zamknij</button>`:""}<button type="button" data-bd="${b.id}">Usun</button></div></div>`;}).join("")
+  :`<div class="empty">Brak botow. „Nowy bot” uruchomi automatyczne transakcje DEMO wg reguly.</div>`;
+ const T=BT.trades.slice().sort((a,b)=>Number(b.id-a.id)).slice(0,100);
+ $("tb").innerHTML=T.length?T.map(t=>{const pl=per.get(t.id);return `<tr><td>${esc(t.day)}</td><td>${esc(names.get(t.bot)||"#"+t.bot)}</td><td><b>${esc(t.sym)}</b></td><td>${t.buy?'<span class="tag ok">KUPNO</span>':'<span class="tag bad">SPRZEDAZ</span>'}</td>
+  <td>${px(t.price)}</td><td class="hm">${t.qty.toLocaleString("pl-PL",{maximumFractionDigits:6})}</td><td>${usd2(t.usd)}</td><td class="${pl?cls(pl.pl):""}">${pl?usd2(pl.pl)+(pl.r!=null?" <span class='note'>"+pc(pl.r)+"</span>":""):"–"}</td></tr>`;}).join(""):`<tr><td colspan="8" class="empty">Brak transakcji botow</td></tr>`;
+ const act=async(fn,msg)=>{try{const r=await fn();prog("err" in r?r.err:r.ok);}catch(e){prog("Blad: "+e.message);}await loadBots();};
+ $("bots").querySelectorAll("[data-be]").forEach(x=>x.onclick=()=>openBot(BT.bots.find(b=>String(b.id)===x.dataset.be)));
+ $("bots").querySelectorAll("[data-bs]").forEach(x=>x.onclick=()=>act(()=>A.sgBotStop(BigInt(x.dataset.bs),false)));
+ $("bots").querySelectorAll("[data-bc]").forEach(x=>x.onclick=()=>{if(confirm("Zatrzymac bota i zamknac pozycje po ostatniej cenie zamkniecia?"))act(()=>A.sgBotStop(BigInt(x.dataset.bc),true));});
+ $("bots").querySelectorAll("[data-bd]").forEach(x=>x.onclick=()=>{if(confirm("Usunac bota razem z historia jego transakcji?"))act(()=>A.sgBotDelete(BigInt(x.dataset.bd)));});
+}
+$("bSy").innerHTML=SYMS.map(s=>`<label><input type="checkbox" value="${s}" checked>${s}</label>`).join("");
+function openBot(b){
+ bEdit=b||null;const e=!!b;$("dbt").textContent=e?"Edytuj bota":"Nowy bot DEMO";$("bOk").textContent=e?"Zapisz":"Uruchom bota";
+ $("bNm").value=e?b.name:"";$("bAm").value=e?b.amount:100;$("bSc").value=e?(b.scale?"1":"0"):"1";$("bFr").value=e?(b.fresh?"1":"0"):"0";$("bMd").value="demo";
+ $("bEd").value=e?b.endDay:"";$("bMx").value=e?Number(b.maxEntries):0;$("bNo").value=e?b.note:"";
+ $("bSy").querySelectorAll("input").forEach(i=>{i.checked=e?b.syms.includes(i.value):true;i.disabled=e;});["bAm","bSc","bFr","bMd"].forEach(id=>$(id).disabled=e);
+ $("bInfo").textContent=e?"W trakcie dzialania mozna zmienic nazwe, termin, limit wejsc i notatke.":"Bot startuje od ostatniej zapisanej swiecy. Po osiagnieciu limitu wejsc zamyka otwarte pozycje wg sygnalu i konczy dzialanie.";
+ $("db").showModal();
+}
+$("bn").onclick=()=>openBot(null);$("bX").onclick=()=>$("db").close();
+$("fb").onsubmit=async ev=>{ev.preventDefault();
+ const syms=[...$("bSy").querySelectorAll("input:checked")].map(i=>i.value);if(!syms.length){prog("Wybierz co najmniej jeden token");return;}
+ const b=bEdit||{};const x={id:bEdit?b.id:0n,name:$("bNm").value.trim().slice(0,40)||"Bot",syms:bEdit?b.syms:syms,amount:bEdit?b.amount:Math.max(0,parseFloat($("bAm").value)||0),
+  scale:bEdit?b.scale:$("bSc").value==="1",fresh:bEdit?b.fresh:$("bFr").value==="1",mode:"demo",start:bEdit?b.start:"",endDay:$("bEd").value||"",
+  maxEntries:BigInt(Math.max(0,parseInt($("bMx").value)||0)),entries:bEdit?b.entries:0n,active:bEdit?b.active:true,note:$("bNo").value.slice(0,300),created:bEdit?b.created:0n};
+ $("bOk").disabled=true;try{const r=await A.sgBotPut(x);if("err" in r){prog(r.err);return;}$("db").close();prog(bEdit?"Zapisano":"Bot uruchomiony");await loadBots();}catch(e){prog("Blad: "+e.message);}finally{$("bOk").disabled=false;}};
+async function loadBots(){try{BT=await A.sgBotsAll();}catch(e){prog("Boty: "+e.message);}renderBots();}
+
+function render(){if(S){renderCards();renderPrice();renderEq();renderHist();}renderPf();if(BT)renderBots();renderPos();renderEvents();renderChips();}
 
 /* ---------- dialog pozycji ---------- */
 $("pSym").innerHTML=SYMS.map(s=>`<option>${s}</option>`).join("");
@@ -282,13 +357,13 @@ $("fp").onsubmit=async ev=>{ev.preventDefault();const f=v=>Math.max(0,parseFloat
 
 /* ---------- akcje ---------- */
 $("bp").onclick=()=>openPos(null);
-$("br").onclick=async()=>{$("br").disabled=true;prog("Pobieram sygnal przez canister…");try{const r=await A.sgRunNow();prog("err" in r?r.err:r.ok);await loadB();}catch(e){prog("Blad: "+e.message);}finally{$("br").disabled=false;}};
+$("br").onclick=async()=>{$("br").disabled=true;prog("Pobieram sygnal przez canister…");try{const r=await A.sgRunNow();prog("err" in r?r.err:r.ok);await Promise.all([loadB(),loadBots()]);}catch(e){prog("Blad: "+e.message);}finally{$("br").disabled=false;}};
 $("bt").onclick=async()=>{$("bt").disabled=true;prog("Wysylam test…");try{const r=await A.sgTestMail();prog("err" in r?r.err:"Test: "+r.ok);}catch(e){prog("Blad: "+e.message);}finally{$("bt").disabled=false;}};
 $("bm").onclick=async()=>{if(!B)return;const r=await A.sgSetMail(!B.mail);prog("err" in r?r.err:r.ok);await loadB();};
 
 async function loadB(){try{B=await A.sgAll();}catch(e){prog("Canister: "+e.message);}render();}
 async function loadS(){try{const r=await fetch(WK+"/k");const j=await r.json();if(j.err)throw new Error(j.err);S=j;}catch(e){prog("Dane cen: "+e.message);}render();}
 let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(S){renderPrice();renderEq();}},150);});
-prog("Wczytywanie…");Promise.all([loadS(),loadB(),prices()]).then(()=>{render();if(!/Blad|Canister|Dane/.test($("prog").textContent))prog("");});
+prog("Wczytywanie…");Promise.all([loadS(),loadB(),prices(),loadBots()]).then(()=>{render();if(!/Blad|Canister|Dane/.test($("prog").textContent))prog("");});
 })();
 </script></body></html>

@@ -737,6 +737,127 @@ persistent actor Budget {
     await httpGetRequestBounded(SG_URL # "/notify", Array.append(sgHdr(), [{ name = "Content-Type"; value = "text/plain" }]), ?txt)
   };
 
+  // ===== Boty DEMO: symulowane transakcje wg reguly, wykonywane przy dziennym zapisie sygnalu (bez dodatkowych outcalli) =====
+  public type SgBot = { id : Nat; name : Text; syms : [Text]; amount : Float; scale : Bool; fresh : Bool; mode : Text;
+    start : Text; endDay : Text; maxEntries : Nat; entries : Nat; active : Bool; note : Text; created : Int };
+  public type SgTrade = { id : Nat; bot : Nat; day : Text; sym : Text; buy : Bool; price : Float; qty : Float; usd : Float; fee : Float };
+  public type SgBotsAll = { bots : [SgBot]; trades : [SgTrade] };
+  var sgBots : [SgBot] = [];
+  var sgTrades : [SgTrade] = [];
+  let SG_TRADABLE : [Text] = ["ETH", "NEAR", "ICP", "INJ"];
+  let SG_FEE : Float = 0.001;
+
+  func sgHeld(bot : Nat, sym : Text) : Float {
+    var q : Float = 0;
+    for (t in sgTrades.vals()) { if (t.bot == bot and t.sym == sym) { q += if (t.buy) t.qty else -t.qty } };
+    if (q < 1e-12) 0 else q
+  };
+  func sgTrade(b : SgBot, day : Text, sym : Text, buy : Bool, price : Float, qty : Float) : Text {
+    let usd = qty * price;
+    sgTrades := Array.append(sgTrades, [{ id = sgNextId; bot = b.id; day; sym; buy; price; qty; usd; fee = usd * SG_FEE }]);
+    sgNextId += 1;
+    "Bot " # b.name # ": " # (if (buy) "KUPNO " else "SPRZEDAZ ") # sym # " " # Float.format(#fix 6, qty) # " @ " # Float.format(#fix 4, price) # " USD\n"
+  };
+  func sgBotStep(b0 : SgBot, day : Text, rows : [SgRow], prevRows : [SgRow]) : (SgBot, Text) {
+    var b = b0;
+    var out = "";
+    if (not b.active or b.mode != "demo") return (b, "");
+    let expired = b.endDay != "" and day > b.endDay;
+    for (sym in b.syms.vals()) {
+      switch (Array.find<SgRow>(rows, func(x) { x.sym == sym })) {
+        case (?r) {
+          let held = sgHeld(b.id, sym);
+          if (held > 0 and (not r.on or expired)) { out #= sgTrade(b, day, sym, false, r.c, held) }
+          else if (held == 0 and r.on and not expired and r.c > 0 and not (b.maxEntries > 0 and b.entries >= b.maxEntries)) {
+            let wasOn = switch (Array.find<SgRow>(prevRows, func(x) { x.sym == sym })) { case (?x) x.on; case null true };
+            let usd = b.amount * (if (b.scale) r.w else 1.0);
+            if ((not b.fresh or not wasOn) and usd > 0) {
+              out #= sgTrade(b, day, sym, true, r.c, usd / r.c);
+              b := { b with entries = b.entries + 1 };
+            };
+          };
+        };
+        case null {};
+      };
+    };
+    let open = Array.filter<Text>(b.syms, func(x) { sgHeld(b.id, x) > 0 }).size();
+    if (expired or (b.maxEntries > 0 and b.entries >= b.maxEntries and open == 0)) b := { b with active = false };
+    (b, out)
+  };
+  func sgBotsStep(day : Text, rows : [SgRow], prevRows : [SgRow]) : Text {
+    var out = "";
+    let nb = Buffer.Buffer<SgBot>(sgBots.size());
+    for (b in sgBots.vals()) { let (x, o) = sgBotStep(b, day, rows, prevRows); out #= o; nb.add(x) };
+    sgBots := Buffer.toArray(nb);
+    out
+  };
+  func sgLastRows() : (Text, [SgRow], [SgRow]) {
+    let n = sgDays.size();
+    if (n == 0) return ("", [], []);
+    let (d, r) = sgParse(sgDays[n - 1].raw);
+    (d, r, if (n > 1) sgParse(sgDays[n - 2].raw).1 else [])
+  };
+
+  public shared query (msg) func sgBotsAll() : async SgBotsAll {
+    if (not stCan(msg.caller)) return { bots = []; trades = [] };
+    { bots = sgBots; trades = sgTrades }
+  };
+
+  public shared (msg) func sgBotPut(b : SgBot) : async Result.Result<Nat, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (b.mode != "demo") return #err("Tylko tryb DEMO (prawdziwe zlecenia - kolejny etap)");
+    if (b.name.size() == 0 or b.name.size() > 40 or b.note.size() > 300 or b.endDay.size() > 10) return #err("Zle dane");
+    if (b.syms.size() == 0 or b.syms.size() > 4) return #err("Wybierz 1-4 tokeny");
+    for (x in b.syms.vals()) { if (Array.find<Text>(SG_TRADABLE, func(t) { t == x }) == null) return #err("Niedozwolony token: " # x) };
+    if (not (b.amount > 0 and b.amount <= 1_000_000)) return #err("Kwota musi byc 0 - 1 000 000 USD");
+    if (b.id == 0) {
+      if (sgBots.size() >= 20) return #err("Limit 20 botow");
+      if (sgTrades.size() >= 20_000) return #err("Limit transakcji");
+      let (d, rows, prevRows) = sgLastRows();
+      if (d == "") return #err("Brak zapisanego sygnalu - najpierw Odswiez sygnal");
+      let nb0 : SgBot = { b with id = sgNextId; start = d; entries = 0; active = true; created = Time.now() };
+      sgNextId += 1;
+      let (nb, _) = sgBotStep(nb0, d, rows, prevRows);
+      sgBots := Array.append(sgBots, [nb]);
+      return #ok(nb.id);
+    };
+    switch (Array.find<SgBot>(sgBots, func(x) { x.id == b.id })) {
+      case null #err("Brak bota");
+      case (?old) {
+        let upd : SgBot = { old with name = b.name; note = b.note; endDay = b.endDay; maxEntries = b.maxEntries };
+        sgBots := Array.map<SgBot, SgBot>(sgBots, func(x) { if (x.id == b.id) upd else x });
+        #ok(b.id)
+      };
+    }
+  };
+
+  public shared (msg) func sgBotStop(id : Nat, close : Bool) : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    let (d, rows, _) = sgLastRows();
+    var closed = 0;
+    let nb = Buffer.Buffer<SgBot>(sgBots.size());
+    for (b in sgBots.vals()) {
+      if (b.id == id) {
+        if (close) {
+          for (x in b.syms.vals()) {
+            let h = sgHeld(b.id, x);
+            if (h > 0) switch (Array.find<SgRow>(rows, func(r) { r.sym == x })) { case (?r) { ignore sgTrade(b, d, x, false, r.c, h); closed += 1 }; case null {} };
+          };
+        };
+        nb.add({ b with active = false });
+      } else nb.add(b);
+    };
+    sgBots := Buffer.toArray(nb);
+    #ok(if (closed == 0) "Bot zatrzymany" else "Bot zatrzymany, zamknieto pozycji: " # Nat.toText(closed))
+  };
+
+  public shared (msg) func sgBotDelete(id : Nat) : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    sgBots := Array.filter<SgBot>(sgBots, func(x) { x.id != id });
+    sgTrades := Array.filter<SgTrade>(sgTrades, func(t) { t.bot != id });
+    #ok("Bot usuniety")
+  };
+
   func sgRun() : async () {
     sgLastRun := Time.now();
     if (sgKey == "") { sgLog := "Brak klucza (sgSetKey)"; return };
@@ -748,7 +869,9 @@ persistent actor Budget {
     sgDays := Array.append(sgDays, [{ day; raw; at = Time.now() }]);
     if (sgDays.size() > 3000) sgDays := Array.subArray(sgDays, sgDays.size() - 3000, 3000);
     let prevRows : [SgRow] = switch (prev) { case (?p) sgParse(p.raw).1; case null [] };
-    if (prevRows.size() == 0) { sgLog := "OK (pierwszy zapis " # day # ")"; return };
+    let botLines = sgBotsStep(day, rows, prevRows);
+    let botTag = if (botLines == "") "" else " · boty: transakcje";
+    if (prevRows.size() == 0) { sgLog := "OK (pierwszy zapis " # day # ")" # botTag; return };
     var subj = "";
     var body = "";
     let evs = Buffer.Buffer<SgEvent>(2);
@@ -763,11 +886,11 @@ persistent actor Budget {
           # (if (r.on) ", pozycja " # Float.format(#fix 0, r.w * 100) # "% slotu" else "") # "\n";
       };
     };
-    if (evs.size() == 0) { sgLog := "OK " # day # " (bez zmian)"; return };
+    if (evs.size() == 0) { sgLog := "OK " # day # " (bez zmian)" # botTag; return };
     var mailed = false;
     if (sgMail) {
       try {
-        let res = await sgSend("Trading Signals: " # subj # "\n" # body # "\nSwieca dzienna " # day # " (zamkniecie 00:00 UTC)\nhttps://57a6w-kiaaa-aaaam-qjmvq-cai.icp0.io/signals.html");
+        let res = await sgSend("Trading Signals: " # subj # "\n" # body # (if (botLines == "") "" else "\nBoty DEMO:\n" # botLines) # "\nSwieca dzienna " # day # " (zamkniecie 00:00 UTC)\nhttps://57a6w-kiaaa-aaaam-qjmvq-cai.icp0.io/signals.html");
         mailed := Text.startsWith(res, #text "OK");
       } catch (_) {};
     };
@@ -865,6 +988,10 @@ persistent actor Budget {
       #removeMember : () -> Principal;
       #stAll : () -> ();
       #sgAll : () -> ();
+      #sgBotDelete : () -> Nat;
+      #sgBotPut : () -> SgBot;
+      #sgBotStop : () -> (Nat, Bool);
+      #sgBotsAll : () -> ();
       #sgPosDelete : () -> Nat;
       #sgPosPut : () -> SgPos;
       #sgRunNow : () -> ();
@@ -895,6 +1022,8 @@ persistent actor Budget {
       case (#kvGetAll _) { isMember(caller) };
       case (#stSetKey _) { Principal.isController(caller) };
       case (#sgSetKey _) { Principal.isController(caller) };
+      case (#sgBotPut _) { stCan(caller) and arg.size() <= 2_000 };
+      case (#sgBotsAll _ or #sgBotStop _ or #sgBotDelete _) { stCan(caller) };
       case (#sgPosPut _) { stCan(caller) and arg.size() <= 4_000 };
       case (#sgAll _ or #sgPosDelete _ or #sgRunNow _ or #sgSetMail _ or #sgTestMail _) { stCan(caller) };
       case (#stTransform _) { false };

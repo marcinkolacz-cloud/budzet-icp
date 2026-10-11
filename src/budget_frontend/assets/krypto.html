@@ -91,7 +91,7 @@ function render(){
  K.mountSelect($("ps"),render);const agg=K.isAgg(),S=K.S,s=K.summary(K.sel()),pl=S.rate||0;
  document.querySelectorAll(".cu").forEach(x=>x.textContent=XR()?"zl":"$");$("dp").disabled=agg;$("ph").hidden=$("ph2").hidden=!agg;
  $("v").textContent=usd(s.mv);$("vs").textContent=alt0(s.mv);
- $("d").textContent=(s.day>=0?"+":"")+usd(s.day);$("d").className=cls(s.day);$("ds").textContent=pct(s.dayPct);$("ds").className=cls(s.day);
+ const dv=XR()?s.dayPln:s.day;$("d").textContent=(dv>=0?"+":"")+(XR()?money(dv,"PLN"):usd(dv));$("d").className=cls(dv);$("ds").textContent=pct(XR()?s.dayPctPln:s.dayPct)+(XR()&&S.fx24!=null?" · w tym USD/PLN "+pct(S.fx24):"");$("ds").className=cls(dv);
  $("c").textContent=usd(s.cost);$("cs").textContent=alt0(s.cost);
  $("u").textContent=(s.unreal>=0?"+":"")+usd(s.unreal);$("u").className=cls(s.unreal);$("us").textContent=pct(s.unrealPct)+" · otwarte pozycje"+(alt0(s.unreal)?" · "+alt0(s.unreal):"");$("us").className=cls(s.unreal);
  $("w").textContent=(s.total>=0?"+":"")+usd(s.total);$("w").className=cls(s.total);$("ws").textContent=pct(s.totPct)+" od "+usd(s.basis)+" · zreal. "+(s.realized>=0?"+":"")+usd(s.realized)+(alt0(s.total)?" · "+alt0(s.total):"");
@@ -100,7 +100,7 @@ function render(){
  const open=s.rows.filter(r=>r.open);
  $("alloc").innerHTML=KC.donut(open.map(r=>({label:r.t,value:r.mv})),KC.kfmt(s.mv*(XR()||1))+(XR()?" zl":" $"),open.length+" aktywow");
  const M=$("mv");M.innerHTML="";const mvs=open.filter(r=>r.ch24!=null).sort((a,b)=>b.ch24-a.ch24),pick=mvs.length>8?[...mvs.slice(0,4),...mvs.slice(-4)]:mvs;
- pick.forEach(r=>{const tr=el("tr");td(tr,coin(r));td(tr,pct(r.ch24),cls(r.ch24));td(tr,(r.day>=0?"+":"")+usd(r.day),cls(r.day));M.append(tr);});
+ pick.forEach(r=>{const tr=el("tr");td(tr,coin(r));td(tr,pct(r.ch24),cls(r.ch24));{const v=XR()?r.dayPln:r.day;td(tr,(v>=0?"+":"")+(XR()?money(v,"PLN"):usd(v)),cls(v));}M.append(tr);});
  if(!pick.length)M.innerHTML='<tr><td class="note">Odswiez ceny, aby zobaczyc zmiany.</td></tr>';
  $("rw").textContent=s.rewV>0?"Nagrody / staking (wg biezacej ceny): "+usd(s.rewV):"";
  // --- aktywa

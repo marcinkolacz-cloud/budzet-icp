@@ -34,17 +34,24 @@ function derive(trades,upTo){
 }
 function summary(ps){
  const pos={};ps.forEach(p=>{const d=derive(p.trades);for(const t in d){const o=d[t],m=pos[t]||(pos[t]={q:0,cost:0,realized:0,bought:0,sold:0,rew:0,cs:0});for(const k in m)m[k]+=o[k]||0;}});
- const rows=[];let mv=0,day=0,cost=0,realized=0,rewV=0;const missing=[];
+ const rows=[];let mv=0,day=0,cost=0,realized=0,rewV=0,base=0,dayPln=0,basePln=0;const missing=[];
+ const d0=today(),tt={},R=S.rate||0,Rp=R&&S.fx24!=null?R/(1+S.fx24/100):R;
+ ps.forEach(p=>p.trades.forEach(x=>{if(x.d===d0&&!isReward(x))(tt[x.t]=tt[x.t]||[]).push(x);}));
  for(const t in pos){const o=pos[t],pr=S.prices[t]||{},p=pr.p||0,open=o.q>1e-9;let m=open?o.q*p:0;
   const nop=open&&!(p>0);if(nop)m=o.cost;
   const r={t,name:(S.meta[t]||{}).name||t,img:(S.meta[t]||{}).img,open,nop,q:o.q,avg:open?o.cost/o.q:0,p,ch24:pr.ch24,ch7:pr.ch7,ch30:pr.ch30,spark:pr.spark,
-   mv:m,cost:open?o.cost:0,day:open&&pr.ch24!=null?m-m/(1+pr.ch24/100):0,unreal:open?m-o.cost:0,realized:o.realized,rew:o.rew,rewV:o.rew*p,bought:o.bought,sold:o.sold};
+   mv:m,cost:open?o.cost:0,day:0,dayPln:0,unreal:open?m-o.cost:0,realized:o.realized,rew:o.rew,rewV:o.rew*p,bought:o.bought,sold:o.sold};
+  if(pr.ch24!=null&&p>0){const p24=p/(1+pr.ch24/100);let bq=0,bb=0,dd=0,qs=0;
+   (tt[t]||[]).forEach(x=>{if(x.s>0){bq+=x.q;bb+=x.q*x.p;dd+=x.q*(p-x.p);}else{qs+=x.q;dd+=x.q*(x.p-p24);}});
+   const qh=Math.max(o.q-bq,0),b0=(qh+qs)*p24;dd+=qh*(p-p24);
+   r.day=dd;r.dayPln=dd*R+b0*(R-Rp);base+=b0+bb;basePln+=b0*Rp+bb*R;}
+  day+=r.day;dayPln+=r.dayPln;
   r.cs=o.cs;r.pctR=o.cs>0?o.realized/o.cs*100:null;r.total=r.unreal+r.realized;r.pctU=r.cost>0?r.unreal/r.cost*100:null;
-  rows.push(r);realized+=o.realized;rewV+=r.rewV;if(open){mv+=m;day+=r.day;cost+=o.cost;if(!(p>0))missing.push(t);}}
+  rows.push(r);realized+=o.realized;rewV+=r.rewV;if(open){mv+=m;cost+=o.cost;if(!(p>0))missing.push(t);}}
  rows.forEach(r=>r.share=mv>0?r.mv/mv*100:0);
  rows.sort((a,b)=>(b.open-a.open)||(b.mv-a.mv)||(a.t<b.t?-1:1));
  const unreal=mv-cost,inv=ps.reduce((a,p)=>a+p.trades.reduce((s,t)=>s+(t.s>0?t.q*t.p+(t.f||0):-(t.q*t.p-(t.f||0))),0),0);
- return {rows,mv,day,dayPct:mv-day>0?day/(mv-day)*100:0,cost,unreal,realized,total:unreal+realized,unrealPct:cost>0?unreal/cost*100:0,basis:cost+rows.reduce((x,r)=>x+(r.cs||0),0),totPct:(cost+rows.reduce((x,r)=>x+(r.cs||0),0))>0?(unreal+realized)/(cost+rows.reduce((x,r)=>x+(r.cs||0),0))*100:0,inv,rewV,missing,pln:S.rate||0};
+ return {rows,mv,day,dayPct:base>0?day/base*100:0,dayPln,dayPctPln:basePln>0?dayPln/basePln*100:0,cost,unreal,realized,total:unreal+realized,unrealPct:cost>0?unreal/cost*100:0,basis:cost+rows.reduce((x,r)=>x+(r.cs||0),0),totPct:(cost+rows.reduce((x,r)=>x+(r.cs||0),0))>0?(unreal+realized)/(cost+rows.reduce((x,r)=>x+(r.cs||0),0))*100:0,inv,rewV,missing,pln:S.rate||0};
 }
 const posRows=()=>isAgg()?S.ps.flatMap(p=>summary([p]).rows.map(r=>({...r,pn:p.name,pid:p.id}))):summary(sel()).rows;
 function validTrades(tr){const q={};for(const t of [...tr].sort(cmp)){q[t.t]=(q[t.t]||0)+(t.s>0?t.q:-t.q);if(q[t.t]<-1e-6)return false;}return true;}
@@ -79,7 +86,9 @@ async function refresh(){
     S.meta[t]={...(S.meta[t]||{}),name:(S.meta[t]||{}).name||x.name,img:x.image};});}
  }catch(e){errs.push(e.message);}
  ts.forEach(t=>{if(S.manual[t]>0)S.prices[t]={p:S.manual[t],manual:true};});
- await rate();S.ts=Date.now();save();
+ await rate();
+ try{const j=(await cg("simple/price?ids=tether&vs_currencies=usd,pln&include_24hr_change=true")).tether;S.fx24=((1+(j.pln_24h_change||0)/100)/(1+(j.usd_24h_change||0)/100)-1)*100;}catch{}
+ S.ts=Date.now();save();
  if(!errs.length)snap();return errs.join(" · ");
 }
 async function quoteOne(t){

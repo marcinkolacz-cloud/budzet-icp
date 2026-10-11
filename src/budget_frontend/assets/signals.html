@@ -71,9 +71,13 @@ dialog select{width:100%}
 <table><thead><tr><th>Token</th><th>Status</th><th>Otwarcie</th><th>Wejscie</th><th class="hm">Ilosc</th><th class="hm">Stop</th><th>Teraz / wyjscie</th><th>Wynik</th><th class="hm">Sygnal</th><th class="hm">Notatka</th><th></th></tr></thead><tbody id="tp"></tbody></table></section>
 
 <section id="botS"><div class="bar"><h2>Boty</h2><button id="bn" class="dark" type="button">Nowy bot</button></div>
-<div class="demo"><b>DEMO</b>Boty wykonuja symulowane transakcje wg reguly po cenie zamkniecia swiecy dziennej (sprawdzenie 02:30), prowizja 0,1%. Prawdziwe zlecenia - kolejny etap.</div>
+<div class="demo"><b>DEMO</b>Boty wykonuja symulowane transakcje wg reguly po cenie zamkniecia swiecy dziennej (sprawdzenie 02:30), prowizja 0,1%. Boty <b style="color:#b91c1c">REAL</b> skladaja prawdziwe zlecenia MARKET na Binance (para USDC) przez worker, z limitem kwoty na zlecenie i dzien.</div>
 <div class="bots" id="bots"></div>
 <table><thead><tr><th>Dzien</th><th>Bot</th><th>Token</th><th>Strona</th><th>Cena</th><th class="hm">Ilosc</th><th>Kwota</th><th>Wynik</th></tr></thead><tbody id="tb"></tbody></table></section>
+
+<section id="ordS"><div class="bar"><h2>Zlecenia na gieldzie <span class="tag" style="color:#b91c1c">REAL</span></h2><span><button type="button" id="oBal">Saldo Binance</button> <button type="button" id="oRt">Ponow oczekujace</button></span></div>
+<p class="note" id="oInf" style="margin:0 0 8px"></p><pre class="note" id="oBl" hidden style="margin:0 0 8px"></pre>
+<table><thead><tr><th>Dzien</th><th>Bot</th><th>Token</th><th>Strona</th><th>Zlecenie</th><th>Status</th><th class="hm">Proby</th><th>Wynik</th></tr></thead><tbody id="to"></tbody></table></section>
 
 <section><h2>Zdarzenia sygnalu (zapis canistra)</h2>
 <table><thead><tr><th>Dzien</th><th>Token</th><th>Sygnal</th><th>Cena</th><th class="hm">Pozycja</th><th>Mail</th><th></th></tr></thead><tbody id="te"></tbody></table>
@@ -92,7 +96,7 @@ dialog select{width:100%}
 <div class="w" id="bQtL" hidden><label id="bQtH">Ilosc tokenow</label><div class="tg" id="bQt"></div></div>
 <label id="bScL">Wielkosc pozycji<select id="bSc"><option value="1">Wg reguly (x waga zmiennosci)</option><option value="0">Zawsze pelna kwota</option></select></label>
 <label>Wejscie<select id="bFr"><option value="0">Od razu, gdy sygnal ON</option><option value="1">Tylko na nowym sygnale OFF→ON</option></select></label>
-<label>Tryb<select id="bMd"><option value="demo">DEMO (symulacja)</option><option value="real" disabled>Prawdziwe - wkrotce</option></select></label>
+<label>Tryb<select id="bMd"><option value="demo">DEMO (symulacja)</option><option value="real" disabled>PRAWDZIWE (Binance)</option></select></label>
 <label>Dzialaj do (puste = bez terminu)<input id="bEd" type="date"></label>
 <label>Max liczba wejsc (0 = bez limitu)<input id="bMx" type="number" min="0" step="1" value="0"></label>
 <label class="w">Notatka<input id="bNo" maxlength="300"></label>
@@ -122,10 +126,12 @@ const idl=({IDL})=>{
  const RT=IDL.Variant({ok:IDL.Text,err:IDL.Text}),RN=IDL.Variant({ok:IDL.Nat,err:IDL.Text});
  const Bot=IDL.Record({id:IDL.Nat,name:IDL.Text,syms:IDL.Vec(IDL.Text),amount:IDL.Float64,scale:IDL.Bool,fresh:IDL.Bool,mode:IDL.Text,start:IDL.Text,endDay:IDL.Text,maxEntries:IDL.Nat,entries:IDL.Nat,active:IDL.Bool,note:IDL.Text,created:IDL.Int});
  const Cfg=IDL.Record({kind:IDL.Text,qty:IDL.Vec(IDL.Tuple(IDL.Text,IDL.Float64))});
+ const Od=IDL.Record({cid:IDL.Text,bot:IDL.Nat,day:IDL.Text,sym:IDL.Text,buy:IDL.Bool,req:IDL.Float64,status:IDL.Text,tries:IDL.Nat,msg:IDL.Text,at:IDL.Int});
  const Tr=IDL.Record({id:IDL.Nat,bot:IDL.Nat,day:IDL.Text,sym:IDL.Text,buy:IDL.Bool,price:IDL.Float64,qty:IDL.Float64,usd:IDL.Float64,fee:IDL.Float64});
  return IDL.Service({sgAll:IDL.Func([],[All],["query"]),sgPosPut:IDL.Func([P],[RN],[]),sgPosDelete:IDL.Func([IDL.Nat],[RT],[]),
   sgRunNow:IDL.Func([],[RT],[]),sgSetMail:IDL.Func([IDL.Bool],[RT],[]),sgTestMail:IDL.Func([],[RT],[]),
-  sgBotsAll:IDL.Func([],[IDL.Record({bots:IDL.Vec(Bot),trades:IDL.Vec(Tr),cfg:IDL.Vec(IDL.Tuple(IDL.Nat,Cfg))})],["query"]),sgBotPut:IDL.Func([Bot],[RN],[]),sgBotPut2:IDL.Func([Bot,Cfg],[RN],[]),sgBotStop:IDL.Func([IDL.Nat,IDL.Bool],[RT],[]),sgBotDelete:IDL.Func([IDL.Nat],[RT],[])});
+  sgBotsAll:IDL.Func([],[IDL.Record({bots:IDL.Vec(Bot),trades:IDL.Vec(Tr),cfg:IDL.Vec(IDL.Tuple(IDL.Nat,Cfg))})],["query"]),sgBotPut:IDL.Func([Bot],[RN],[]),sgBotPut2:IDL.Func([Bot,Cfg],[RN],[]),sgBotStop:IDL.Func([IDL.Nat,IDL.Bool],[RT],[]),sgBotDelete:IDL.Func([IDL.Nat],[RT],[]),
+  sgLiveAll:IDL.Func([],[IDL.Record({live:IDL.Bool,max:IDL.Float64,orders:IDL.Vec(Od)})],["query"]),sgOrdRetry:IDL.Func([],[RT],[]),sgBalance:IDL.Func([],[RT],[])});
 };
 const A=Auth.mk(idl);
 const WK="https://gielda-quote.marcinkolacz.workers.dev",CARDS=["BTC","ETH","NEAR","ICP","INJ"],SYMS=["ETH","NEAR","ICP","INJ"],FEE=0.001,FREEZE="2026-10-11";
@@ -311,12 +317,12 @@ function renderBots(){
  if(!BT){$("bots").innerHTML="";$("tb").innerHTML="";return;}
  const names=new Map(BT.bots.map(b=>[b.id,b.name])),per=new Map();
  $("bots").innerHTML=BT.bots.length?BT.bots.slice().sort((a,b)=>Number(b.id-a.id)).map(b=>{const st=botStats(b);st.per.forEach((v,k)=>per.set(k,v));const tot=st.real+st.unreal;
-  return `<div class="bot${b.active?"":" off"}"><div class="top"><span class="nm">${esc(b.name)}</span><span>${b.active?'<span class="tag ok">aktywny</span>':'<span class="tag">zakonczony</span>'} <span class="tag" style="color:#b45309">DEMO</span></span></div>
+  return `<div class="bot${b.active?"":" off"}"><div class="top"><span class="nm">${esc(b.name)}</span><span>${b.active?'<span class="tag ok">aktywny</span>':'<span class="tag">zakonczony</span>'} ${b.mode==="real"?'<span class="tag" style="color:#b91c1c">REAL</span>':'<span class="tag" style="color:#b45309">DEMO</span>'}</span></div>
   <div class="chips2">${b.syms.map(s=>`<span class="tag">${esc(s)}</span>`).join("")}<span class="tag">${esc(sizeTxt(b))}</span><span class="tag">${b.fresh?"nowy sygnal":"od razu"}</span></div>
   <div class="res"><div>Wynik lacznie<b class="${cls(tot)}">${usd2(tot)}</b></div><div>Zrealizowany<b class="${cls(st.real)}">${usd2(st.real)}</b></div>
   <div>Otwarte<b class="${cls(st.unreal)}">${st.openC?usd2(st.unreal):"–"}</b></div><div>Transakcje<b>${st.closed} zamkn. · ${st.closed?Math.round(st.wins/st.closed*100)+"% traf.":"–"}</b></div></div>
   <div class="note" style="margin:0 0 8px">Start ${esc(b.start)} · wejscia ${b.entries}${Number(b.maxEntries)?"/"+b.maxEntries:""}${b.endDay?" · do "+esc(b.endDay):""}${st.open.length?" · trzyma: "+esc(st.open.join(", ")):""}${holdTxt(b)}${b.note?" · "+esc(b.note):""}</div>
-  <div class="act"><button type="button" data-be="${b.id}">Edytuj</button>${b.active?`<button type="button" data-bs="${b.id}">Zatrzymaj</button><button type="button" data-bc="${b.id}">Zatrzymaj i zamknij</button>`:""}<button type="button" data-bd="${b.id}">Usun</button></div></div>`;}).join("")
+  <div class="act"><button type="button" data-be="${b.id}">Edytuj</button>${b.active?`<button type="button" data-bs="${b.id}">Zatrzymaj</button><button type="button" data-bc="${b.id}">Zatrzymaj i zamknij</button>`:""}${b.mode==="real"?"":`<button type="button" data-bd="${b.id}">Usun</button>`}</div></div>`;}).join("")
   :`<div class="empty">Brak botow. „Nowy bot” uruchomi automatyczne transakcje DEMO wg reguly.</div>`;
  const T=BT.trades.slice().sort((a,b)=>Number(b.id-a.id)).slice(0,100);
  $("tb").innerHTML=T.length?T.map(t=>{const pl=per.get(t.id);return `<tr><td>${esc(t.day)}</td><td>${esc(names.get(t.bot)||"#"+t.bot)}</td><td><b>${esc(t.sym)}</b></td><td>${t.buy?'<span class="tag ok">KUPNO</span>':'<span class="tag bad">SPRZEDAZ</span>'}</td>
@@ -324,7 +330,7 @@ function renderBots(){
  const act=async(fn,msg)=>{try{const r=await fn();prog("err" in r?r.err:r.ok);}catch(e){prog("Blad: "+e.message);}await loadBots();};
  $("bots").querySelectorAll("[data-be]").forEach(x=>x.onclick=()=>openBot(BT.bots.find(b=>String(b.id)===x.dataset.be)));
  $("bots").querySelectorAll("[data-bs]").forEach(x=>x.onclick=()=>act(()=>A.sgBotStop(BigInt(x.dataset.bs),false)));
- $("bots").querySelectorAll("[data-bc]").forEach(x=>x.onclick=()=>{if(confirm("Zatrzymac bota i zamknac pozycje po ostatniej cenie zamkniecia?"))act(()=>A.sgBotStop(BigInt(x.dataset.bc),true));});
+ $("bots").querySelectorAll("[data-bc]").forEach(x=>x.onclick=()=>{const rb=BT.bots.find(b=>String(b.id)===x.dataset.bc);if(confirm(rb&&rb.mode==="real"?"Zatrzymac bota REAL i SPRZEDAC jego tokeny na Binance po cenie rynkowej?":"Zatrzymac bota i zamknac pozycje po ostatniej cenie zamkniecia?"))act(()=>A.sgBotStop(BigInt(x.dataset.bc),true));});
  $("bots").querySelectorAll("[data-bd]").forEach(x=>x.onclick=()=>{if(confirm("Usunac bota razem z historia jego transakcji?"))act(()=>A.sgBotDelete(BigInt(x.dataset.bd)));});
 }
 $("bSy").innerHTML=SYMS.map(s=>`<label><input type="checkbox" value="${s}" checked>${s}</label>`).join("");
@@ -333,13 +339,14 @@ function bKind(){const k=$("bKd").value,sel=[...$("bSy").querySelectorAll("input
  $("bAmL").hidden=k!=="usd";$("bQtL").hidden=k==="usd";$("bScL").hidden=k==="all";
  $("bQtH").textContent=k==="all"?"Posiadane tokeny na start (bot sprzedaje calosc przy OFF i odkupuje za cala gotowke przy ON)":"Ilosc tokenow na jedno wejscie";
  $("bQt").querySelectorAll("[data-qs]").forEach(l=>l.hidden=!sel.includes(l.dataset.qs));}
-$("bKd").onchange=bKind;$("bSy").onchange=bKind;
+function bMode(){const r=$("bMd").value==="real",o=$("bKd").querySelector('[value="all"]');o.disabled=r;if(r&&$("bKd").value==="all")$("bKd").value="usd";$("dbt").textContent=bEdit?"Edytuj bota":r?"Nowy bot REAL":"Nowy bot DEMO";bKind();}
+$("bMd").onchange=bMode;$("bKd").onchange=bKind;$("bSy").onchange=bKind;
 function openBot(b){
  bEdit=b||null;const e=!!b;$("dbt").textContent=e?"Edytuj bota":"Nowy bot DEMO";$("bOk").textContent=e?"Zapisz":"Uruchom bota";
- $("bNm").value=e?b.name:"";$("bAm").value=e?b.amount:100;$("bSc").value=e?(b.scale?"1":"0"):"1";$("bFr").value=e?(b.fresh?"1":"0"):"0";$("bMd").value="demo";
+ $("bNm").value=e?b.name:"";$("bAm").value=e?b.amount:100;$("bSc").value=e?(b.scale?"1":"0"):"1";$("bFr").value=e?(b.fresh?"1":"0"):"0";$("bMd").value=e?b.mode:"demo";{const o=$("bMd").querySelector('[value="real"]');o.disabled=!(LV&&LV.live);o.textContent=LV&&LV.live?"PRAWDZIWE (Binance, max $"+LV.max+"/zlecenie)":"PRAWDZIWE - wylaczone";}
  $("bEd").value=e?b.endDay:"";$("bMx").value=e?Number(b.maxEntries):0;$("bNo").value=e?b.note:"";
  $("bSy").querySelectorAll("input").forEach(i=>{i.checked=e?b.syms.includes(i.value):true;i.disabled=e;});["bAm","bSc","bFr","bMd","bKd"].forEach(id=>$(id).disabled=e);
- const c=e?cfgOf(b):{kind:"usd",qty:[]};$("bKd").value=c.kind;$("bQt").querySelectorAll("[data-qq]").forEach(i=>{const x=c.qty.find(q=>q[0]===i.dataset.qq);i.value=x?x[1]:"";i.disabled=e;});bKind();
+ const c=e?cfgOf(b):{kind:"usd",qty:[]};$("bKd").value=c.kind;$("bQt").querySelectorAll("[data-qq]").forEach(i=>{const x=c.qty.find(q=>q[0]===i.dataset.qq);i.value=x?x[1]:"";i.disabled=e;});bMode();
  $("bInfo").textContent=e?"W trakcie dzialania mozna zmienic nazwe, termin, limit wejsc i notatke.":"Bot startuje od ostatniej zapisanej swiecy. Po osiagnieciu limitu wejsc zamyka otwarte pozycje wg sygnalu i konczy dzialanie.";
  $("db").showModal();
 }
@@ -347,13 +354,23 @@ $("bn").onclick=()=>openBot(null);$("bX").onclick=()=>$("db").close();
 $("fb").onsubmit=async ev=>{ev.preventDefault();
  const syms=[...$("bSy").querySelectorAll("input:checked")].map(i=>i.value);if(!syms.length){prog("Wybierz co najmniej jeden token");return;}
  const b=bEdit||{};const x={id:bEdit?b.id:0n,name:$("bNm").value.trim().slice(0,40)||"Bot",syms:bEdit?b.syms:syms,amount:bEdit?b.amount:Math.max(0,parseFloat($("bAm").value)||0),
-  scale:bEdit?b.scale:$("bSc").value==="1",fresh:bEdit?b.fresh:$("bFr").value==="1",mode:"demo",start:bEdit?b.start:"",endDay:$("bEd").value||"",
+  scale:bEdit?b.scale:$("bSc").value==="1",fresh:bEdit?b.fresh:$("bFr").value==="1",mode:bEdit?b.mode:$("bMd").value,start:bEdit?b.start:"",endDay:$("bEd").value||"",
   maxEntries:BigInt(Math.max(0,parseInt($("bMx").value)||0)),entries:bEdit?b.entries:0n,active:bEdit?b.active:true,note:$("bNo").value.slice(0,300),created:bEdit?b.created:0n};
  const kind=bEdit?cfgOf(b).kind:$("bKd").value,cfg=bEdit?cfgOf(b):{kind,qty:kind==="usd"?[]:syms.map(s=>[s,Math.max(0,parseFloat($("bQt").querySelector(`[data-qq="${s}"]`).value)||0)])};
  if(!bEdit&&kind!=="usd"&&cfg.qty.some(q=>!(q[1]>0))){prog("Podaj ilosc dla kazdego wybranego tokena");return;}
  if(kind!=="usd")x.amount=0;
+ if(!bEdit&&x.mode==="real"&&!confirm("Bot REAL bedzie skladal PRAWDZIWE zlecenia na Binance ("+syms.join(", ")+"). Kontynuowac?"))return;
  $("bOk").disabled=true;try{const r=await A.sgBotPut2(x,cfg);if("err" in r){prog(r.err);return;}$("db").close();prog(bEdit?"Zapisano":"Bot uruchomiony");await loadBots();}catch(e){prog("Blad: "+e.message);}finally{$("bOk").disabled=false;}};
-async function loadBots(){try{BT=await A.sgBotsAll();}catch(e){prog("Boty: "+e.message);}renderBots();}
+async function loadBots(){try{[BT,LV]=await Promise.all([A.sgBotsAll(),A.sgLiveAll()]);}catch(e){prog("Boty: "+e.message);}renderBots();renderOrd();}
+let LV=null;
+function renderOrd(){if(!LV)return;const names=new Map((BT?BT.bots:[]).map(b=>[b.id,b.name])),O=LV.orders.slice().reverse().slice(0,100);
+ $("oInf").innerHTML=(LV.live?'<span class="tag ok">REAL wlaczone</span>':'<span class="tag">REAL wylaczone</span>')+" · limit zlecenia $"+LV.max+" · oczekujace: "+LV.orders.filter(o=>o.status==="pending").length+" · ponowienie co 15 min, max 3 proby";
+ const tg={pending:"",done:"ok",error:"bad",skip:""};
+ $("to").innerHTML=O.length?O.map(o=>`<tr><td>${esc(o.day)}</td><td>${esc(names.get(o.bot)||"#"+o.bot)}</td><td><b>${esc(o.sym)}</b></td><td>${o.buy?'<span class="tag ok">KUPNO</span>':'<span class="tag bad">SPRZEDAZ</span>'}</td>
+  <td>${o.buy?usd2(o.req):o.req.toLocaleString("pl-PL",{maximumFractionDigits:6})}</td><td><span class="tag ${tg[o.status]||""}">${esc(o.status)}</span></td><td class="hm">${o.tries}</td><td class="note" style="margin:0">${esc(o.msg)}</td></tr>`).join(""):`<tr><td colspan="8" class="empty">Brak zlecen REAL</td></tr>`;}
+$("oRt").onclick=async()=>{try{const r=await A.sgOrdRetry();prog("err" in r?r.err:r.ok);}catch(e){prog("Blad: "+e.message);}await loadBots();};
+$("oBal").onclick=async()=>{try{const r=await A.sgBalance();if("err" in r){prog(r.err);return;}const L=r.ok.split("\n"),h=L[0].split("|");
+ $("oBl").hidden=false;$("oBl").textContent=(h[0]==="L"?"Worker LIVE="+h[1]+" · max/zlecenie $"+h[2]+" · max/dzien $"+h[3]+" · colo "+h[4]+"\n":"")+L.slice(h[0]==="L"?1:0).map(x=>x.replace("|",": ")).join("\n");}catch(e){prog("Blad: "+e.message);}};
 
 function render(){if(S){renderCards();renderPrice();renderEq();renderHist();}renderPf();if(BT)renderBots();renderPos();renderEvents();renderChips();}
 

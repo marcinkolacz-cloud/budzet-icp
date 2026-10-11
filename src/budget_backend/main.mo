@@ -764,6 +764,25 @@ persistent actor Budget {
     if (c < 0) 0 else c
   };
   var sgBots : [SgBot] = [];
+  // ===== Etap 2: prawdziwe zlecenia (mode "real") przez worker /ord; klucze gieldy tylko w workerze =====
+  public type SgOrd = { cid : Text; bot : Nat; day : Text; sym : Text; buy : Bool; req : Float; status : Text; tries : Nat; msg : Text; at : Int };
+  public type SgLiveAll = { live : Bool; max : Float; orders : [SgOrd] };
+  var sgLive : Bool = false;
+  var sgLiveMax : Float = 50;
+  var sgOrders : [SgOrd] = [];
+  transient var sgExecBusy : Bool = false;
+  transient var sgRetryTimer : ?Timer.TimerId = null;
+  transient var sgBalAt : Int = 0;
+  func sgPending(bot : Nat, sym : Text) : Bool {
+    Array.find<SgOrd>(sgOrders, func(o) { o.bot == bot and o.sym == sym and o.status == "pending" }) != null
+  };
+  func sgQueue(b : SgBot, day : Text, sym : Text, buy : Bool, req : Float, tag : Text) : Text {
+    let cid = "b" # Nat.toText(b.id) # "-" # day # "-" # sym # (if (buy) "-B" else "-S") # tag;
+    if (Array.find<SgOrd>(sgOrders, func(o) { o.cid == cid }) != null) return "";
+    sgOrders := Array.append(sgOrders, [{ cid; bot = b.id; day; sym; buy; req; status = "pending"; tries = 0; msg = ""; at = Time.now() }]);
+    if (sgOrders.size() > 2000) sgOrders := Array.subArray(sgOrders, sgOrders.size() - 2000, 2000);
+    "Bot " # b.name # " [REAL]: zlecenie " # (if (buy) "KUPNO " # sym # " " # Float.format(#fix 2, req) # " USD" else "SPRZEDAZ " # sym # " " # Float.format(#fix 6, req)) # "\n"
+  };
   var sgTrades : [SgTrade] = [];
   let SG_TRADABLE : [Text] = ["ETH", "NEAR", "ICP", "INJ"];
   let SG_FEE : Float = 0.001;
@@ -782,13 +801,15 @@ persistent actor Budget {
   func sgBotStep(b0 : SgBot, day : Text, rows : [SgRow], prevRows : [SgRow]) : (SgBot, Text) {
     var b = b0;
     var out = "";
-    if (not b.active or b.mode != "demo") return (b, "");
+    let real = b.mode == "real";
+    if (not b.active or (b.mode != "demo" and not real) or (real and not sgLive)) return (b, "");
     let expired = b.endDay != "" and day > b.endDay;
     for (sym in b.syms.vals()) {
       switch (Array.find<SgRow>(rows, func(x) { x.sym == sym })) {
         case (?r) {
           let held = sgHeld(b.id, sym);
-          if (held > 0 and (not r.on or expired)) { out #= sgTrade(b, day, sym, false, r.c, held) }
+          if (real and sgPending(b.id, sym)) {}
+          else if (held > 0 and (not r.on or expired)) { out #= if (real) sgQueue(b, day, sym, false, held, "") else sgTrade(b, day, sym, false, r.c, held) }
           else if (held == 0 and r.on and not expired and r.c > 0 and not (b.maxEntries > 0 and b.entries >= b.maxEntries)) {
             let wasOn = switch (Array.find<SgRow>(prevRows, func(x) { x.sym == sym })) { case (?x) x.on; case null true };
             let cfg = sgCfg(b.id);
@@ -798,7 +819,7 @@ persistent actor Budget {
               case (_) b.amount * (if (b.scale) r.w else 1.0);
             };
             if ((not b.fresh or not wasOn) and usd > 0) {
-              out #= sgTrade(b, day, sym, true, r.c, usd / r.c);
+              out #= if (real) sgQueue(b, day, sym, true, Float.min(usd, sgLiveMax), "") else sgTrade(b, day, sym, true, r.c, usd / r.c);
               b := { b with entries = b.entries + 1 };
             };
           };
@@ -806,7 +827,7 @@ persistent actor Budget {
         case null {};
       };
     };
-    let open = Array.filter<Text>(b.syms, func(x) { sgHeld(b.id, x) > 0 }).size();
+    let open = Array.filter<Text>(b.syms, func(x) { sgHeld(b.id, x) > 0 or sgPending(b.id, x) }).size();
     if (expired or (b.maxEntries > 0 and b.entries >= b.maxEntries and open == 0)) b := { b with active = false };
     (b, out)
   };
@@ -841,11 +862,19 @@ persistent actor Budget {
     if (b.id == 0 and c.kind != "usd") {
       for (x in b.syms.vals()) { let q = sgQ(c, x); if (not (q > 0 and q <= 1_000_000_000)) return #err("Podaj ilosc dla " # x) };
     };
-    sgBotSave(b, c)
+    let r = sgBotSave(b, c);
+    if (b.id == 0 and b.mode == "real") ignore await sgExec();
+    r
   };
 
   func sgBotSave(b : SgBot, c : SgBotCfg) : Result.Result<Nat, Text> {
-    if (b.mode != "demo") return #err("Tylko tryb DEMO (prawdziwe zlecenia - kolejny etap)");
+    if (b.id == 0 and b.mode != "demo" and b.mode != "real") return #err("Zly tryb");
+    if (b.id == 0 and b.mode == "real") {
+      if (not sgLive) return #err("Prawdziwe zlecenia wylaczone (sgSetLive)");
+      if (c.kind == "all") return #err("Tryb REAL: tylko kwota USD lub stala ilosc");
+      if (c.kind == "usd" and b.amount > sgLiveMax) return #err("Limit zlecenia " # Float.format(#fix 0, sgLiveMax) # " USD");
+      if (Array.filter<SgBot>(sgBots, func(x) { x.mode == "real" and x.active }).size() >= 4) return #err("Limit 4 aktywnych botow REAL");
+    };
     if (b.name.size() == 0 or b.name.size() > 40 or b.note.size() > 300 or b.endDay.size() > 10) return #err("Zle dane");
     if (b.syms.size() == 0 or b.syms.size() > 4) return #err("Wybierz 1-4 tokeny");
     for (x in b.syms.vals()) { if (Array.find<Text>(SG_TRADABLE, func(t) { t == x }) == null) return #err("Niedozwolony token: " # x) };
@@ -858,7 +887,7 @@ persistent actor Budget {
       let nb0 : SgBot = { b with id = sgNextId; start = d; entries = 0; active = true; created = Time.now() };
       sgNextId += 1;
       if (c.kind != "usd") sgBotCfg := Array.append(sgBotCfg, [(nb0.id, c)]);
-      if (c.kind == "all") {
+      if (c.kind == "all" and b.mode == "demo") {
         // pozycja startowa: posiadane tokeny wyceniane po ostatnim zamknieciu (bez prowizji)
         for (x in b.syms.vals()) {
           switch (Array.find<SgRow>(rows, func(r) { r.sym == x })) {
@@ -897,18 +926,24 @@ persistent actor Budget {
         if (close) {
           for (x in b.syms.vals()) {
             let h = sgHeld(b.id, x);
-            if (h > 0) switch (Array.find<SgRow>(rows, func(r) { r.sym == x })) { case (?r) { ignore sgTrade(b, d, x, false, r.c, h); closed += 1 }; case null {} };
+            if (h > 0 and b.mode == "real") { if (not sgPending(b.id, x)) { ignore sgQueue(b, d, x, false, h, "X" # Nat.toText(Int.abs(Time.now() / 1_000_000_000) % 100_000)); closed += 1 } }
+            else if (h > 0) switch (Array.find<SgRow>(rows, func(r) { r.sym == x })) { case (?r) { ignore sgTrade(b, d, x, false, r.c, h); closed += 1 }; case null {} };
           };
         };
         nb.add({ b with active = false });
       } else nb.add(b);
     };
     sgBots := Buffer.toArray(nb);
-    #ok(if (closed == 0) "Bot zatrzymany" else "Bot zatrzymany, zamknieto pozycji: " # Nat.toText(closed))
+    let ex = await sgExec();
+    #ok((if (closed == 0) "Bot zatrzymany" else "Bot zatrzymany, zamknieto pozycji: " # Nat.toText(closed)) # (if (ex == "") "" else "\n" # ex))
   };
 
   public shared (msg) func sgBotDelete(id : Nat) : async Result.Result<Text, Text> {
     if (not stCan(msg.caller)) return #err("Brak dostepu");
+    switch (Array.find<SgBot>(sgBots, func(x) { x.id == id })) {
+      case (?b) { if (b.mode == "real") return #err("Bota REAL nie usuwa sie (historia zlecen) - zatrzymaj go") };
+      case null {};
+    };
     sgBots := Array.filter<SgBot>(sgBots, func(x) { x.id != id });
     sgTrades := Array.filter<SgTrade>(sgTrades, func(t) { t.bot != id });
     sgBotCfg := Array.filter<(Nat, SgBotCfg)>(sgBotCfg, func(x) { x.0 != id });
@@ -926,7 +961,9 @@ persistent actor Budget {
     sgDays := Array.append(sgDays, [{ day; raw; at = Time.now() }]);
     if (sgDays.size() > 3000) sgDays := Array.subArray(sgDays, sgDays.size() - 3000, 3000);
     let prevRows : [SgRow] = switch (prev) { case (?p) sgParse(p.raw).1; case null [] };
-    let botLines = sgBotsStep(day, rows, prevRows);
+    var botLines = sgBotsStep(day, rows, prevRows);
+    let ex = await sgExec();
+    if (ex != "") botLines #= ex;
     let botTag = if (botLines == "") "" else " · boty: transakcje";
     if (prevRows.size() == 0) { sgLog := "OK (pierwszy zapis " # day # ")" # botTag; return };
     var subj = "";
@@ -947,12 +984,77 @@ persistent actor Budget {
     var mailed = false;
     if (sgMail) {
       try {
-        let res = await sgSend("Trading Signals: " # subj # "\n" # body # (if (botLines == "") "" else "\nBoty DEMO:\n" # botLines) # "\nSwieca dzienna " # day # " (zamkniecie 00:00 UTC)\nhttps://57a6w-kiaaa-aaaam-qjmvq-cai.icp0.io/signals.html");
+        let res = await sgSend("Trading Signals: " # subj # "\n" # body # (if (botLines == "") "" else "\nBoty:\n" # botLines) # "\nSwieca dzienna " # day # " (zamkniecie 00:00 UTC)\nhttps://57a6w-kiaaa-aaaam-qjmvq-cai.icp0.io/signals.html");
         mailed := Text.startsWith(res, #text "OK");
       } catch (_) {};
     };
     sgEvents := Array.append(sgEvents, Array.map<SgEvent, SgEvent>(Buffer.toArray(evs), func(e) { { e with mailed } }));
     sgLog := "OK " # day # ": " # subj # (if (mailed) " (mail wyslany)" else if (sgMail) " (mail: blad)" else "");
+  };
+
+  // wykonanie oczekujacych zlecen: 1 outcall/zlecenie, idempotentne (cid), max 3 proby co 15 min
+  func sgExec() : async Text {
+    if (sgExecBusy or sgKey == "") return "";
+    sgExecBusy := true;
+    var out = "";
+    for (o in sgOrders.vals()) {
+      if (o.status == "pending") {
+        let body = o.cid # "|" # o.sym # "|" # (if (o.buy) "BUY|" # Float.format(#fix 2, o.req) else "SELL|" # Float.format(#fix 8, o.req));
+        let res = try { await httpGetRequestBounded(SG_URL # "/ord", Array.append(sgHdr(), [{ name = "Content-Type"; value = "text/plain" }]), ?body) } catch (e) { "ERR " # Error.message(e) };
+        let f = Iter.toArray(Text.split(res, #char '|'));
+        var st = "pending";
+        var m = res;
+        if (f.size() >= 7 and f[0] == "OK" and (f[2] == "FILLED" or f[2] == "PARTIALLY_FILLED" or f[2] == "EXPIRED") and sgF(f[3]) > 0) {
+          let q = sgF(f[3]); let usd = sgF(f[4]);
+          sgTrades := Array.append(sgTrades, [{ id = sgNextId; bot = o.bot; day = o.day; sym = o.sym; buy = o.buy; price = usd / q; qty = q; usd; fee = sgF(f[5]) }]);
+          sgNextId += 1;
+          st := "done"; m := f[2] # " " # f[3] # " @ " # Float.format(#fix 4, usd / q) # " (#" # f[6] # ")";
+        } else if (f.size() >= 1 and f[0] == "SKIP") { st := "skip" }
+        else if (f.size() >= 3 and f[0] == "OK") { st := "error"; m := "Status " # f[2] # " bez wykonania" }
+        else if (o.tries + 1 >= 3) { st := "error" };
+        sgOrders := Array.map<SgOrd, SgOrd>(sgOrders, func(x) { if (x.cid == o.cid) { { x with status = st; tries = x.tries + 1; msg = m; at = Time.now() } } else x });
+        out #= "[REAL] " # o.cid # ": " # st # " - " # m # "\n";
+      };
+    };
+    sgExecBusy := false;
+    if (Array.find<SgOrd>(sgOrders, func(x) { x.status == "pending" }) != null) sgRetryArm<system>();
+    out
+  };
+  func sgRetryArm<system>() {
+    switch (sgRetryTimer) { case (?t) Timer.cancelTimer(t); case null {} };
+    sgRetryTimer := ?Timer.setTimer<system>(#seconds 900, sgRetryTick);
+  };
+  func sgRetryTick() : async () {
+    sgRetryTimer := null;
+    let ex = await sgExec();
+    if (ex != "" and sgMail) { try { ignore await sgSend("Trading Signals: zlecenia REAL\n" # ex) } catch (_) {} };
+  };
+
+  public shared query (msg) func sgLiveAll() : async SgLiveAll {
+    if (not stCan(msg.caller)) return { live = false; max = 0; orders = [] };
+    let n = sgOrders.size();
+    { live = sgLive; max = sgLiveMax; orders = if (n > 300) Array.subArray(sgOrders, n - 300, 300) else sgOrders }
+  };
+
+  public shared (msg) func sgSetLive(on : Bool, max : Float) : async Result.Result<Text, Text> {
+    if (not Principal.isController(msg.caller)) return #err("Tylko kontroler");
+    if (not (max >= 5 and max <= 10_000)) return #err("Limit 5 - 10 000 USD");
+    sgLive := on; sgLiveMax := max;
+    #ok("REAL " # (if (on) "WLACZONE" else "WYLACZONE") # ", limit zlecenia " # Float.format(#fix 0, max) # " USD")
+  };
+
+  public shared (msg) func sgOrdRetry() : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    let r = await sgExec();
+    #ok(if (r == "") "Brak oczekujacych zlecen" else r)
+  };
+
+  public shared (msg) func sgBalance() : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (sgKey == "") return #err("Brak klucza (sgSetKey)");
+    if (Time.now() - sgBalAt < 60_000_000_000) return #err("Odczekaj 1 min");
+    sgBalAt := Time.now();
+    try { #ok(await httpGetRequestBounded(SG_URL # "/bal", sgHdr(), null)) } catch (e) { #err(Error.message(e)) }
   };
 
   func sgArm<system>() {
@@ -1050,6 +1152,10 @@ persistent actor Budget {
       #sgBotPut2 : () -> (SgBot, SgBotCfg);
       #sgBotStop : () -> (Nat, Bool);
       #sgBotsAll : () -> ();
+      #sgLiveAll : () -> ();
+      #sgSetLive : () -> (Bool, Float);
+      #sgOrdRetry : () -> ();
+      #sgBalance : () -> ();
       #sgPosDelete : () -> Nat;
       #sgPosPut : () -> SgPos;
       #sgRunNow : () -> ();
@@ -1079,7 +1185,8 @@ persistent actor Budget {
       case (#kvPut _) { isMember(caller) and arg.size() <= 1_100_000 };
       case (#kvGetAll _) { isMember(caller) };
       case (#stSetKey _) { Principal.isController(caller) };
-      case (#sgSetKey _) { Principal.isController(caller) };
+      case (#sgSetKey _ or #sgSetLive _) { Principal.isController(caller) };
+      case (#sgLiveAll _ or #sgOrdRetry _ or #sgBalance _) { stCan(caller) };
       case (#sgBotPut _ or #sgBotPut2 _) { stCan(caller) and arg.size() <= 2_000 };
       case (#sgBotsAll _ or #sgBotStop _ or #sgBotDelete _) { stCan(caller) };
       case (#sgPosPut _) { stCan(caller) and arg.size() <= 4_000 };

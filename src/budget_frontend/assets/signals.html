@@ -131,7 +131,7 @@ const idl=({IDL})=>{
  return IDL.Service({sgAll:IDL.Func([],[All],["query"]),sgPosPut:IDL.Func([P],[RN],[]),sgPosDelete:IDL.Func([IDL.Nat],[RT],[]),
   sgRunNow:IDL.Func([],[RT],[]),sgSetMail:IDL.Func([IDL.Bool],[RT],[]),sgTestMail:IDL.Func([],[RT],[]),
   sgBotsAll:IDL.Func([],[IDL.Record({bots:IDL.Vec(Bot),trades:IDL.Vec(Tr),cfg:IDL.Vec(IDL.Tuple(IDL.Nat,Cfg))})],["query"]),sgBotPut:IDL.Func([Bot],[RN],[]),sgBotPut2:IDL.Func([Bot,Cfg],[RN],[]),sgBotStop:IDL.Func([IDL.Nat,IDL.Bool],[RT],[]),sgBotDelete:IDL.Func([IDL.Nat],[RT],[]),
-  sgLiveAll:IDL.Func([],[IDL.Record({live:IDL.Bool,max:IDL.Float64,orders:IDL.Vec(Od)})],["query"]),sgOrdRetry:IDL.Func([],[RT],[]),sgBalance:IDL.Func([],[RT],[])});
+  sgLiveAll:IDL.Func([],[IDL.Record({live:IDL.Bool,max:IDL.Float64,orders:IDL.Vec(Od),owner:IDL.Bool})],["query"]),sgOrdRetry:IDL.Func([],[RT],[]),sgBalance:IDL.Func([],[RT],[])});
 };
 const A=Auth.mk(idl);
 const WK="https://gielda-quote.marcinkolacz.workers.dev",CARDS=["BTC","ETH","NEAR","ICP","INJ"],SYMS=["ETH","NEAR","ICP","INJ"],FEE=0.001,FREEZE="2026-10-11";
@@ -322,7 +322,7 @@ function renderBots(){
   <div class="res"><div>Wynik lacznie<b class="${cls(tot)}">${usd2(tot)}</b></div><div>Zrealizowany<b class="${cls(st.real)}">${usd2(st.real)}</b></div>
   <div>Otwarte<b class="${cls(st.unreal)}">${st.openC?usd2(st.unreal):"–"}</b></div><div>Transakcje<b>${st.closed} zamkn. · ${st.closed?Math.round(st.wins/st.closed*100)+"% traf.":"–"}</b></div></div>
   <div class="note" style="margin:0 0 8px">Start ${esc(b.start)} · wejscia ${b.entries}${Number(b.maxEntries)?"/"+b.maxEntries:""}${b.endDay?" · do "+esc(b.endDay):""}${st.open.length?" · trzyma: "+esc(st.open.join(", ")):""}${holdTxt(b)}${b.note?" · "+esc(b.note):""}</div>
-  <div class="act"><button type="button" data-be="${b.id}">Edytuj</button>${b.active?`<button type="button" data-bs="${b.id}">Zatrzymaj</button><button type="button" data-bc="${b.id}">Zatrzymaj i zamknij</button>`:""}${b.mode==="real"?"":`<button type="button" data-bd="${b.id}">Usun</button>`}</div></div>`;}).join("")
+  <div class="act">${b.mode==="real"&&!(LV&&LV.owner)?"":`<button type="button" data-be="${b.id}">Edytuj</button>${b.active?`<button type="button" data-bs="${b.id}">Zatrzymaj</button><button type="button" data-bc="${b.id}">Zatrzymaj i zamknij</button>`:""}${b.mode==="real"?"":`<button type="button" data-bd="${b.id}">Usun</button>`}`}</div></div>`;}).join("")
   :`<div class="empty">Brak botow. „Nowy bot” uruchomi automatyczne transakcje DEMO wg reguly.</div>`;
  const T=BT.trades.slice().sort((a,b)=>Number(b.id-a.id)).slice(0,100);
  $("tb").innerHTML=T.length?T.map(t=>{const pl=per.get(t.id);return `<tr><td>${esc(t.day)}</td><td>${esc(names.get(t.bot)||"#"+t.bot)}</td><td><b>${esc(t.sym)}</b></td><td>${t.buy?'<span class="tag ok">KUPNO</span>':'<span class="tag bad">SPRZEDAZ</span>'}</td>
@@ -343,7 +343,7 @@ function bMode(){const r=$("bMd").value==="real",o=$("bKd").querySelector('[valu
 $("bMd").onchange=bMode;$("bKd").onchange=bKind;$("bSy").onchange=bKind;
 function openBot(b){
  bEdit=b||null;const e=!!b;$("dbt").textContent=e?"Edytuj bota":"Nowy bot DEMO";$("bOk").textContent=e?"Zapisz":"Uruchom bota";
- $("bNm").value=e?b.name:"";$("bAm").value=e?b.amount:100;$("bSc").value=e?(b.scale?"1":"0"):"1";$("bFr").value=e?(b.fresh?"1":"0"):"0";$("bMd").value=e?b.mode:"demo";{const o=$("bMd").querySelector('[value="real"]');o.disabled=!(LV&&LV.live);o.textContent=LV&&LV.live?"PRAWDZIWE (Kraken, max $"+LV.max+"/zlecenie)":"PRAWDZIWE - wylaczone";}
+ $("bNm").value=e?b.name:"";$("bAm").value=e?b.amount:100;$("bSc").value=e?(b.scale?"1":"0"):"1";$("bFr").value=e?(b.fresh?"1":"0"):"0";$("bMd").value=e?b.mode:"demo";{const o=$("bMd").querySelector('[value="real"]');o.disabled=!(LV&&LV.live&&LV.owner);o.textContent=LV&&LV.live&&!LV.owner?"PRAWDZIWE - tylko wlasciciel":LV&&LV.live?"PRAWDZIWE (Kraken, max $"+LV.max+"/zlecenie)":"PRAWDZIWE - wylaczone";}
  $("bEd").value=e?b.endDay:"";$("bMx").value=e?Number(b.maxEntries):0;$("bNo").value=e?b.note:"";
  $("bSy").querySelectorAll("input").forEach(i=>{i.checked=e?b.syms.includes(i.value):true;i.disabled=e;});["bAm","bSc","bFr","bMd","bKd"].forEach(id=>$(id).disabled=e);
  const c=e?cfgOf(b):{kind:"usd",qty:[]};$("bKd").value=c.kind;$("bQt").querySelectorAll("[data-qq]").forEach(i=>{const x=c.qty.find(q=>q[0]===i.dataset.qq);i.value=x?x[1]:"";i.disabled=e;});bMode();
@@ -363,7 +363,7 @@ $("fb").onsubmit=async ev=>{ev.preventDefault();
  $("bOk").disabled=true;try{const r=await A.sgBotPut2(x,cfg);if("err" in r){prog(r.err);return;}$("db").close();prog(bEdit?"Zapisano":"Bot uruchomiony");await loadBots();}catch(e){prog("Blad: "+e.message);}finally{$("bOk").disabled=false;}};
 async function loadBots(){try{[BT,LV]=await Promise.all([A.sgBotsAll(),A.sgLiveAll()]);}catch(e){prog("Boty: "+e.message);}renderBots();renderOrd();}
 let LV=null;
-function renderOrd(){if(!LV)return;const names=new Map((BT?BT.bots:[]).map(b=>[b.id,b.name])),O=LV.orders.slice().reverse().slice(0,100);
+function renderOrd(){if(!LV)return;$("oBal").hidden=$("oRt").hidden=!LV.owner;const names=new Map((BT?BT.bots:[]).map(b=>[b.id,b.name])),O=LV.orders.slice().reverse().slice(0,100);
  $("oInf").innerHTML=(LV.live?'<span class="tag ok">REAL wlaczone</span>':'<span class="tag">REAL wylaczone</span>')+" · limit zlecenia $"+LV.max+" · oczekujace: "+LV.orders.filter(o=>o.status==="pending").length+" · ponowienie co 15 min, max 3 proby";
  const tg={pending:"",done:"ok",error:"bad",skip:""};
  $("to").innerHTML=O.length?O.map(o=>`<tr><td>${esc(o.day)}</td><td>${esc(names.get(o.bot)||"#"+o.bot)}</td><td><b>${esc(o.sym)}</b></td><td>${o.buy?'<span class="tag ok">KUPNO</span>':'<span class="tag bad">SPRZEDAZ</span>'}</td>

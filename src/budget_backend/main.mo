@@ -766,13 +766,16 @@ persistent actor Budget {
   var sgBots : [SgBot] = [];
   // ===== Etap 2: prawdziwe zlecenia (mode "real") przez worker /ord; klucze gieldy tylko w workerze =====
   public type SgOrd = { cid : Text; bot : Nat; day : Text; sym : Text; buy : Bool; req : Float; status : Text; tries : Nat; msg : Text; at : Int };
-  public type SgLiveAll = { live : Bool; max : Float; orders : [SgOrd] };
+  public type SgLiveAll = { live : Bool; max : Float; orders : [SgOrd]; owner : Bool };
   var sgLive : Bool = false;
   var sgLiveMax : Float = 50;
   var sgOrders : [SgOrd] = [];
   transient var sgExecBusy : Bool = false;
   transient var sgRetryTimer : ?Timer.TimerId = null;
   transient var sgBalAt : Int = 0;
+  // operacje na prawdziwych srodkach: tylko kontroler lub admin (nie zwykly czlonek z zaproszenia)
+  func sgOwner(p : Principal) : Bool { Principal.isController(p) or isAdmin(p) };
+  func sgIsReal(id : Nat) : Bool { switch (Array.find<SgBot>(sgBots, func(x) { x.id == id })) { case (?b) b.mode == "real"; case null false } };
   func sgPending(bot : Nat, sym : Text) : Bool {
     Array.find<SgOrd>(sgOrders, func(o) { o.bot == bot and o.sym == sym and o.status == "pending" }) != null
   };
@@ -852,11 +855,13 @@ persistent actor Budget {
 
   public shared (msg) func sgBotPut(b : SgBot) : async Result.Result<Nat, Text> {
     if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (b.mode == "real" or sgIsReal(b.id)) return #err("Tylko wlasciciel");
     sgBotSave(b, SG_CFG_USD)
   };
 
   public shared (msg) func sgBotPut2(b : SgBot, c : SgBotCfg) : async Result.Result<Nat, Text> {
     if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if ((b.mode == "real" or sgIsReal(b.id)) and not sgOwner(msg.caller)) return #err("Bot REAL: tylko wlasciciel");
     if (c.kind != "usd" and c.kind != "qty" and c.kind != "all") return #err("Zly tryb wielkosci");
     if (c.qty.size() > 4) return #err("Zle ilosci");
     if (b.id == 0 and c.kind != "usd") {
@@ -918,6 +923,7 @@ persistent actor Budget {
 
   public shared (msg) func sgBotStop(id : Nat, close : Bool) : async Result.Result<Text, Text> {
     if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (sgIsReal(id) and not sgOwner(msg.caller)) return #err("Bot REAL: tylko wlasciciel");
     let (d, rows, _) = sgLastRows();
     var closed = 0;
     let nb = Buffer.Buffer<SgBot>(sgBots.size());
@@ -1032,9 +1038,9 @@ persistent actor Budget {
   };
 
   public shared query (msg) func sgLiveAll() : async SgLiveAll {
-    if (not stCan(msg.caller)) return { live = false; max = 0; orders = [] };
+    if (not stCan(msg.caller)) return { live = false; max = 0; orders = []; owner = false };
     let n = sgOrders.size();
-    { live = sgLive; max = sgLiveMax; orders = if (n > 300) Array.subArray(sgOrders, n - 300, 300) else sgOrders }
+    { live = sgLive; max = sgLiveMax; orders = if (n > 300) Array.subArray(sgOrders, n - 300, 300) else sgOrders; owner = sgOwner(msg.caller) }
   };
 
   public shared (msg) func sgSetLive(on : Bool, max : Float) : async Result.Result<Text, Text> {
@@ -1045,13 +1051,13 @@ persistent actor Budget {
   };
 
   public shared (msg) func sgOrdRetry() : async Result.Result<Text, Text> {
-    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (not sgOwner(msg.caller)) return #err("Tylko wlasciciel");
     let r = await sgExec();
     #ok(if (r == "") "Brak oczekujacych zlecen" else r)
   };
 
   public shared (msg) func sgBalance() : async Result.Result<Text, Text> {
-    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (not sgOwner(msg.caller)) return #err("Tylko wlasciciel");
     if (sgKey == "") return #err("Brak klucza (sgSetKey)");
     if (Time.now() - sgBalAt < 60_000_000_000) return #err("Odczekaj 1 min");
     sgBalAt := Time.now();
@@ -1187,7 +1193,8 @@ persistent actor Budget {
       case (#kvGetAll _) { isMember(caller) };
       case (#stSetKey _) { Principal.isController(caller) };
       case (#sgSetKey _ or #sgSetLive _) { Principal.isController(caller) };
-      case (#sgLiveAll _ or #sgOrdRetry _ or #sgBalance _) { stCan(caller) };
+      case (#sgLiveAll _) { stCan(caller) };
+      case (#sgOrdRetry _ or #sgBalance _) { Principal.isController(caller) or isAdmin(caller) };
       case (#sgBotPut _ or #sgBotPut2 _) { stCan(caller) and arg.size() <= 2_000 };
       case (#sgBotsAll _ or #sgBotStop _ or #sgBotDelete _) { stCan(caller) };
       case (#sgPosPut _) { stCan(caller) and arg.size() <= 4_000 };

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pl"><head><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="icon" href="favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1c1915"><meta name="apple-mobile-web-app-title" content="Budzet"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dashboard</title><link rel="stylesheet" href="base.css"><link rel="stylesheet" href="theme.css"><script src="theme.js"></script></head>
 <body><div class="app">
-<nav class="topnav"><a href="index.html" class="on">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html">Staking</a><a href="kosz.html">Kosz</a></nav>
+<nav class="topnav"><a href="index.html" class="on">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html">Staking</a><a href="signals.html">Signals</a><a href="kosz.html">Kosz</a></nav>
 <header><div><h1>Dashboard</h1><div class="sub" id="date"></div></div></header>
 <div class="tiles" id="tiles"></div>
 <section id="data" style="margin-top:18px"><h2 style="margin:0 0 4px;font-size:16px">Dane i kopie zapasowe</h2>
@@ -38,7 +38,8 @@ const TILES=[
  const td=K.today(),mon=d=>{const x=new Date(d+"T00:00:00");x.setDate(x.getDate()-(x.getDay()+6)%7);return x.toLocaleDateString("sv");};
  let rem=0;C.forEach(c=>{const p=(K.S.prices[c.t]||{}).p||0,L=[...c.lv].sort((a,b)=>a.p-b.p);let q=0;L.forEach(l=>{if(p>0&&p>=l.p)q=l.q;});
   const k=c.cy==="d"?td:mon(td),s=c.sales.filter(x=>(c.cy==="d"?x.d:mon(x.d))===k).reduce((a,x)=>a+x.q,0);let r=Math.max(0,q-s);if(c.tot>0)r=Math.min(r,Math.max(0,c.tot-c.sales.reduce((a,x)=>a+x.q,0)));rem+=r*p;});
- return [K.money(rem,"USD",0),"do sprzedania w biezacym cyklu",rem>0?"pos":""];}}
+ return [K.money(rem,"USD",0),"do sprzedania w biezacym cyklu",rem>0?"pos":""];}},
+{title:"Trading Signals",href:"signals.html",val(){return ["5 tokenow","EMA200 + rezim BTC · alert e-mail",""];}}
 ];
 const host=document.getElementById("tiles");
 TILES.forEach(t=>{const [v,s,c]=t.val();const a=document.createElement("a");a.className="tile";a.href=t.href;

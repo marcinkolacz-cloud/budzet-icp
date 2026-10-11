@@ -700,7 +700,149 @@ persistent actor Budget {
     #ok(stLog)
   };
 
-  system func postupgrade() { stArm<system>(); stNArm<system>() };
+  // ===== Trading Signals: regula T_vt (EMA200 +-2%, rezim BTC, vol-target 60%) =====
+  // 1 outcall dziennie 02:30 PL do workera /sig (<=4 KB); mail przez worker /notify tylko przy zmianie sygnalu
+  public type SgDay = { day : Text; raw : Text; at : Int };
+  public type SgEvent = { id : Nat; day : Text; sym : Text; on : Bool; price : Float; w : Float; mailed : Bool };
+  public type SgPos = { id : Nat; sym : Text; status : Text; opened : Text; entry : Float; qty : Float; stop : Float; closed : Text; exit : Float; note : Text; evId : Nat; at : Int };
+  public type SgAll = { days : [SgDay]; events : [SgEvent]; pos : [SgPos]; lastRun : Int; log : Text; nextRunSec : Nat; hasKey : Bool; mail : Bool };
+  type SgRow = { sym : Text; on : Bool; w : Float; c : Float };
+  var sgDays : [SgDay] = [];
+  var sgEvents : [SgEvent] = [];
+  var sgPos : [SgPos] = [];
+  var sgNextId : Nat = 1;
+  var sgKey : Text = "";
+  var sgMail : Bool = true;
+  var sgLastRun : Int = 0;
+  var sgLog : Text = "";
+  transient var sgTimer : ?Timer.TimerId = null;
+  transient var sgManualAt : Int = 0;
+  transient var sgMailAt : Int = 0;
+  let SG_URL = "https://gielda-quote.marcinkolacz.workers.dev";
+  let SG_AT : Int = 2 * 3_600 + 30 * 60;
+
+  func sgF(t : Text) : Float { stFloatAt(Iter.toArray(t.chars()), 0) };
+  func sgParse(raw : Text) : (Text, [SgRow]) {
+    var day = "";
+    let rows = Buffer.Buffer<SgRow>(5);
+    for (line in Text.split(raw, #char '\n')) {
+      let f = Iter.toArray(Text.split(line, #char '|'));
+      if (f.size() == 2 and f[0] == "D") { day := f[1] }
+      else if (f.size() >= 4) { rows.add({ sym = f[0]; on = f[1] == "1"; w = sgF(f[2]); c = sgF(f[3]) }) };
+    };
+    (day, Buffer.toArray(rows))
+  };
+  func sgHdr() : [HttpHeader] { [{ name = "x-sig-key"; value = sgKey }] };
+  func sgSend(txt : Text) : async Text {
+    await httpGetRequestBounded(SG_URL # "/notify", Array.append(sgHdr(), [{ name = "Content-Type"; value = "text/plain" }]), ?txt)
+  };
+
+  func sgRun() : async () {
+    sgLastRun := Time.now();
+    if (sgKey == "") { sgLog := "Brak klucza (sgSetKey)"; return };
+    let raw = try { await httpGetRequestBounded(SG_URL # "/sig", sgHdr(), null) } catch (e) { sgLog := "sig: " # Error.message(e); return };
+    let (day, rows) = sgParse(raw);
+    if (day == "" or rows.size() == 0) { sgLog := "sig: zla odpowiedz"; return };
+    let prev : ?SgDay = if (sgDays.size() == 0) null else ?sgDays[sgDays.size() - 1];
+    switch (prev) { case (?p) { if (p.day == day) { sgLog := "OK (" # day # " juz zapisany)"; return } }; case null {} };
+    sgDays := Array.append(sgDays, [{ day; raw; at = Time.now() }]);
+    if (sgDays.size() > 3000) sgDays := Array.subArray(sgDays, sgDays.size() - 3000, 3000);
+    let prevRows : [SgRow] = switch (prev) { case (?p) sgParse(p.raw).1; case null [] };
+    if (prevRows.size() == 0) { sgLog := "OK (pierwszy zapis " # day # ")"; return };
+    var subj = "";
+    var body = "";
+    let evs = Buffer.Buffer<SgEvent>(2);
+    for (r in rows.vals()) {
+      let was = switch (Array.find<SgRow>(prevRows, func(x) { x.sym == r.sym })) { case (?x) x.on; case null r.on };
+      if (was != r.on) {
+        evs.add({ id = sgNextId; day; sym = r.sym; on = r.on; price = r.c; w = r.w; mailed = false });
+        sgNextId += 1;
+        let tag = r.sym # (if (r.on) " ON" else " OFF");
+        subj := if (subj == "") tag else subj # ", " # tag;
+        body #= (if (r.on) "WEJSCIE (ON): " else "WYJSCIE (OFF): ") # r.sym # " @ " # Float.format(#fix 4, r.c) # " USD"
+          # (if (r.on) ", pozycja " # Float.format(#fix 0, r.w * 100) # "% slotu" else "") # "\n";
+      };
+    };
+    if (evs.size() == 0) { sgLog := "OK " # day # " (bez zmian)"; return };
+    var mailed = false;
+    if (sgMail) {
+      try {
+        let res = await sgSend("Trading Signals: " # subj # "\n" # body # "\nSwieca dzienna " # day # " (zamkniecie 00:00 UTC)\nhttps://57a6w-kiaaa-aaaam-qjmvq-cai.icp0.io/signals.html");
+        mailed := Text.startsWith(res, #text "OK");
+      } catch (_) {};
+    };
+    sgEvents := Array.append(sgEvents, Array.map<SgEvent, SgEvent>(Buffer.toArray(evs), func(e) { { e with mailed } }));
+    sgLog := "OK " # day # ": " # subj # (if (mailed) " (mail wyslany)" else if (sgMail) " (mail: blad)" else "");
+  };
+
+  func sgArm<system>() {
+    switch (sgTimer) { case (?t) Timer.cancelTimer(t); case null {} };
+    sgTimer := ?Timer.setTimer<system>(#seconds (secsToNextAt(SG_AT)), sgTick);
+  };
+  func sgTick() : async () {
+    sgArm<system>();
+    await sgRun();
+  };
+
+  public shared query (msg) func sgAll() : async SgAll {
+    if (not stCan(msg.caller)) return { days = []; events = []; pos = []; lastRun = 0; log = "Brak dostepu"; nextRunSec = 0; hasKey = false; mail = false };
+    let n = sgDays.size();
+    { days = if (n > 400) Array.subArray(sgDays, n - 400, 400) else sgDays; events = sgEvents; pos = sgPos;
+      lastRun = sgLastRun; log = sgLog; nextRunSec = secsToNextAt(SG_AT); hasKey = sgKey != ""; mail = sgMail }
+  };
+
+  public shared (msg) func sgSetKey(k : Text) : async Result.Result<Text, Text> {
+    if (not Principal.isController(msg.caller)) return #err("Tylko kontroler");
+    sgKey := Text.trim(k, #char ' ');
+    if (sgTimer == null) sgArm<system>();
+    #ok(if (sgKey == "") "Klucz usuniety" else "Klucz zapisany")
+  };
+
+  public shared (msg) func sgSetMail(on : Bool) : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    sgMail := on;
+    #ok(if (on) "Maile wlaczone" else "Maile wylaczone")
+  };
+
+  public shared (msg) func sgRunNow() : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (Time.now() - sgManualAt < 600_000_000_000) return #err("Odczekaj 10 min od poprzedniego odswiezenia");
+    sgManualAt := Time.now();
+    await sgRun();
+    if (sgTimer == null) sgArm<system>();
+    #ok(sgLog)
+  };
+
+  public shared (msg) func sgTestMail() : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (sgKey == "") return #err("Brak klucza (sgSetKey)");
+    if (Time.now() - sgMailAt < 600_000_000_000) return #err("Odczekaj 10 min od poprzedniego testu");
+    sgMailAt := Time.now();
+    try { #ok(await sgSend("Trading Signals: test\nTest alertu z canistra budzetu. Jesli to czytasz, alerty dzialaja.")) } catch (e) { #err(Error.message(e)) }
+  };
+
+  public shared (msg) func sgPosPut(p : SgPos) : async Result.Result<Nat, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (p.sym.size() == 0 or p.sym.size() > 10 or p.status.size() > 10 or p.note.size() > 500 or p.opened.size() > 10 or p.closed.size() > 10) return #err("Zle dane");
+    if (p.id == 0) {
+      if (sgPos.size() >= 1000) return #err("Limit 1000 pozycji");
+      let id = sgNextId;
+      sgNextId += 1;
+      sgPos := Array.append(sgPos, [{ p with id; at = Time.now() }]);
+      return #ok(id);
+    };
+    if (Array.find<SgPos>(sgPos, func(x) { x.id == p.id }) == null) return #err("Brak pozycji");
+    sgPos := Array.map<SgPos, SgPos>(sgPos, func(x) { if (x.id == p.id) { { p with at = Time.now() } } else x });
+    #ok(p.id)
+  };
+
+  public shared (msg) func sgPosDelete(id : Nat) : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    sgPos := Array.filter<SgPos>(sgPos, func(x) { x.id != id });
+    #ok("Usunieto")
+  };
+
+  system func postupgrade() { stArm<system>(); stNArm<system>(); sgArm<system>() };
 
   public query func health() : async Text { "ok" };
 
@@ -722,6 +864,13 @@ persistent actor Budget {
       #removeAdmin : () -> Principal;
       #removeMember : () -> Principal;
       #stAll : () -> ();
+      #sgAll : () -> ();
+      #sgPosDelete : () -> Nat;
+      #sgPosPut : () -> SgPos;
+      #sgRunNow : () -> ();
+      #sgSetKey : () -> Text;
+      #sgSetMail : () -> Bool;
+      #sgTestMail : () -> ();
       #stNeuronPut : () -> StNeuron;
       #stNeuronRemove : () -> Nat64;
       #stRewardDelete : () -> (Nat64, Int);
@@ -745,6 +894,9 @@ persistent actor Budget {
       case (#kvPut _) { isMember(caller) and arg.size() <= 1_100_000 };
       case (#kvGetAll _) { isMember(caller) };
       case (#stSetKey _) { Principal.isController(caller) };
+      case (#sgSetKey _) { Principal.isController(caller) };
+      case (#sgPosPut _) { stCan(caller) and arg.size() <= 4_000 };
+      case (#sgAll _ or #sgPosDelete _ or #sgRunNow _ or #sgSetMail _ or #sgTestMail _) { stCan(caller) };
       case (#stTransform _) { false };
       case (#stRewardsImport _ or #stWtnPut _ or #stExtImport _) { stCan(caller) and arg.size() <= 1_900_000 };
       case (#stAll _ or #stNeuronPut _ or #stNeuronRemove _ or #stRewardDelete _ or #stWtnDelete _ or #stWtnPosPut _ or #stWtnPosRemove _ or #stSyncNow _ or #stSyncNeurons _) { stCan(caller) };

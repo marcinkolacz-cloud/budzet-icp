@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pl"><head><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="icon" href="favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1c1915"><meta name="apple-mobile-web-app-title" content="Budzet"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Signals</title><link rel="stylesheet" href="base.css"><link rel="stylesheet" href="theme.css"><script src="theme.js"></script>
+<style>
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0}.chips span{font-size:12px;color:var(--muted);background:var(--field,#f7f4ee);border-radius:999px;padding:3px 10px}
+.chips .bad{color:var(--neg)}.chips .ok{color:var(--pos)}
+.seg{display:flex;gap:4px;flex-wrap:wrap}.seg button{padding:4px 11px;font-size:12px}.seg button.on{background:var(--acc,var(--ink));color:var(--acc-ink,#fff);border-color:var(--acc,var(--ink))}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px}.bar h2{margin:0}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;position:relative}
+.card:hover{transform:translateY(-2px);box-shadow:0 8px 24px #0001}.card.sel{border-color:var(--acc,var(--ink))}
+.card .top{display:flex;justify-content:space-between;align-items:center}.card .sym{font-size:20px;font-weight:700;letter-spacing:-.03em}
+.badge{font-size:11px;font-weight:700;letter-spacing:.06em;border-radius:999px;padding:3px 10px;background:var(--field,#f7f4ee);color:var(--muted)}
+.badge.on{background:var(--soft,#e7f6ee);color:var(--pos)}
+.card .px{font-size:24px;letter-spacing:-.03em;margin:6px 0 2px;font-weight:600}
+.kv{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:12px;color:var(--muted)}.kv b{color:var(--ink);font-weight:600;text-align:right}
+.card svg{display:block;width:100%;height:44px;margin-top:8px}
+.ch{position:relative;width:100%}.ch svg{display:block;width:100%}
+.ch .p{fill:none;stroke:var(--ink);stroke-width:1.6}.ch .e{fill:none;stroke:var(--acc,#c9a227);stroke-width:1.4;stroke-dasharray:5 4}
+.ch .s{fill:none;stroke:var(--pos);stroke-width:2}.ch .b{fill:none;stroke:var(--muted);stroke-width:1.5}
+.ch .z{fill:var(--pos);opacity:.09}.ch .g{stroke:var(--grid,#ece6dc);stroke-width:1}.ch text{fill:var(--muted);font-size:11px}
+.ch .mu{fill:var(--pos)}.ch .md{fill:var(--neg)}.ch .x{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--card);font-size:12px;line-height:1.4;padding:6px 10px;border-radius:10px;white-space:nowrap;box-shadow:0 6px 18px #0002;z-index:5}.tip b{display:block}
+.lg{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:6px}.lg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.tag{font-size:11px;border-radius:999px;padding:2px 8px;background:var(--field,#f7f4ee);color:var(--muted)}.tag.ok{color:var(--pos)}.tag.bad{color:var(--neg)}
+.row-act button{padding:3px 9px;font-size:12px}
+dialog{border:1px solid var(--line);border-radius:20px;padding:0;width:min(520px,calc(100vw - 24px));background:var(--card);color:var(--ink);box-shadow:0 24px 60px #0003}
+dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
+dialog form{padding:20px 22px;display:grid;gap:10px;grid-template-columns:1fr 1fr}dialog h3{margin:0 0 4px;grid-column:1/-1}dialog label{font-size:12px;color:var(--muted);display:grid;gap:4px}
+dialog .w{grid-column:1/-1}dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:6px;grid-column:1/-1}
+dialog select{width:100%}
+.empty{color:var(--muted);font-size:13px;padding:10px 0}
+@media (max-width:760px){.cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card{padding:12px;border-radius:14px}.card .sym{font-size:17px}.card .px{font-size:19px}.badge .lt{display:none}.kv{font-size:10.5px;gap:2px 4px}.kv span,.kv b{white-space:nowrap}dialog form{grid-template-columns:1fr}}
+</style></head>
+<body><div class="app">
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html">Staking</a><a href="signals.html" class="on">Signals</a><a href="kosz.html">Kosz</a></nav>
+<header><div><h1>Trading Signals</h1><div class="sub">Regula: cena &gt; EMA200 +2% i BTC &gt; EMA200 · wyjscie ponizej EMA200 -2% · pozycja = min(1, 60% / zmiennosc 30d) · swieca 1D Binance</div><div class="chips" id="chips"></div></div>
+<div class="form"><button id="bm" type="button">Maile: …</button><button id="bt" type="button">Test maila</button><button id="br" type="button">Odswiez sygnal</button><button id="bp" class="dark" type="button">Dodaj pozycje</button></div></header>
+<p class="note" id="prog"></p>
+
+<div class="cards" id="cards"></div>
+
+<section><div class="bar"><h2>Cena i sygnal: <span id="csym">BTC</span></h2><div class="seg" id="sp"></div></div>
+<div class="ch" id="c1"></div>
+<div class="lg"><span><i style="background:var(--ink)"></i>Cena</span><span><i style="background:var(--acc,#c9a227)"></i>EMA200</span><span><i style="background:var(--pos);opacity:.35;height:10px"></i>Sygnal ON</span><span>▲ wejscie · ▼ wyjscie</span></div></section>
+
+<section><div class="bar"><h2>Strategia vs Buy &amp; Hold (5 tokenow)</h2><div class="seg" id="se"></div></div>
+<div class="stats" id="st"></div>
+<div class="ch" id="c2" style="margin-top:10px"></div>
+<div class="lg"><span><i style="background:var(--pos)"></i>Strategia (sloty 1/N x pozycja, prowizja 0,1%)</span><span><i style="background:var(--muted)"></i>Buy &amp; Hold (rowne wagi)</span></div></section>
+
+<section><div class="bar"><h2>Dziennik pozycji</h2><div class="seg" id="sf"></div></div>
+<div class="stats" id="ps" style="margin-bottom:10px"></div>
+<table><thead><tr><th>Token</th><th>Status</th><th>Otwarcie</th><th>Wejscie</th><th class="hm">Ilosc</th><th class="hm">Stop</th><th>Teraz / wyjscie</th><th>Wynik</th><th class="hm">Sygnal</th><th class="hm">Notatka</th><th></th></tr></thead><tbody id="tp"></tbody></table></section>
+
+<section><h2>Zdarzenia sygnalu (zapis canistra)</h2>
+<table><thead><tr><th>Dzien</th><th>Token</th><th>Sygnal</th><th>Cena</th><th class="hm">Pozycja</th><th>Mail</th><th></th></tr></thead><tbody id="te"></tbody></table>
+<p class="note">Canister sprawdza sygnal codziennie o 02:30 (PL) po zamknieciu swiecy dziennej i wysyla mail tylko przy zmianie ON/OFF.</p></section>
+
+<section><div class="bar"><h2>Historia sygnalow (backtest w wybranym okresie)</h2><span class="note" id="hs" style="margin:0"></span></div>
+<table><thead><tr><th>Token</th><th>Wejscie</th><th>Cena</th><th>Wyjscie</th><th>Cena</th><th>Wynik</th><th class="hm">Dni</th></tr></thead><tbody id="th"></tbody></table></section>
+
+<p class="note">Narzedzie badawcze (paper trading). Wyniki historyczne nie gwarantuja przyszlych - to nie jest rekomendacja inwestycyjna.</p>
+
+<dialog id="dp"><form method="dialog" id="fp"><h3 id="dpt">Pozycja</h3>
+<label>Token<select id="pSym"></select></label>
+<label>Status<select id="pSt"><option value="trigger">Trigger ustawiony</option><option value="open">Otwarta</option><option value="closed">Zamknieta</option></select></label>
+<label>Data otwarcia<input id="pOp" type="date"></label>
+<label>Cena wejscia (USD)<input id="pEn" type="number" step="any" min="0"></label>
+<label>Ilosc<input id="pQt" type="number" step="any" min="0"></label>
+<label>Stop (USD)<input id="pSp" type="number" step="any" min="0"></label>
+<label>Data zamkniecia<input id="pCl" type="date"></label>
+<label>Cena wyjscia (USD)<input id="pEx" type="number" step="any" min="0"></label>
+<label class="w">Notatka<input id="pNo" maxlength="500"></label>
+<div class="act"><button value="cancel" type="button" id="pX">Anuluj</button><button class="dark" type="submit" id="pOk">Zapisz</button></div></form></dialog>
+</div>
+<script src="auth.js"></script>
+<script type="text/x-after-auth">
+;(function(){
+const $=id=>document.getElementById(id);
+const idl=({IDL})=>{
+ const D=IDL.Record({day:IDL.Text,raw:IDL.Text,at:IDL.Int});
+ const E=IDL.Record({id:IDL.Nat,day:IDL.Text,sym:IDL.Text,on:IDL.Bool,price:IDL.Float64,w:IDL.Float64,mailed:IDL.Bool});
+ const P=IDL.Record({id:IDL.Nat,sym:IDL.Text,status:IDL.Text,opened:IDL.Text,entry:IDL.Float64,qty:IDL.Float64,stop:IDL.Float64,closed:IDL.Text,exit:IDL.Float64,note:IDL.Text,evId:IDL.Nat,at:IDL.Int});
+ const All=IDL.Record({days:IDL.Vec(D),events:IDL.Vec(E),pos:IDL.Vec(P),lastRun:IDL.Int,log:IDL.Text,nextRunSec:IDL.Nat,hasKey:IDL.Bool,mail:IDL.Bool});
+ const RT=IDL.Variant({ok:IDL.Text,err:IDL.Text}),RN=IDL.Variant({ok:IDL.Nat,err:IDL.Text});
+ return IDL.Service({sgAll:IDL.Func([],[All],["query"]),sgPosPut:IDL.Func([P],[RN],[]),sgPosDelete:IDL.Func([IDL.Nat],[RT],[]),
+  sgRunNow:IDL.Func([],[RT],[]),sgSetMail:IDL.Func([IDL.Bool],[RT],[]),sgTestMail:IDL.Func([],[RT],[])});
+};
+const A=Auth.mk(idl);
+const WK="https://gielda-quote.marcinkolacz.workers.dev",SYMS=["BTC","ETH","NEAR","ICP","INJ"],FEE=0.001,FREEZE="2026-10-11";
+let S=null,B=null,sel="BTC",per="1Y",eper="paper",pf="all";
+try{const o=JSON.parse(localStorage.getItem("sgUi")||"{}");sel=o.sel||sel;per=o.per||per;eper=o.eper||eper;pf=o.pf||pf;}catch(e){}
+const save=()=>{try{localStorage.setItem("sgUi",JSON.stringify({sel,per,eper,pf}));}catch(e){}};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const px=v=>v==null||!isFinite(v)?"–":"$"+(v>=1000?v.toLocaleString("pl-PL",{maximumFractionDigits:0}):v>=10?v.toFixed(2):v>=1?v.toFixed(3):v.toPrecision(4));
+const pc=(v,d=1)=>v==null||!isFinite(v)?"–":(v>0?"+":"")+(v*100).toFixed(d)+"%";
+const cls=v=>v>0?"pos":v<0?"neg":"";
+const prog=t=>{$("prog").textContent=t||"";};
+const dd=(a,b)=>Math.round((Date.parse(b)-Date.parse(a))/864e5);
+
+/* ---------- wykres SVG ---------- */
+function chart(host,o){
+ const W=Math.max(320,host.clientWidth||800),H=o.h||300,L=6,R=58,T=10,Bm=22,n=o.x.length;
+ if(n<2){host.innerHTML='<div class="empty">Brak danych</div>';return;}
+ let mn=Infinity,mx=-Infinity;o.lines.forEach(l=>l.v.forEach(v=>{if(v!=null&&isFinite(v)){mn=Math.min(mn,v);mx=Math.max(mx,v);}}));
+ if(!isFinite(mn)){host.innerHTML='<div class="empty">Brak danych</div>';return;}
+ const pad=(mx-mn)*.06||Math.abs(mx)*.05||1;mn-=pad;mx+=pad;
+ const X=i=>L+i/(n-1)*(W-L-R),Y=v=>T+(1-(v-mn)/(mx-mn))*(H-T-Bm);
+ let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}">`;
+ (o.zones||[]).forEach(([a,b])=>{s+=`<rect class="z" x="${X(a).toFixed(1)}" y="${T}" width="${Math.max(1,X(b)-X(a)).toFixed(1)}" height="${H-T-Bm}"/>`;});
+ for(let k=0;k<=4;k++){const v=mn+(mx-mn)*k/4,y=Y(v).toFixed(1);s+=`<line class="g" x1="${L}" x2="${W-R}" y1="${y}" y2="${y}"/><text x="${W-R+6}" y="${+y+4}">${esc(o.yf(v))}</text>`;}
+ const step=Math.max(1,Math.floor(n/Math.max(2,Math.min(6,Math.floor(W/120)))));for(let i=0;i<n;i+=step)s+=`<text x="${X(i).toFixed(1)}" y="${H-6}" text-anchor="${i===0?"start":"middle"}">${esc(o.x[i].slice(0,7))}</text>`;
+ o.lines.forEach(l=>{let d="",pen=false;l.v.forEach((v,i)=>{if(v==null||!isFinite(v)){pen=false;return;}d+=(pen?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1);pen=true;});s+=`<path class="${l.c}" d="${d}"/>`;});
+ (o.marks||[]).forEach(m=>{const x=X(m.i),y=Y(m.v);s+=m.up?`<path class="mu" d="M${(x-5).toFixed(1)} ${(y+12).toFixed(1)}l5 -8l5 8z"/>`:`<path class="md" d="M${(x-5).toFixed(1)} ${(y-12).toFixed(1)}l5 8l5 -8z"/>`;});
+ s+=`<line class="x" id="${host.id}x" x1="0" x2="0" y1="${T}" y2="${H-Bm}" visibility="hidden"/><rect x="${L}" y="0" width="${W-L-R}" height="${H}" fill="transparent" id="${host.id}h"/></svg><div class="tip" hidden></div>`;
+ host.innerHTML=s;
+ const svg=host.querySelector("svg"),hl=$(host.id+"x"),tip=host.querySelector(".tip"),hit=$(host.id+"h");
+ const mv=ev=>{const r=svg.getBoundingClientRect(),sx=(ev.clientX-r.left)*W/r.width,i=Math.max(0,Math.min(n-1,Math.round((sx-L)/(W-L-R)*(n-1))));
+  hl.setAttribute("x1",X(i));hl.setAttribute("x2",X(i));hl.setAttribute("visibility","visible");
+  tip.hidden=false;tip.innerHTML=o.tip(i);const tx=X(i)*r.width/W,tw=tip.offsetWidth;tip.style.left=Math.min(Math.max(0,tx-tw/2),r.width-tw)+"px";tip.style.top="-6px";};
+ hit.addEventListener("mousemove",mv);hit.addEventListener("touchstart",e=>mv(e.touches[0]),{passive:true});hit.addEventListener("touchmove",e=>mv(e.touches[0]),{passive:true});
+ hit.addEventListener("mouseleave",()=>{tip.hidden=true;hl.setAttribute("visibility","hidden");});
+}
+function spark(c,e,on){
+ const n=c.length,W=200,H=44;let mn=Infinity,mx=-Infinity;c.concat(e).forEach(v=>{if(v!=null){mn=Math.min(mn,v);mx=Math.max(mx,v);}});
+ if(!isFinite(mn)||n<2)return "";const X=i=>i/(n-1)*W,Y=v=>2+(1-(v-mn)/((mx-mn)||1))*(H-4);
+ const p=a=>{let d="",pen=false;a.forEach((v,i)=>{if(v==null){pen=false;return;}d+=(pen?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1);pen=true;});return d;};
+ let z="";zones(on,0,n-1).forEach(([a,b])=>{z+=`<rect x="${X(a).toFixed(1)}" y="0" width="${Math.max(1,X(b)-X(a)).toFixed(1)}" height="${H}" style="fill:var(--pos);opacity:.1"/>`;});
+ return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${z}<path d="${p(e)}" style="fill:none;stroke:var(--acc,#c9a227);stroke-width:1.2;stroke-dasharray:4 3" vector-effect="non-scaling-stroke"/><path d="${p(c)}" style="fill:none;stroke:var(--ink);stroke-width:1.5" vector-effect="non-scaling-stroke"/></svg>`;
+}
+function zones(on,a,b){const z=[];let s=null;for(let i=a;i<=b;i++){if(on[i]&&s==null)s=i-a;if(!on[i]&&s!=null){z.push([s,i-a]);s=null;}}if(s!=null)z.push([s,b-a]);return z;}
+
+/* ---------- obliczenia ---------- */
+const N=()=>S.t.length;
+const startIdx=p=>{const n=N(),m={"6M":182,"1Y":365,"2Y":730};if(m[p])return Math.max(0,n-m[p]);if(p==="paper"){const i=S.t.indexOf(FREEZE);return i<0?Math.max(0,n-2):i;}return S.t.findIndex((_,i)=>SYMS.some(s=>S[s].e[i]!=null));};
+const since=s=>{const o=S[s].on,n=N();let i=n-1;while(i>0&&o[i-1]===o[n-1])i--;return S.t[i];};
+function equity(i0){
+ const n=N(),eqS=[1],eqB=[1],rs=[];let pw={},inM=0,tr=0;
+ for(let i=i0;i<n-1;i++){
+  const av=SYMS.filter(s=>S[s].e[i]!=null&&S[s].c[i+1]!=null),k=av.length||1;let rS=0,rB=0,turn=0,exp=0;
+  SYMS.forEach(s=>{const w=av.includes(s)?S[s].w[i]/k:0,r=av.includes(s)?S[s].c[i+1]/S[s].c[i]-1:0;rS+=w*r;rB+=av.includes(s)?r/k:0;turn+=Math.abs(w-(pw[s]||0));if(S[s].on[i]&&!(S[s].on[i-1]))tr++;pw[s]=w;exp+=w;});
+  rS-=FEE*turn;rs.push(rS);inM+=exp>0?1:0;eqS.push(eqS.at(-1)*(1+rS));eqB.push(eqB.at(-1)*(1+rB));
+ }
+ const dd=a=>{let m=a[0],w=0;a.forEach(v=>{m=Math.max(m,v);w=Math.min(w,v/m-1);});return w;};
+ const mean=rs.reduce((a,b)=>a+b,0)/(rs.length||1),sd=Math.sqrt(rs.reduce((a,b)=>a+(b-mean)**2,0)/Math.max(1,rs.length-1));
+ const yrs=rs.length/365;
+ return {eqS,eqB,ret:eqS.at(-1)-1,retB:eqB.at(-1)-1,cagr:yrs>.5?eqS.at(-1)**(1/yrs)-1:null,dd:dd(eqS),ddB:dd(eqB),sh:sd>0?mean/sd*Math.sqrt(365):null,inM:rs.length?inM/rs.length:0,tr,days:rs.length};
+}
+function trades(i0){
+ const out=[];SYMS.forEach(s=>{const o=S[s].on,c=S[s].c;let e=null;for(let i=Math.max(1,i0);i<N();i++){if(o[i]&&!o[i-1])e=i;if(!o[i]&&o[i-1]&&e!=null){out.push({s,a:e,b:i,r:c[i]/c[e]-1});e=null;}}if(e!=null)out.push({s,a:e,b:null,r:c[N()-1]/c[e]-1});});
+ return out.sort((x,y)=>y.a-x.a);
+}
+
+/* ---------- render ---------- */
+function renderCards(){
+ const n=N();$("cards").innerHTML=SYMS.map(s=>{const o=S[s],c=o.c[n-1],e=o.e[n-1],on=o.on[n-1],sn=since(s),b=Math.max(0,n-180);
+  return `<div class="card${s===sel?" sel":""}" data-s="${s}"><div class="top"><span class="sym">${s}</span><span class="badge${on?" on":""}">${on?'ON<span class="lt"> · TRZYMAJ</span>':'OFF<span class="lt"> · POZA RYNKIEM</span>'}</span></div>
+  <div class="px">${px(c)}</div><div class="kv"><span>Od EMA200</span><b class="${cls(c/e-1)}">${e?pc(c/e-1):"–"}</b><span>Pozycja (slot)</span><b>${on?Math.round(o.w[n-1]*100)+"%":"0%"}</b>
+  <span>ER30 (trend)</span><b>${o.er[n-1]!=null?o.er[n-1].toFixed(2):"–"}</b><span>Stan od</span><b>${sn} (${dd(sn,S.t[n-1])} d)</b></div>
+  ${spark(o.c.slice(b),o.e.slice(b),o.on.slice(b))}</div>`;}).join("");
+ $("cards").querySelectorAll(".card").forEach(d=>d.onclick=()=>{sel=d.dataset.s;save();renderCards();renderPrice();});
+}
+function seg(host,items,cur,fn){host.innerHTML=items.map(([k,l])=>`<button type="button" data-k="${k}" class="${k===cur?"on":""}">${l}</button>`).join("");host.querySelectorAll("button").forEach(b=>b.onclick=()=>fn(b.dataset.k));}
+function renderPrice(){
+ $("csym").textContent=sel;seg($("sp"),[["6M","6M"],["1Y","1R"],["2Y","2L"],["MAX","Max"]],per,k=>{per=k;save();renderPrice();});
+ const o=S[sel],i0=Math.max(startIdx(per),o.c.findIndex(v=>v!=null)),x=S.t.slice(i0),c=o.c.slice(i0),e=o.e.slice(i0),on=o.on.slice(i0),marks=[];
+ for(let i=1;i<on.length;i++)if(on[i]!==on[i-1])marks.push({i,v:c[i],up:!!on[i]});
+ chart($("c1"),{x,h:320,yf:v=>px(v),lines:[{v:e,c:"e"},{v:c,c:"p"}],zones:zones(on,0,on.length-1),marks,
+  tip:i=>`<b>${x[i]}</b>Cena ${px(c[i])}<br>EMA200 ${px(e[i])}${e[i]?" ("+pc(c[i]/e[i]-1)+")":""}<br>Sygnal: ${on[i]?"ON":"OFF"}`});
+}
+function renderEq(){
+ seg($("se"),[["paper","Od zamrozenia"],["1Y","1R"],["2Y","2L"],["MAX","Max"]],eper,k=>{eper=k;save();renderEq();renderHist();});
+ const i0=startIdx(eper),r=equity(i0),x=S.t.slice(i0,i0+r.eqS.length);
+ const tile=(t,v,sub,c="")=>`<div class="stat"><span>${t}</span><strong class="${c}">${v}</strong><small>${sub}</small></div>`;
+ $("st").innerHTML=tile("Zwrot strategii",pc(r.ret),"Buy &amp; Hold: "+pc(r.retB),cls(r.ret))+tile("Max obsuniecie",pc(r.dd),"Buy &amp; Hold: "+pc(r.ddB),"neg")
+  +tile("Sharpe",r.sh==null?"–":r.sh.toFixed(2),r.cagr==null?r.days+" dni w okresie":"CAGR "+pc(r.cagr))+tile("Czas w rynku",pc(r.inM,0).replace("+",""),r.tr+" wejsc w okresie");
+ if(r.eqS.length<2){$("c2").innerHTML=`<div class="empty">Okres od zamrozenia reguly (${FREEZE}) - krzywa pojawi sie po kolejnych swiecach dziennych.</div>`;return;}
+ const rg=Math.max(...r.eqS,...r.eqB)-Math.min(...r.eqS,...r.eqB);
+ chart($("c2"),{x,h:260,yf:v=>pc(v-1,rg<.05?2:rg<.5?1:0),lines:[{v:r.eqB,c:"b"},{v:r.eqS,c:"s"}],tip:i=>`<b>${x[i]}</b>Strategia ${pc(r.eqS[i]-1)}<br>Buy &amp; Hold ${pc(r.eqB[i]-1)}`});
+}
+function renderHist(){
+ const i0=startIdx(eper),t=trades(i0),cl=t.filter(x=>x.b!=null),w=cl.filter(x=>x.r>0);
+ const avg=a=>a.length?a.reduce((s,x)=>s+x.r,0)/a.length:null,l=cl.filter(x=>x.r<=0);
+ $("hs").textContent=cl.length?`Zamkniete: ${cl.length} · trafne ${Math.round(w.length/cl.length*100)}% · sr. zysk ${pc(avg(w))} · sr. strata ${pc(avg(l))}`:"";
+ $("th").innerHTML=t.length?t.map(x=>`<tr><td><b>${x.s}</b></td><td>${S.t[x.a]}</td><td>${px(S[x.s].c[x.a])}</td><td>${x.b==null?'<span class="tag ok">otwarta</span>':S.t[x.b]}</td><td>${x.b==null?px(S[x.s].c[N()-1]):px(S[x.s].c[x.b])}</td><td class="${cls(x.r)}">${pc(x.r)}</td><td class="hm">${dd(S.t[x.a],S.t[x.b==null?N()-1:x.b])}</td></tr>`).join(""):`<tr><td colspan="7" class="empty">Brak sygnalow w okresie</td></tr>`;
+}
+const last=s=>S?S[s].c[N()-1]:null;
+function renderPos(){
+ seg($("sf"),[["all","Wszystkie"],["active","Aktywne"],["closed","Zamkniete"]],pf,k=>{pf=k;save();renderPos();});
+ const P=(B?B.pos:[]).filter(p=>pf==="all"||(pf==="closed")===(p.status==="closed")).sort((a,b)=>b.opened.localeCompare(a.opened));
+ const res=p=>{const x=p.status==="closed"?p.exit:last(p.sym);return p.entry>0&&x>0?x/p.entry-1:null;};
+ const all=B?B.pos:[],act=all.filter(p=>p.status!=="closed"),clo=all.filter(p=>p.status==="closed"&&p.entry>0&&p.exit>0);
+ const pnl=clo.reduce((s,p)=>s+(p.exit-p.entry)*p.qty,0),opn=act.filter(p=>p.status==="open").reduce((s,p)=>s+((last(p.sym)||0)-p.entry)*p.qty,0);
+ const tile=(t,v,sub,c="")=>`<div class="stat"><span>${t}</span><strong class="${c}">${v}</strong><small>${sub}</small></div>`;
+ $("ps").innerHTML=tile("Aktywne",act.length,act.filter(p=>p.status==="trigger").length+" triggerow · "+act.filter(p=>p.status==="open").length+" otwartych")
+  +tile("Wynik otwartych","$"+opn.toFixed(2),"wg biezacych cen",cls(opn))+tile("Wynik zrealizowany","$"+pnl.toFixed(2),clo.length+" zamknietych · trafne "+(clo.length?Math.round(clo.filter(p=>p.exit>p.entry).length/clo.length*100):0)+"%",cls(pnl));
+ const lab={trigger:'<span class="tag">trigger</span>',open:'<span class="tag ok">otwarta</span>',closed:'<span class="tag">zamknieta</span>'};
+ $("tp").innerHTML=P.length?P.map(p=>{const r=res(p),ev=B.events.find(e=>e.id===p.evId),sig=S?S[p.sym]?.on[N()-1]:null;
+  return `<tr><td><b>${esc(p.sym)}</b></td><td>${lab[p.status]||esc(p.status)}</td><td>${esc(p.opened)}</td><td>${px(p.entry)}</td><td class="hm">${p.qty||"–"}</td><td class="hm">${p.stop?px(p.stop):"–"}</td>
+  <td>${p.status==="closed"?px(p.exit)+" <span class='note'>"+esc(p.closed)+"</span>":px(last(p.sym))}</td><td class="${cls(r)}">${pc(r)}</td>
+  <td class="hm">${sig==null?"–":sig?'<span class="tag ok">ON</span>':'<span class="tag bad">OFF</span>'}${ev?" <span class='note'>"+esc(ev.day)+"</span>":""}</td><td class="hm" style="white-space:normal;max-width:240px;text-align:left">${esc(p.note)}</td>
+  <td class="row-act"><button type="button" data-e="${p.id}">Edytuj</button> <button type="button" data-d="${p.id}">Usun</button></td></tr>`;}).join(""):`<tr><td colspan="11" class="empty">Brak pozycji. Po mailu z sygnalem ON uzyj „Postawilem trigger” w tabeli zdarzen.</td></tr>`;
+ $("tp").querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>openPos(B.pos.find(p=>String(p.id)===b.dataset.e)));
+ $("tp").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{if(!confirm("Usunac pozycje z dziennika?"))return;const r=await A.sgPosDelete(BigInt(b.dataset.d));prog("err" in r?r.err:"");await loadB();});
+}
+function renderEvents(){
+ const E=(B?B.events:[]).slice().reverse();
+ $("te").innerHTML=E.length?E.map(e=>`<tr><td>${esc(e.day)}</td><td><b>${esc(e.sym)}</b></td><td>${e.on?'<span class="tag ok">ON · wejscie</span>':'<span class="tag bad">OFF · wyjscie</span>'}</td><td>${px(e.price)}</td><td class="hm">${e.on?Math.round(e.w*100)+"%":"–"}</td><td>${e.mailed?'<span class="tag ok">wyslany</span>':'<span class="tag">nie</span>'}</td>
+  <td class="row-act">${e.on?`<button type="button" data-t="${e.id}">Postawilem trigger</button>`:B.pos.some(p=>p.sym===e.sym&&p.status!=="closed")?`<button type="button" data-c="${e.id}">Zamknij pozycje</button>`:""}</td></tr>`).join(""):`<tr><td colspan="7" class="empty">Brak zdarzen - pierwszy zapis tworzy punkt odniesienia, zdarzenia pojawia sie przy zmianie sygnalu.</td></tr>`;
+ $("te").querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{const e=B.events.find(x=>String(x.id)===b.dataset.t);openPos(null,{sym:e.sym,status:"trigger",opened:e.day,entry:e.price,evId:e.id});});
+ $("te").querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{const e=B.events.find(x=>String(x.id)===b.dataset.c),p=B.pos.find(x=>x.sym===e.sym&&x.status!=="closed");openPos(p,{status:"closed",closed:e.day,exit:e.price});});
+}
+function renderChips(){
+ if(!B){$("chips").innerHTML="";return;}
+ const lr=Number(B.lastRun/1000000n),h=Math.round(Number(B.nextRunSec)/360)/10;
+ $("chips").innerHTML=[`<span>Ostatni zapis: ${lr?new Date(lr).toLocaleString("pl-PL"):"–"}</span>`,`<span class="${/^OK/.test(B.log)?"ok":B.log?"bad":""}">${esc(B.log||"brak")}</span>`,
+  `<span>Nastepny: za ${h} h</span>`,B.hasKey?`<span class="ok">klucz workera OK</span>`:`<span class="bad">brak klucza workera (sgSetKey)</span>`,S?`<span>Swieca: ${S.t[N()-1]} · zrodlo: ${esc([...new Set(Object.values(S.src||{}))].join(", "))}</span>`:""].join("");
+ $("bm").textContent="Maile: "+(B.mail?"wlaczone":"wylaczone");
+}
+function render(){if(S){renderCards();renderPrice();renderEq();renderHist();}renderPos();renderEvents();renderChips();}
+
+/* ---------- dialog pozycji ---------- */
+$("pSym").innerHTML=SYMS.map(s=>`<option>${s}</option>`).join("");
+let edit=null;
+function openPos(p,pre){
+ const d=Object.assign({id:0n,sym:sel,status:"trigger",opened:new Date().toLocaleDateString("sv"),entry:last(sel)||0,qty:0,stop:0,closed:"",exit:0,note:"",evId:0n,at:0n},p||{},pre||{});
+ edit=d;$("dpt").textContent=p?"Edytuj pozycje":"Nowa pozycja";
+ $("pSym").value=d.sym;$("pSt").value=d.status;$("pOp").value=d.opened;$("pEn").value=d.entry||"";$("pQt").value=d.qty||"";$("pSp").value=d.stop||"";$("pCl").value=d.closed;$("pEx").value=d.exit||"";$("pNo").value=d.note;
+ $("dp").showModal();
+}
+$("pX").onclick=()=>$("dp").close();
+$("pSt").onchange=()=>{if($("pSt").value==="closed"&&!$("pCl").value){$("pCl").value=new Date().toLocaleDateString("sv");if(!$("pEx").value)$("pEx").value=last($("pSym").value)||"";}};
+$("fp").onsubmit=async ev=>{ev.preventDefault();const f=v=>Math.max(0,parseFloat(v)||0);
+ const p={...edit,sym:$("pSym").value,status:$("pSt").value,opened:$("pOp").value,entry:f($("pEn").value),qty:f($("pQt").value),stop:f($("pSp").value),
+  closed:$("pSt").value==="closed"?$("pCl").value:"",exit:$("pSt").value==="closed"?f($("pEx").value):0,note:$("pNo").value.slice(0,500),id:BigInt(edit.id),evId:BigInt(edit.evId),at:BigInt(edit.at)};
+ $("pOk").disabled=true;try{const r=await A.sgPosPut(p);if("err" in r){prog(r.err);return;}$("dp").close();await loadB();}catch(e){prog("Blad: "+e.message);}finally{$("pOk").disabled=false;}};
+
+/* ---------- akcje ---------- */
+$("bp").onclick=()=>openPos(null);
+$("br").onclick=async()=>{$("br").disabled=true;prog("Pobieram sygnal przez canister…");try{const r=await A.sgRunNow();prog("err" in r?r.err:r.ok);await loadB();}catch(e){prog("Blad: "+e.message);}finally{$("br").disabled=false;}};
+$("bt").onclick=async()=>{$("bt").disabled=true;prog("Wysylam test…");try{const r=await A.sgTestMail();prog("err" in r?r.err:"Test: "+r.ok);}catch(e){prog("Blad: "+e.message);}finally{$("bt").disabled=false;}};
+$("bm").onclick=async()=>{if(!B)return;const r=await A.sgSetMail(!B.mail);prog("err" in r?r.err:r.ok);await loadB();};
+
+async function loadB(){try{B=await A.sgAll();}catch(e){prog("Canister: "+e.message);}render();}
+async function loadS(){try{const r=await fetch(WK+"/k");const j=await r.json();if(j.err)throw new Error(j.err);S=j;}catch(e){prog("Dane cen: "+e.message);}render();}
+let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(S){renderPrice();renderEq();}},150);});
+prog("Wczytywanie…");Promise.all([loadS(),loadB()]).then(()=>{if(!/Blad|Canister|Dane/.test($("prog").textContent))prog("");});
+})();
+</script></body></html>

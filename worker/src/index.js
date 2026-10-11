@@ -132,7 +132,9 @@ async function kr(env, method, params = {}) {
 }
 const QT = env => env.QUOTE || "USDC";
 async function pairInfo(sym, q) {
-  const res = await krPub("AssetPairs", { pair: sym + q }), key = Object.keys(res)[0], p = res[key];
+  const r = await fetch(`${KRB}/0/public/AssetPairs`, { headers: UA, cf: { cacheTtl: 3600, cacheEverything: true } }), j = await r.json();
+  if (j.error && j.error.length) throw new Error("kraken " + j.error.join(","));
+  const ws = `${sym}/${q}`, key = Object.keys(j.result).find(k => j.result[k].wsname === ws || j.result[k].altname === sym + q), p = j.result[key];
   if (!p || (p.status && p.status !== "online")) throw new Error(`brak pary ${sym}${q}`);
   return { key, lot: p.lot_decimals ?? 8, omin: +(p.ordermin || 0), cmin: +(p.costmin || 0.5) };
 }

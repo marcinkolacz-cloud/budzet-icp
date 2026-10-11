@@ -16,6 +16,7 @@ var MOON='<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 
 var PAL='<svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2a10 10 0 0 0 0 20c.9 0 1.7-.8 1.7-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.8-1.7 1.7-1.7h2A5.6 5.6 0 0 0 22 10.8C22 5.9 17.5 2 12 2z"/></svg>';
 var GEAR='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
 var TRASH='<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>';
+var DB='<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>';
 var CK=["krypto-cur","staking-cur"];function dcur(){return get("budzet-cur")||""}
 var root,tg,pop,sw;
 function sync(){if(!root)return;sw.checked=d.classList.contains("priv");var dark=d.dataset.theme==="dark";tg.innerHTML=dark?SUN:MOON;tg.title=tg.ariaLabel=dark?"Tryb dzienny":"Tryb nocny";
@@ -38,7 +39,10 @@ function mount(){var nav=document.querySelector(".topnav");if(!nav||root)return;
  sw.onchange=function(){put(PV,sw.checked?"1":null);pv()};
  var cs=document.getElementById("cur");if(cs)cs.classList.add("cur");
  var kz=nav.querySelector('a[href="kosz.html"]');if(kz){kz.className="ib"+(/kosz\.html/.test(location.pathname)?" on":"");kz.innerHTML=TRASH;kz.title=kz.ariaLabel="Kosz"}
- root.append(pl);if(cs)root.append(cs);if(kz)root.append(kz);root.append(tg,pb,pop);nav.append(root);sync();}
+ var dm=document.createElement("div");dm.className="mnu dat";
+ dm.innerHTML='<button type="button" class="mnb" aria-haspopup="true" aria-expanded="false" title="Kopia zapasowa" aria-label="Kopia zapasowa">'+DB+'</button><div class="mnp" role="menu" hidden><b>Kopia zapasowa</b><button type="button" data-bk="exp">Pobierz pelny backup</button><button type="button" data-bk="pick">Przywroc z backupu</button><small class="hint">Budzet, Gielda, Krypto, Terminal, Staking, Signals, ustawienia</small></div>';
+ dm.querySelector(".mnp").addEventListener("click",function(e){var b=e.target.closest("[data-bk]");if(!b)return;if(!window.BK)return alert("Poczekaj na zalogowanie i wczytanie danych.");window.BK[b.dataset.bk]()});
+ root.append(pl,dm);if(cs)root.append(cs);if(kz)root.append(kz);root.append(tg,pb,pop);nav.append(root);sync();}
 function menus(){document.querySelectorAll(".mnu").forEach(function(m){var b=m.querySelector(".mnb"),p=m.querySelector(".mnp");if(!b||!p||m.dataset.ok)return;m.dataset.ok=1;
  function cl(){p.hidden=true;b.setAttribute("aria-expanded","false")}
  b.onclick=function(e){e.stopPropagation();var o=p.hidden;document.querySelectorAll(".mnp").forEach(function(x){x.hidden=true});p.hidden=!o;b.setAttribute("aria-expanded",o);if(o){var r=b.getBoundingClientRect();p.style.top=(r.bottom+6)+"px";p.style.right=Math.max(8,innerWidth-r.right)+"px";var f=p.querySelector("button");f&&f.focus()}};

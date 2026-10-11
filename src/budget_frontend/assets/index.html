@@ -6,9 +6,10 @@
 <div class="tiles" id="tiles"></div>
 <section id="data" style="margin-top:18px"><h2 style="margin:0 0 4px;font-size:16px">Dane i kopie zapasowe</h2>
 <p class="note" style="margin:0 0 10px">Excel zawiera budzet, kredyty i gielde. Kopia JSON zapisuje wszystkie dane konta i pozwala je przywrocic.</p>
-<div class="form"><button id="xa" type="button">Excel - wszystko</button><button id="xb" type="button">Excel - budzet</button><button id="xg" type="button">Excel - gielda</button><button id="kb" class="dark" type="button">Kopia JSON</button><button id="ki" type="button">Import JSON</button></div></section>
+<div class="form"><button id="xa" type="button">Excel - wszystko</button><button id="xb" type="button">Excel - budzet</button><button id="xg" type="button">Excel - gielda</button></div></section>
 </div>
 <script src="auth.js"></script>
+<script type="text/x-after-auth" src="backup.js"></script>
 <script type="text/x-after-auth" src="gcore.js"></script>
 <script type="text/x-after-auth" src="ccore.js"></script>
 <script type="text/x-after-auth" src="io.js"></script>
@@ -48,6 +49,6 @@ TILES.forEach(t=>{const [v,s,c]=t.val();const a=document.createElement("a");a.cl
 document.getElementById("date").textContent=new Date().toLocaleDateString("pl-PL",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 
 document.getElementById("xa").onclick=()=>IO.excel("all");document.getElementById("xb").onclick=()=>IO.excel("budzet");document.getElementById("xg").onclick=()=>IO.excel("gielda");
-document.getElementById("kb").onclick=IO.backup;document.getElementById("ki").onclick=IO.pick;
+
 })();
 </script></body></html>

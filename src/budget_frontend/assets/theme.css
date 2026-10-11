@@ -84,3 +84,7 @@ html.priv section svg:not(button svg),html.priv section canvas{pointer-events:no
 html[data-theme] .mnp button{border:0;background:transparent;border-radius:9px;padding:8px 10px;text-align:left;font-size:13px;width:100%;color:var(--ink)}
 html[data-theme] .mnp button:hover,html[data-theme] .mnp button:focus-visible{background:var(--field)}
 html[data-theme] .mnp button.neg{color:var(--neg)}
+
+.thm .mnu.dat>.mnb{width:34px;height:34px;padding:0;display:grid;place-items:center;border-radius:999px}
+.thm .mnu.dat>.mnb svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mnp .hint{font-size:11px;color:var(--muted);padding:4px 10px 6px;max-width:220px}

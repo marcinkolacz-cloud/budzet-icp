@@ -33,7 +33,7 @@ dialog select{width:100%}
 </style></head>
 <body><div class="app">
 <nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html">Staking</a><a href="signals.html" class="on">Signals</a><a href="kosz.html">Kosz</a></nav>
-<header><div><h1>Trading Signals</h1><div class="sub">Regula: cena &gt; EMA200 +2% i BTC &gt; EMA200 · wyjscie ponizej EMA200 -2% · pozycja = min(1, 60% / zmiennosc 30d) · swieca 1D Binance</div><div class="chips" id="chips"></div></div>
+<header><div><h1>Trading Signals</h1><div class="sub">Regula: cena &gt; EMA200 +2% i BTC &gt; EMA200 · wyjscie ponizej EMA200 -2% · pozycja = min(1, 60% / zmiennosc 30d) · swieca 1D · BTC tylko jako filtr rezimu (nie handlowany)</div><div class="chips" id="chips"></div></div>
 <div class="form"><button id="bm" type="button">Maile: …</button><button id="bt" type="button">Test maila</button><button id="br" type="button">Odswiez sygnal</button><button id="bp" class="dark" type="button">Dodaj pozycje</button></div></header>
 <p class="note" id="prog"></p>
 
@@ -43,7 +43,7 @@ dialog select{width:100%}
 <div class="ch" id="c1"></div>
 <div class="lg"><span><i style="background:var(--ink)"></i>Cena</span><span><i style="background:var(--acc,#c9a227)"></i>EMA200</span><span><i style="background:var(--pos);opacity:.35;height:10px"></i>Sygnal ON</span><span>▲ wejscie · ▼ wyjscie</span></div></section>
 
-<section><div class="bar"><h2>Strategia vs Buy &amp; Hold (5 tokenow)</h2><div class="seg" id="se"></div></div>
+<section><div class="bar"><h2>Strategia vs Buy &amp; Hold (4 altcoiny)</h2><div class="seg" id="se"></div></div>
 <div class="stats" id="st"></div>
 <div class="ch" id="c2" style="margin-top:10px"></div>
 <div class="lg"><span><i style="background:var(--pos)"></i>Strategia (sloty 1/N x pozycja, prowizja 0,1%)</span><span><i style="background:var(--muted)"></i>Buy &amp; Hold (rowne wagi)</span></div></section>
@@ -87,7 +87,7 @@ const idl=({IDL})=>{
   sgRunNow:IDL.Func([],[RT],[]),sgSetMail:IDL.Func([IDL.Bool],[RT],[]),sgTestMail:IDL.Func([],[RT],[])});
 };
 const A=Auth.mk(idl);
-const WK="https://gielda-quote.marcinkolacz.workers.dev",SYMS=["BTC","ETH","NEAR","ICP","INJ"],FEE=0.001,FREEZE="2026-10-11";
+const WK="https://gielda-quote.marcinkolacz.workers.dev",CARDS=["BTC","ETH","NEAR","ICP","INJ"],SYMS=["ETH","NEAR","ICP","INJ"],FEE=0.001,FREEZE="2026-10-11";
 let S=null,B=null,sel="BTC",per="1Y",eper="paper",pf="all";
 try{const o=JSON.parse(localStorage.getItem("sgUi")||"{}");sel=o.sel||sel;per=o.per||per;eper=o.eper||eper;pf=o.pf||pf;}catch(e){}
 const save=()=>{try{localStorage.setItem("sgUi",JSON.stringify({sel,per,eper,pf}));}catch(e){}};
@@ -153,9 +153,9 @@ function trades(i0){
 
 /* ---------- render ---------- */
 function renderCards(){
- const n=N();$("cards").innerHTML=SYMS.map(s=>{const o=S[s],c=o.c[n-1],e=o.e[n-1],on=o.on[n-1],sn=since(s),b=Math.max(0,n-180);
-  return `<div class="card${s===sel?" sel":""}" data-s="${s}"><div class="top"><span class="sym">${s}</span><span class="badge${on?" on":""}">${on?'ON<span class="lt"> · TRZYMAJ</span>':'OFF<span class="lt"> · POZA RYNKIEM</span>'}</span></div>
-  <div class="px">${px(c)}</div><div class="kv"><span>Od EMA200</span><b class="${cls(c/e-1)}">${e?pc(c/e-1):"–"}</b><span>Pozycja (slot)</span><b>${on?Math.round(o.w[n-1]*100)+"%":"0%"}</b>
+ const n=N();$("cards").innerHTML=CARDS.map(s=>{const o=S[s],c=o.c[n-1],e=o.e[n-1],on=o.on[n-1],sn=since(s),b=Math.max(0,n-180);
+  return `<div class="card${s===sel?" sel":""}" data-s="${s}"><div class="top"><span class="sym">${s}</span><span class="badge${on?" on":""}">${s==="BTC"?(on?'REZIM<span class="lt"> · HOSSA</span>':'REZIM<span class="lt"> · BESSA</span>'):on?'ON<span class="lt"> · TRZYMAJ</span>':'OFF<span class="lt"> · POZA RYNKIEM</span>'}</span></div>
+  <div class="px">${px(c)}</div><div class="kv"><span>Od EMA200</span><b class="${cls(c/e-1)}">${e?pc(c/e-1):"–"}</b><span>${s==="BTC"?"Rola":"Pozycja (slot)"}</span><b>${s==="BTC"?(on?"alty dozwolone":"alty zablokowane"):on?Math.round(o.w[n-1]*100)+"%":"0%"}</b>
   <span>ER30 (trend)</span><b>${o.er[n-1]!=null?o.er[n-1].toFixed(2):"–"}</b><span>Stan od</span><b>${sn} (${dd(sn,S.t[n-1])} d)</b></div>
   ${spark(o.c.slice(b),o.e.slice(b),o.on.slice(b))}</div>`;}).join("");
  $("cards").querySelectorAll(".card").forEach(d=>d.onclick=()=>{sel=d.dataset.s;save();renderCards();renderPrice();});
@@ -184,7 +184,7 @@ function renderHist(){
  $("hs").textContent=cl.length?`Zamkniete: ${cl.length} · trafne ${Math.round(w.length/cl.length*100)}% · sr. zysk ${pc(avg(w))} · sr. strata ${pc(avg(l))}`:"";
  $("th").innerHTML=t.length?t.map(x=>`<tr><td><b>${x.s}</b></td><td>${S.t[x.a]}</td><td>${px(S[x.s].c[x.a])}</td><td>${x.b==null?'<span class="tag ok">otwarta</span>':S.t[x.b]}</td><td>${x.b==null?px(S[x.s].c[N()-1]):px(S[x.s].c[x.b])}</td><td class="${cls(x.r)}">${pc(x.r)}</td><td class="hm">${dd(S.t[x.a],S.t[x.b==null?N()-1:x.b])}</td></tr>`).join(""):`<tr><td colspan="7" class="empty">Brak sygnalow w okresie</td></tr>`;
 }
-const last=s=>S?S[s].c[N()-1]:null;
+const last=s=>S&&S[s]?S[s].c[N()-1]:null;
 function renderPos(){
  seg($("sf"),[["all","Wszystkie"],["active","Aktywne"],["closed","Zamkniete"]],pf,k=>{pf=k;save();renderPos();});
  const P=(B?B.pos:[]).filter(p=>pf==="all"||(pf==="closed")===(p.status==="closed")).sort((a,b)=>b.opened.localeCompare(a.opened));
@@ -206,7 +206,7 @@ function renderPos(){
 function renderEvents(){
  const E=(B?B.events:[]).slice().reverse();
  $("te").innerHTML=E.length?E.map(e=>`<tr><td>${esc(e.day)}</td><td><b>${esc(e.sym)}</b></td><td>${e.on?'<span class="tag ok">ON · wejscie</span>':'<span class="tag bad">OFF · wyjscie</span>'}</td><td>${px(e.price)}</td><td class="hm">${e.on?Math.round(e.w*100)+"%":"–"}</td><td>${e.mailed?'<span class="tag ok">wyslany</span>':'<span class="tag">nie</span>'}</td>
-  <td class="row-act">${e.on?`<button type="button" data-t="${e.id}">Postawilem trigger</button>`:B.pos.some(p=>p.sym===e.sym&&p.status!=="closed")?`<button type="button" data-c="${e.id}">Zamknij pozycje</button>`:""}</td></tr>`).join(""):`<tr><td colspan="7" class="empty">Brak zdarzen - pierwszy zapis tworzy punkt odniesienia, zdarzenia pojawia sie przy zmianie sygnalu.</td></tr>`;
+  <td class="row-act">${!SYMS.includes(e.sym)?"":e.on?`<button type="button" data-t="${e.id}">Postawilem trigger</button>`:B.pos.some(p=>p.sym===e.sym&&p.status!=="closed")?`<button type="button" data-c="${e.id}">Zamknij pozycje</button>`:""}</td></tr>`).join(""):`<tr><td colspan="7" class="empty">Brak zdarzen - pierwszy zapis tworzy punkt odniesienia, zdarzenia pojawia sie przy zmianie sygnalu.</td></tr>`;
  $("te").querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{const e=B.events.find(x=>String(x.id)===b.dataset.t);openPos(null,{sym:e.sym,status:"trigger",opened:e.day,entry:e.price,evId:e.id});});
  $("te").querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{const e=B.events.find(x=>String(x.id)===b.dataset.c),p=B.pos.find(x=>x.sym===e.sym&&x.status!=="closed");openPos(p,{status:"closed",closed:e.day,exit:e.price});});
 }

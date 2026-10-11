@@ -110,7 +110,7 @@ async function canister(req, env, u) {
   const T = (t, s = 200) => new Response(t, { status: s, headers: { "Content-Type": "text/plain" } });
   if (u.pathname === "/sig") {
     const S = await series(), L = S.t.length - 1;
-    return T(["D|" + S.t[L], ...SG.map(s => [s, S[s].on[L], S[s].w[L], P6(S[s].c[L]), S[s].e[L] ?? 0, S[s].er[L] ?? 0].join("|"))].join("\n"));
+    return T(["D|" + S.t[L], ...SG.filter(s => s !== "BTC").map(s => [s, S[s].on[L], S[s].w[L], P6(S[s].c[L]), S[s].e[L] ?? 0, S[s].er[L] ?? 0].join("|"))].join("\n"));
   }
   if (u.pathname === "/notify" && req.method === "POST") {
     if (!env.RESEND_KEY || !env.MAIL_TO) return T("ERR config", 500);

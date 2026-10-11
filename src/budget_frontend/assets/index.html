@@ -39,7 +39,7 @@ const TILES=[
  let rem=0;C.forEach(c=>{const p=(K.S.prices[c.t]||{}).p||0,L=[...c.lv].sort((a,b)=>a.p-b.p);let q=0;L.forEach(l=>{if(p>0&&p>=l.p)q=l.q;});
   const k=c.cy==="d"?td:mon(td),s=c.sales.filter(x=>(c.cy==="d"?x.d:mon(x.d))===k).reduce((a,x)=>a+x.q,0);let r=Math.max(0,q-s);if(c.tot>0)r=Math.min(r,Math.max(0,c.tot-c.sales.reduce((a,x)=>a+x.q,0)));rem+=r*p;});
  return [K.money(rem,"USD",0),"do sprzedania w biezacym cyklu",rem>0?"pos":""];}},
-{title:"Trading Signals",href:"signals.html",val(){return ["5 tokenow","EMA200 + rezim BTC · alert e-mail",""];}}
+{title:"Trading Signals",href:"signals.html",val(){return ["4 altcoiny","EMA200 + rezim BTC · alert e-mail",""];}}
 ];
 const host=document.getElementById("tiles");
 TILES.forEach(t=>{const [v,s,c]=t.val();const a=document.createElement("a");a.className="tile";a.href=t.href;

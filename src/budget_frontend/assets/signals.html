@@ -363,7 +363,7 @@ $("fb").onsubmit=async ev=>{ev.preventDefault();
  $("bOk").disabled=true;try{const r=await A.sgBotPut2(x,cfg);if("err" in r){prog(r.err);return;}$("db").close();prog(bEdit?"Zapisano":"Bot uruchomiony");await loadBots();}catch(e){prog("Blad: "+e.message);}finally{$("bOk").disabled=false;}};
 async function loadBots(){try{[BT,LV]=await Promise.all([A.sgBotsAll(),A.sgLiveAll()]);}catch(e){prog("Boty: "+e.message);}renderBots();renderOrd();}
 let LV=null;
-function renderOrd(){if(!LV)return;$("oBal").hidden=$("oRt").hidden=!LV.owner;const names=new Map((BT?BT.bots:[]).map(b=>[b.id,b.name])),O=LV.orders.slice().reverse().slice(0,100);
+function renderOrd(){if(!LV)return;$("oBal").hidden=$("oRt").hidden=!LV.owner;const names=new Map([[0n,"Terminal sprzedazy"],[0,"Terminal sprzedazy"],...(BT?BT.bots:[]).map(b=>[b.id,b.name])]),O=LV.orders.slice().reverse().slice(0,100);
  $("oInf").innerHTML=(LV.live?'<span class="tag ok">REAL wlaczone</span>':'<span class="tag">REAL wylaczone</span>')+" · limit zlecenia $"+LV.max+" · oczekujace: "+LV.orders.filter(o=>o.status==="pending").length+" · ponowienie co 15 min, max 3 proby";
  const tg={pending:"",done:"ok",error:"bad",skip:""};
  $("to").innerHTML=O.length?O.map(o=>`<tr><td>${esc(o.day)}</td><td>${esc(names.get(o.bot)||"#"+o.bot)}</td><td><b>${esc(o.sym)}</b></td><td>${o.buy?'<span class="tag ok">KUPNO</span>':'<span class="tag bad">SPRZEDAZ</span>'}</td>

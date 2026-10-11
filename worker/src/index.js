@@ -108,7 +108,7 @@ async function sendMail(env, txt) {
 
 
 // ===== Etap 2: prawdziwe zlecenia OKX EEA (spot, MARKET, pary *-USDC). Klucze tylko w sekretach workera. =====
-// sekrety: OKX_KEY, OKX_SECRET, OKX_PASS; zmienne: LIVE=1 (wylacznik), MAX_ORDER_USD, MAX_DAY_USD, QUOTE (domyslnie USDC)
+// sekrety: OKX_KEY, OKX_SECRET, OKX_PASS; zmienne: LIVE=1 (wylacznik), MAX_ORDER_USD, MAX_DAY_USD, MAX_TERM_USD, QUOTE (domyslnie USDC)
 const OKB = "https://eea.okx.com", TRAD = ["ETH", "NEAR", "ICP", "INJ"];
 const b64e = b => btoa(String.fromCharCode(...new Uint8Array(b)));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -175,7 +175,8 @@ async function placeOrder(env, body) {
     const vol = Math.floor(Math.min(+amt, bal[sym]) / pi.lsz) * pi.lsz;
     if (!(vol > 0)) return `SKIP|${cid}|brak ${sym} na gieldzie`;
     if (vol < pi.omin) return `SKIP|${cid}|ponizej minimum (${pi.omin} ${sym})`;
-    if (vol * bid > maxO * 4) return `ERR sprzedaz > ${maxO * 4} USD`;
+    const maxS = cid.startsWith("t-") ? +(env.MAX_TERM_USD || 5000) : maxO * 4; // terminal sprzedazy: osobny limit
+    if (vol * bid > maxS) return `ERR sprzedaz > ${maxS} USD`;
     ord = { sz: vol.toFixed(pi.lot), tgtCcy: "base_ccy" };
   }
   await okx(env, "POST", "/api/v5/trade/order", null, { instId: pi.id, tdMode: "cash", side: side.toLowerCase(), ordType: "market", clOrdId: cl, ...ord });

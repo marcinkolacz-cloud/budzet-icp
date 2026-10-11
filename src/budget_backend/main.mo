@@ -968,6 +968,7 @@ persistent actor Budget {
     if (sgDays.size() > 3000) sgDays := Array.subArray(sgDays, sgDays.size() - 3000, 3000);
     let prevRows : [SgRow] = switch (prev) { case (?p) sgParse(p.raw).1; case null [] };
     var botLines = sgBotsStep(day, rows, prevRows);
+    botLines #= tbStep(rows);
     let ex = await sgExec();
     if (ex != "") botLines #= ex;
     let botTag = if (botLines == "") "" else " · boty: transakcje";
@@ -1062,6 +1063,55 @@ persistent actor Budget {
     if (Time.now() - sgBalAt < 60_000_000_000) return #err("Odczekaj 1 min");
     sgBalAt := Time.now();
     try { #ok(await httpGetRequestBounded(SG_URL # "/bal", sgHdr(), null)) } catch (e) { #err(Error.message(e)) }
+  };
+
+  // ===== Terminal sprzedazy: auto-sprzedaz REAL (OKX) raz w tygodniu wg progow; zlecenia i transakcje z bot = 0 =====
+  public type TbPlan = { sym : Text; lv : [(Float, Float)]; tot : Float; on : Bool; at : Int };
+  public type TbAll = { plans : [TbPlan]; sales : [SgTrade]; orders : [SgOrd]; live : Bool; owner : Bool };
+  var tbPlans : [TbPlan] = [];
+  func tbWeek() : Text { Int.toText((Time.now() / 86_400_000_000_000 + 3) / 7) };
+  func tbSold(sym : Text) : Float {
+    var q : Float = 0;
+    for (t in sgTrades.vals()) { if (t.bot == 0 and t.sym == sym and not t.buy) q += t.qty };
+    q
+  };
+  func tbStep(rows : [SgRow]) : Text {
+    if (not sgLive) return "";
+    let wk = tbWeek();
+    let day = dayKey(Time.now());
+    var out = "";
+    for (p in tbPlans.vals()) {
+      let cid = "t-" # p.sym # "-w" # wk;
+      if (p.on and not sgPending(0, p.sym) and Array.find<SgOrd>(sgOrders, func(o) { o.cid == cid }) == null) {
+        switch (Array.find<SgRow>(rows, func(x) { x.sym == p.sym })) {
+          case (?r) {
+            var best : Float = -1;
+            var q : Float = 0;
+            for ((px, qq) in p.lv.vals()) { if (px > 0 and r.c >= px and px > best) { best := px; q := qq } };
+            if (p.tot > 0) q := Float.min(q, p.tot - tbSold(p.sym));
+            if (q > 0) {
+              sgOrders := Array.append(sgOrders, [{ cid; bot = 0; day; sym = p.sym; buy = false; req = q; status = "pending"; tries = 0; msg = ""; at = Time.now() }]);
+              out #= "Terminal [REAL]: SPRZEDAZ " # p.sym # " " # Float.format(#fix 4, q) # " (cena " # Float.format(#fix 4, r.c) # ", prog " # Float.format(#fix 4, best) # ")\n";
+            };
+          };
+          case null {};
+        };
+      };
+    };
+    out
+  };
+  public shared query (msg) func tbAll() : async TbAll {
+    if (not sgOwner(msg.caller)) return { plans = []; sales = []; orders = []; live = false; owner = false };
+    { plans = tbPlans; sales = Array.filter<SgTrade>(sgTrades, func(t) { t.bot == 0 }); orders = Array.filter<SgOrd>(sgOrders, func(o) { o.bot == 0 }); live = sgLive; owner = true }
+  };
+  public shared (msg) func tbPut(p : TbPlan) : async Result.Result<Text, Text> {
+    if (not sgOwner(msg.caller)) return #err("Tylko wlasciciel");
+    if (Array.find<Text>(SG_TRADABLE, func(x) { x == p.sym }) == null) return #err("Auto tylko dla ETH, NEAR, ICP, INJ");
+    if (p.lv.size() == 0 or p.lv.size() > 20) return #err("Progi: 1-20");
+    for ((px, qq) in p.lv.vals()) { if (not (px > 0 and qq > 0)) return #err("Zly prog") };
+    if (not (p.tot >= 0)) return #err("Zla pula");
+    tbPlans := Array.append(Array.filter<TbPlan>(tbPlans, func(x) { x.sym != p.sym }), [{ p with at = Time.now() }]);
+    #ok("Auto " # p.sym # (if (p.on) " WLACZONE" else " WYLACZONE"))
   };
 
   func sgArm<system>() {
@@ -1160,6 +1210,8 @@ persistent actor Budget {
       #sgBotStop : () -> (Nat, Bool);
       #sgBotsAll : () -> ();
       #sgLiveAll : () -> ();
+      #tbAll : () -> ();
+      #tbPut : () -> TbPlan;
       #sgSetLive : () -> (Bool, Float);
       #sgOrdRetry : () -> ();
       #sgBalance : () -> ();
@@ -1195,6 +1247,8 @@ persistent actor Budget {
       case (#sgSetKey _ or #sgSetLive _) { Principal.isController(caller) };
       case (#sgLiveAll _) { stCan(caller) };
       case (#sgOrdRetry _ or #sgBalance _) { Principal.isController(caller) or isAdmin(caller) };
+      case (#tbAll _) { Principal.isController(caller) or isAdmin(caller) };
+      case (#tbPut _) { (Principal.isController(caller) or isAdmin(caller)) and arg.size() <= 2_000 };
       case (#sgBotPut _ or #sgBotPut2 _) { stCan(caller) and arg.size() <= 2_000 };
       case (#sgBotsAll _ or #sgBotStop _ or #sgBotDelete _) { stCan(caller) };
       case (#sgPosPut _) { stCan(caller) and arg.size() <= 4_000 };

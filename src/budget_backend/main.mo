@@ -741,7 +741,28 @@ persistent actor Budget {
   public type SgBot = { id : Nat; name : Text; syms : [Text]; amount : Float; scale : Bool; fresh : Bool; mode : Text;
     start : Text; endDay : Text; maxEntries : Nat; entries : Nat; active : Bool; note : Text; created : Int };
   public type SgTrade = { id : Nat; bot : Nat; day : Text; sym : Text; buy : Bool; price : Float; qty : Float; usd : Float; fee : Float };
-  public type SgBotsAll = { bots : [SgBot]; trades : [SgTrade] };
+  // wielkosc transakcji (osobny stabilny zapis, rekord SgBot bez zmian): usd = kwota USD, qty = stala ilosc tokenow, all = wszystkie dostepne (reinwestycja)
+  public type SgBotCfg = { kind : Text; qty : [(Text, Float)] };
+  public type SgBotsAll = { bots : [SgBot]; trades : [SgTrade]; cfg : [(Nat, SgBotCfg)] };
+  var sgBotCfg : [(Nat, SgBotCfg)] = [];
+  let SG_CFG_USD : SgBotCfg = { kind = "usd"; qty = [] };
+  func sgCfg(id : Nat) : SgBotCfg {
+    switch (Array.find<(Nat, SgBotCfg)>(sgBotCfg, func(x) { x.0 == id })) { case (?x) x.1; case null SG_CFG_USD }
+  };
+  func sgQ(c : SgBotCfg, sym : Text) : Float {
+    switch (Array.find<(Text, Float)>(c.qty, func(x) { x.0 == sym })) { case (?x) x.1; case null 0 }
+  };
+  // tryb all: gotowka tokenu = sprzedaze netto - zakupy (bez pierwszego zakupu startowego)
+  func sgCash(bot : Nat, sym : Text) : Float {
+    var c : Float = 0;
+    var first = true;
+    for (t in sgTrades.vals()) {
+      if (t.bot == bot and t.sym == sym) {
+        if (t.buy) { if (first) first := false else c -= t.usd + t.fee } else c += t.usd - t.fee;
+      };
+    };
+    if (c < 0) 0 else c
+  };
   var sgBots : [SgBot] = [];
   var sgTrades : [SgTrade] = [];
   let SG_TRADABLE : [Text] = ["ETH", "NEAR", "ICP", "INJ"];
@@ -770,7 +791,12 @@ persistent actor Budget {
           if (held > 0 and (not r.on or expired)) { out #= sgTrade(b, day, sym, false, r.c, held) }
           else if (held == 0 and r.on and not expired and r.c > 0 and not (b.maxEntries > 0 and b.entries >= b.maxEntries)) {
             let wasOn = switch (Array.find<SgRow>(prevRows, func(x) { x.sym == sym })) { case (?x) x.on; case null true };
-            let usd = b.amount * (if (b.scale) r.w else 1.0);
+            let cfg = sgCfg(b.id);
+            let usd = switch (cfg.kind) {
+              case ("qty") sgQ(cfg, sym) * r.c * (if (b.scale) r.w else 1.0);
+              case ("all") sgCash(b.id, sym) / (1.0 + SG_FEE);
+              case (_) b.amount * (if (b.scale) r.w else 1.0);
+            };
             if ((not b.fresh or not wasOn) and usd > 0) {
               out #= sgTrade(b, day, sym, true, r.c, usd / r.c);
               b := { b with entries = b.entries + 1 };
@@ -799,17 +825,31 @@ persistent actor Budget {
   };
 
   public shared query (msg) func sgBotsAll() : async SgBotsAll {
-    if (not stCan(msg.caller)) return { bots = []; trades = [] };
-    { bots = sgBots; trades = sgTrades }
+    if (not stCan(msg.caller)) return { bots = []; trades = []; cfg = [] };
+    { bots = sgBots; trades = sgTrades; cfg = sgBotCfg }
   };
 
   public shared (msg) func sgBotPut(b : SgBot) : async Result.Result<Nat, Text> {
     if (not stCan(msg.caller)) return #err("Brak dostepu");
+    sgBotSave(b, SG_CFG_USD)
+  };
+
+  public shared (msg) func sgBotPut2(b : SgBot, c : SgBotCfg) : async Result.Result<Nat, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (c.kind != "usd" and c.kind != "qty" and c.kind != "all") return #err("Zly tryb wielkosci");
+    if (c.qty.size() > 4) return #err("Zle ilosci");
+    if (b.id == 0 and c.kind != "usd") {
+      for (x in b.syms.vals()) { let q = sgQ(c, x); if (not (q > 0 and q <= 1_000_000_000)) return #err("Podaj ilosc dla " # x) };
+    };
+    sgBotSave(b, c)
+  };
+
+  func sgBotSave(b : SgBot, c : SgBotCfg) : Result.Result<Nat, Text> {
     if (b.mode != "demo") return #err("Tylko tryb DEMO (prawdziwe zlecenia - kolejny etap)");
     if (b.name.size() == 0 or b.name.size() > 40 or b.note.size() > 300 or b.endDay.size() > 10) return #err("Zle dane");
     if (b.syms.size() == 0 or b.syms.size() > 4) return #err("Wybierz 1-4 tokeny");
     for (x in b.syms.vals()) { if (Array.find<Text>(SG_TRADABLE, func(t) { t == x }) == null) return #err("Niedozwolony token: " # x) };
-    if (not (b.amount > 0 and b.amount <= 1_000_000)) return #err("Kwota musi byc 0 - 1 000 000 USD");
+    if (b.id == 0 and c.kind == "usd" and not (b.amount > 0 and b.amount <= 1_000_000)) return #err("Kwota musi byc 0 - 1 000 000 USD");
     if (b.id == 0) {
       if (sgBots.size() >= 20) return #err("Limit 20 botow");
       if (sgTrades.size() >= 20_000) return #err("Limit transakcji");
@@ -817,6 +857,22 @@ persistent actor Budget {
       if (d == "") return #err("Brak zapisanego sygnalu - najpierw Odswiez sygnal");
       let nb0 : SgBot = { b with id = sgNextId; start = d; entries = 0; active = true; created = Time.now() };
       sgNextId += 1;
+      if (c.kind != "usd") sgBotCfg := Array.append(sgBotCfg, [(nb0.id, c)]);
+      if (c.kind == "all") {
+        // pozycja startowa: posiadane tokeny wyceniane po ostatnim zamknieciu (bez prowizji)
+        for (x in b.syms.vals()) {
+          switch (Array.find<SgRow>(rows, func(r) { r.sym == x })) {
+            case (?r) {
+              let q = sgQ(c, x);
+              if (q > 0 and r.c > 0) {
+                sgTrades := Array.append(sgTrades, [{ id = sgNextId; bot = nb0.id; day = d; sym = x; buy = true; price = r.c; qty = q; usd = q * r.c; fee = 0.0 }]);
+                sgNextId += 1;
+              };
+            };
+            case null {};
+          };
+        };
+      };
       let (nb, _) = sgBotStep(nb0, d, rows, prevRows);
       sgBots := Array.append(sgBots, [nb]);
       return #ok(nb.id);
@@ -855,6 +911,7 @@ persistent actor Budget {
     if (not stCan(msg.caller)) return #err("Brak dostepu");
     sgBots := Array.filter<SgBot>(sgBots, func(x) { x.id != id });
     sgTrades := Array.filter<SgTrade>(sgTrades, func(t) { t.bot != id });
+    sgBotCfg := Array.filter<(Nat, SgBotCfg)>(sgBotCfg, func(x) { x.0 != id });
     #ok("Bot usuniety")
   };
 
@@ -990,6 +1047,7 @@ persistent actor Budget {
       #sgAll : () -> ();
       #sgBotDelete : () -> Nat;
       #sgBotPut : () -> SgBot;
+      #sgBotPut2 : () -> (SgBot, SgBotCfg);
       #sgBotStop : () -> (Nat, Bool);
       #sgBotsAll : () -> ();
       #sgPosDelete : () -> Nat;
@@ -1022,7 +1080,7 @@ persistent actor Budget {
       case (#kvGetAll _) { isMember(caller) };
       case (#stSetKey _) { Principal.isController(caller) };
       case (#sgSetKey _) { Principal.isController(caller) };
-      case (#sgBotPut _) { stCan(caller) and arg.size() <= 2_000 };
+      case (#sgBotPut _ or #sgBotPut2 _) { stCan(caller) and arg.size() <= 2_000 };
       case (#sgBotsAll _ or #sgBotStop _ or #sgBotDelete _) { stCan(caller) };
       case (#sgPosPut _) { stCan(caller) and arg.size() <= 4_000 };
       case (#sgAll _ or #sgPosDelete _ or #sgRunNow _ or #sgSetMail _ or #sgTestMail _) { stCan(caller) };

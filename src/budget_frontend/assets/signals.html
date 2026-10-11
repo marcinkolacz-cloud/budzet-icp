@@ -87,8 +87,10 @@ dialog select{width:100%}
 <dialog id="db"><form method="dialog" id="fb"><h3 id="dbt">Nowy bot DEMO</h3>
 <label class="w">Nazwa<input id="bNm" maxlength="40" placeholder="np. Alty 100$"></label>
 <div class="w"><label>Tokeny</label><div class="tg" id="bSy"></div></div>
-<label>Kwota na wejscie (USD)<input id="bAm" type="number" step="any" min="1" value="100"></label>
-<label>Wielkosc pozycji<select id="bSc"><option value="1">Wg reguly (x waga zmiennosci)</option><option value="0">Zawsze pelna kwota</option></select></label>
+<label class="w">Wielkosc transakcji<select id="bKd"><option value="usd">Kwota USD na wejscie</option><option value="qty">Stala ilosc tokenow na wejscie</option><option value="all">Wszystkie dostepne tokeny (reinwestycja)</option></select></label>
+<label id="bAmL">Kwota na wejscie (USD)<input id="bAm" type="number" step="any" min="1" value="100"></label>
+<div class="w" id="bQtL" hidden><label id="bQtH">Ilosc tokenow</label><div class="tg" id="bQt"></div></div>
+<label id="bScL">Wielkosc pozycji<select id="bSc"><option value="1">Wg reguly (x waga zmiennosci)</option><option value="0">Zawsze pelna kwota</option></select></label>
 <label>Wejscie<select id="bFr"><option value="0">Od razu, gdy sygnal ON</option><option value="1">Tylko na nowym sygnale OFF→ON</option></select></label>
 <label>Tryb<select id="bMd"><option value="demo">DEMO (symulacja)</option><option value="real" disabled>Prawdziwe - wkrotce</option></select></label>
 <label>Dzialaj do (puste = bez terminu)<input id="bEd" type="date"></label>
@@ -119,10 +121,11 @@ const idl=({IDL})=>{
  const All=IDL.Record({days:IDL.Vec(D),events:IDL.Vec(E),pos:IDL.Vec(P),lastRun:IDL.Int,log:IDL.Text,nextRunSec:IDL.Nat,hasKey:IDL.Bool,mail:IDL.Bool});
  const RT=IDL.Variant({ok:IDL.Text,err:IDL.Text}),RN=IDL.Variant({ok:IDL.Nat,err:IDL.Text});
  const Bot=IDL.Record({id:IDL.Nat,name:IDL.Text,syms:IDL.Vec(IDL.Text),amount:IDL.Float64,scale:IDL.Bool,fresh:IDL.Bool,mode:IDL.Text,start:IDL.Text,endDay:IDL.Text,maxEntries:IDL.Nat,entries:IDL.Nat,active:IDL.Bool,note:IDL.Text,created:IDL.Int});
+ const Cfg=IDL.Record({kind:IDL.Text,qty:IDL.Vec(IDL.Tuple(IDL.Text,IDL.Float64))});
  const Tr=IDL.Record({id:IDL.Nat,bot:IDL.Nat,day:IDL.Text,sym:IDL.Text,buy:IDL.Bool,price:IDL.Float64,qty:IDL.Float64,usd:IDL.Float64,fee:IDL.Float64});
  return IDL.Service({sgAll:IDL.Func([],[All],["query"]),sgPosPut:IDL.Func([P],[RN],[]),sgPosDelete:IDL.Func([IDL.Nat],[RT],[]),
   sgRunNow:IDL.Func([],[RT],[]),sgSetMail:IDL.Func([IDL.Bool],[RT],[]),sgTestMail:IDL.Func([],[RT],[]),
-  sgBotsAll:IDL.Func([],[IDL.Record({bots:IDL.Vec(Bot),trades:IDL.Vec(Tr)})],["query"]),sgBotPut:IDL.Func([Bot],[RN],[]),sgBotStop:IDL.Func([IDL.Nat,IDL.Bool],[RT],[]),sgBotDelete:IDL.Func([IDL.Nat],[RT],[])});
+  sgBotsAll:IDL.Func([],[IDL.Record({bots:IDL.Vec(Bot),trades:IDL.Vec(Tr),cfg:IDL.Vec(IDL.Tuple(IDL.Nat,Cfg))})],["query"]),sgBotPut:IDL.Func([Bot],[RN],[]),sgBotPut2:IDL.Func([Bot,Cfg],[RN],[]),sgBotStop:IDL.Func([IDL.Nat,IDL.Bool],[RT],[]),sgBotDelete:IDL.Func([IDL.Nat],[RT],[])});
 };
 const A=Auth.mk(idl);
 const WK="https://gielda-quote.marcinkolacz.workers.dev",CARDS=["BTC","ETH","NEAR","ICP","INJ"],SYMS=["ETH","NEAR","ICP","INJ"],FEE=0.001,FREEZE="2026-10-11";
@@ -299,15 +302,20 @@ function botStats(b){
  let openV=0,openC=0;Object.entries(pos).forEach(([s,p])=>{if(p.q>0){openV+=p.q*(last(s)||0)*(1-FEE);openC+=p.c;}});
  return {T,real,closed,wins,openV,openC,unreal:openV-openC,per,open:Object.entries(pos).filter(([,p])=>p.q>0).map(([s,p])=>s+" "+p.q.toLocaleString("pl-PL",{maximumFractionDigits:4}))};
 }
+const cfgOf=b=>{const x=(BT&&BT.cfg||[]).find(c=>c[0]===b.id);return x?x[1]:{kind:"usd",qty:[]};};
+const qStr=c=>c.qty.map(([s,q])=>s+" "+q.toLocaleString("pl-PL",{maximumFractionDigits:6})).join(", ");
+function sizeTxt(b){const c=cfgOf(b);return c.kind==="all"?"wszystkie: "+qStr(c):c.kind==="qty"?qStr(c)+(b.scale?" x waga":""):usd2(b.amount)+(b.scale?" x waga":"");}
+function holdTxt(b){const c=cfgOf(b);if(c.kind!=="all")return "";const T=BT.trades.filter(t=>t.bot===b.id);let v=0;
+ c.qty.forEach(([s,q])=>{const f=T.find(t=>t.sym===s&&t.buy);if(f)v+=q*(last(s)||0)-f.usd;});return " · vs trzymanie: "+usd2(v);}
 function renderBots(){
  if(!BT){$("bots").innerHTML="";$("tb").innerHTML="";return;}
  const names=new Map(BT.bots.map(b=>[b.id,b.name])),per=new Map();
  $("bots").innerHTML=BT.bots.length?BT.bots.slice().sort((a,b)=>Number(b.id-a.id)).map(b=>{const st=botStats(b);st.per.forEach((v,k)=>per.set(k,v));const tot=st.real+st.unreal;
   return `<div class="bot${b.active?"":" off"}"><div class="top"><span class="nm">${esc(b.name)}</span><span>${b.active?'<span class="tag ok">aktywny</span>':'<span class="tag">zakonczony</span>'} <span class="tag" style="color:#b45309">DEMO</span></span></div>
-  <div class="chips2">${b.syms.map(s=>`<span class="tag">${esc(s)}</span>`).join("")}<span class="tag">${usd2(b.amount)}${b.scale?" x waga":""}</span><span class="tag">${b.fresh?"nowy sygnal":"od razu"}</span></div>
+  <div class="chips2">${b.syms.map(s=>`<span class="tag">${esc(s)}</span>`).join("")}<span class="tag">${esc(sizeTxt(b))}</span><span class="tag">${b.fresh?"nowy sygnal":"od razu"}</span></div>
   <div class="res"><div>Wynik lacznie<b class="${cls(tot)}">${usd2(tot)}</b></div><div>Zrealizowany<b class="${cls(st.real)}">${usd2(st.real)}</b></div>
   <div>Otwarte<b class="${cls(st.unreal)}">${st.openC?usd2(st.unreal):"–"}</b></div><div>Transakcje<b>${st.closed} zamkn. · ${st.closed?Math.round(st.wins/st.closed*100)+"% traf.":"–"}</b></div></div>
-  <div class="note" style="margin:0 0 8px">Start ${esc(b.start)} · wejscia ${b.entries}${Number(b.maxEntries)?"/"+b.maxEntries:""}${b.endDay?" · do "+esc(b.endDay):""}${st.open.length?" · trzyma: "+esc(st.open.join(", ")):""}${b.note?" · "+esc(b.note):""}</div>
+  <div class="note" style="margin:0 0 8px">Start ${esc(b.start)} · wejscia ${b.entries}${Number(b.maxEntries)?"/"+b.maxEntries:""}${b.endDay?" · do "+esc(b.endDay):""}${st.open.length?" · trzyma: "+esc(st.open.join(", ")):""}${holdTxt(b)}${b.note?" · "+esc(b.note):""}</div>
   <div class="act"><button type="button" data-be="${b.id}">Edytuj</button>${b.active?`<button type="button" data-bs="${b.id}">Zatrzymaj</button><button type="button" data-bc="${b.id}">Zatrzymaj i zamknij</button>`:""}<button type="button" data-bd="${b.id}">Usun</button></div></div>`;}).join("")
   :`<div class="empty">Brak botow. „Nowy bot” uruchomi automatyczne transakcje DEMO wg reguly.</div>`;
  const T=BT.trades.slice().sort((a,b)=>Number(b.id-a.id)).slice(0,100);
@@ -320,11 +328,18 @@ function renderBots(){
  $("bots").querySelectorAll("[data-bd]").forEach(x=>x.onclick=()=>{if(confirm("Usunac bota razem z historia jego transakcji?"))act(()=>A.sgBotDelete(BigInt(x.dataset.bd)));});
 }
 $("bSy").innerHTML=SYMS.map(s=>`<label><input type="checkbox" value="${s}" checked>${s}</label>`).join("");
+$("bQt").innerHTML=SYMS.map(s=>`<label data-qs="${s}">${s}<input type="number" step="any" min="0" data-qq="${s}" style="width:110px"></label>`).join("");
+function bKind(){const k=$("bKd").value,sel=[...$("bSy").querySelectorAll("input:checked")].map(i=>i.value);
+ $("bAmL").hidden=k!=="usd";$("bQtL").hidden=k==="usd";$("bScL").hidden=k==="all";
+ $("bQtH").textContent=k==="all"?"Posiadane tokeny na start (bot sprzedaje calosc przy OFF i odkupuje za cala gotowke przy ON)":"Ilosc tokenow na jedno wejscie";
+ $("bQt").querySelectorAll("[data-qs]").forEach(l=>l.hidden=!sel.includes(l.dataset.qs));}
+$("bKd").onchange=bKind;$("bSy").onchange=bKind;
 function openBot(b){
  bEdit=b||null;const e=!!b;$("dbt").textContent=e?"Edytuj bota":"Nowy bot DEMO";$("bOk").textContent=e?"Zapisz":"Uruchom bota";
  $("bNm").value=e?b.name:"";$("bAm").value=e?b.amount:100;$("bSc").value=e?(b.scale?"1":"0"):"1";$("bFr").value=e?(b.fresh?"1":"0"):"0";$("bMd").value="demo";
  $("bEd").value=e?b.endDay:"";$("bMx").value=e?Number(b.maxEntries):0;$("bNo").value=e?b.note:"";
- $("bSy").querySelectorAll("input").forEach(i=>{i.checked=e?b.syms.includes(i.value):true;i.disabled=e;});["bAm","bSc","bFr","bMd"].forEach(id=>$(id).disabled=e);
+ $("bSy").querySelectorAll("input").forEach(i=>{i.checked=e?b.syms.includes(i.value):true;i.disabled=e;});["bAm","bSc","bFr","bMd","bKd"].forEach(id=>$(id).disabled=e);
+ const c=e?cfgOf(b):{kind:"usd",qty:[]};$("bKd").value=c.kind;$("bQt").querySelectorAll("[data-qq]").forEach(i=>{const x=c.qty.find(q=>q[0]===i.dataset.qq);i.value=x?x[1]:"";i.disabled=e;});bKind();
  $("bInfo").textContent=e?"W trakcie dzialania mozna zmienic nazwe, termin, limit wejsc i notatke.":"Bot startuje od ostatniej zapisanej swiecy. Po osiagnieciu limitu wejsc zamyka otwarte pozycje wg sygnalu i konczy dzialanie.";
  $("db").showModal();
 }
@@ -334,7 +349,10 @@ $("fb").onsubmit=async ev=>{ev.preventDefault();
  const b=bEdit||{};const x={id:bEdit?b.id:0n,name:$("bNm").value.trim().slice(0,40)||"Bot",syms:bEdit?b.syms:syms,amount:bEdit?b.amount:Math.max(0,parseFloat($("bAm").value)||0),
   scale:bEdit?b.scale:$("bSc").value==="1",fresh:bEdit?b.fresh:$("bFr").value==="1",mode:"demo",start:bEdit?b.start:"",endDay:$("bEd").value||"",
   maxEntries:BigInt(Math.max(0,parseInt($("bMx").value)||0)),entries:bEdit?b.entries:0n,active:bEdit?b.active:true,note:$("bNo").value.slice(0,300),created:bEdit?b.created:0n};
- $("bOk").disabled=true;try{const r=await A.sgBotPut(x);if("err" in r){prog(r.err);return;}$("db").close();prog(bEdit?"Zapisano":"Bot uruchomiony");await loadBots();}catch(e){prog("Blad: "+e.message);}finally{$("bOk").disabled=false;}};
+ const kind=bEdit?cfgOf(b).kind:$("bKd").value,cfg=bEdit?cfgOf(b):{kind,qty:kind==="usd"?[]:syms.map(s=>[s,Math.max(0,parseFloat($("bQt").querySelector(`[data-qq="${s}"]`).value)||0)])};
+ if(!bEdit&&kind!=="usd"&&cfg.qty.some(q=>!(q[1]>0))){prog("Podaj ilosc dla kazdego wybranego tokena");return;}
+ if(kind!=="usd")x.amount=0;
+ $("bOk").disabled=true;try{const r=await A.sgBotPut2(x,cfg);if("err" in r){prog(r.err);return;}$("db").close();prog(bEdit?"Zapisano":"Bot uruchomiony");await loadBots();}catch(e){prog("Blad: "+e.message);}finally{$("bOk").disabled=false;}};
 async function loadBots(){try{BT=await A.sgBotsAll();}catch(e){prog("Boty: "+e.message);}renderBots();}
 
 function render(){if(S){renderCards();renderPrice();renderEq();renderHist();}renderPf();if(BT)renderBots();renderPos();renderEvents();renderChips();}

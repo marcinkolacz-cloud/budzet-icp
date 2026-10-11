@@ -25,8 +25,8 @@ dialog::backdrop{background:#1c191566;backdrop-filter:blur(2px)}
 <nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html" class="on">Krypto</a><a href="staking.html">Staking</a><a href="signals.html">Signals</a><a href="kosz.html">Kosz</a></nav>
 <header><div><h1>Krypto</h1><div class="sub" id="st">Ceny: CoinGecko · kurs USD/PLN: ECB</div>
 <div class="nav"><a class="on" href="krypto.html">Portfel</a><a href="krypto-analityka.html">Analityka</a><a href="terminal.html">Terminal</a></div></div>
-<div class="form"><select id="ps"></select><button id="np" type="button">Nowy portfel</button><button id="rn" type="button">Zmien nazwe</button><button id="dp" type="button">Usun portfel</button><button id="rs" type="button">Kosz</button>
-<select id="cur" aria-label="Waluta"><option>USD</option><option>PLN</option></select><button id="rf" class="dark" type="button">Odswiez ceny</button><button id="im" type="button">Import z innej aplikacji</button><button id="ex" type="button">Eksport JSON</button></div></header>
+<div class="form"><select id="ps"></select>
+<select id="cur" aria-label="Waluta"><option>USD</option><option>PLN</option></select><button id="rf" class="dark" type="button">Odswiez ceny</button><div class="mnu"><button type="button" class="mnb" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>Wiecej</button><div class="mnp" role="menu" hidden><b>Portfel</b><button id="np" type="button">Nowy portfel</button><button id="rn" type="button">Zmien nazwe</button><button id="dp" type="button" class="neg">Usun portfel</button><b>Dane</b><button id="ex" type="button">Eksport JSON</button><button id="im" type="button">Import z innej aplikacji</button></div></div></div></header>
 <div class="stats">
 <div class="stat"><span>Wartosc</span><strong id="v">–</strong><small id="vs"></small></div>
 <div class="stat"><span>24h</span><strong id="d">–</strong><small id="ds"></small></div>
@@ -207,7 +207,6 @@ async function refresh(){$("st").textContent="Odswiezanie cen...";$("rf").disabl
 $("np").onclick=()=>{const v=prompt("Nazwa nowego portfela");if(v&&v.trim()){K.addPortfolio(v.trim());render();}};
 $("rn").onclick=()=>{const cur=K.isAgg()?K.S.aggName:K.P().name,v=prompt("Nowa nazwa",cur);if(v&&v.trim()){K.rename(v.trim());render();}};
 $("dp").onclick=()=>{const p=K.P();if(!p)return;const v=prompt("Aby usunac portfel wpisz jego nazwe: "+p.name);if(v!==p.name)return v!=null&&alert("Nazwa sie nie zgadza - nic nie usunieto");const m=K.removePortfolio(p);if(m)alert(m);render();};
-$("rs").onclick=()=>{location.href="kosz.html";};
 $("rf").onclick=refresh;
 $("im").onclick=()=>{const i=el("input");i.type="file";i.accept=".json,application/json";i.onchange=async()=>{
  const f=i.files[0];if(!f)return;let l;try{l=K.parseExport(JSON.parse(await f.text()));}catch(e){return alert(e.message||"Nieprawidlowy plik");}

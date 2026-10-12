@@ -98,15 +98,14 @@ let A=null;try{A=Auth.mk(idl);}catch{}
 let TB=null;
 const tbP=t=>TB&&TB.plans.find(p=>p.sym===t);
 async function tbLoad(){if(!A)return;try{const r=await A.tbAll();TB=r.owner?r:null;}catch{TB=null;}if(TB){tbMerge();render();}}
-// zrealizowane sprzedaze z OKX -> terminal (+ portfel Krypto, jesli ma token); bez duplikatow (ox = id transakcji)
-function tbMerge(){let ch=0;
- TB.sales.filter(x=>!x.buy&&x.qty>0).forEach(x=>{const ox=String(x.id),c=T().coins.find(c=>c.t===x.sym&&c.cy==="w");if(!c||c.sales.some(s=>s.ox===ox))return;
-  const s={id:uid(),d:x.day,q:x.qty,p:x.price,ox};if(x.fee>0)s.f=x.fee;
-  const W=S.ps.find(p=>(K.derive(p.trades)[c.t]||{}).q>0);
-  if(W){const bk=W.trades.slice(),tr={id:uid(),d:x.day,t:c.t,s:-1,q:x.qty,p:x.price,f:x.fee||0,c:"terminal auto OKX"},am=x.qty*x.price-(x.fee||0);W.trades.push(tr);
-   if(am>0){const au={id:uid(),d:x.day,t:"USDC",s:1,q:+am.toFixed(6),p:1,f:0,c:"auto: sprzedaz "+c.t,auto:tr.id};tr.lk=au.id;W.trades.push(au);}
-   if(K.validTrades(W.trades)){s.kp=W.id;s.kt=tr.id;}else W.trades=bk;}
-  c.sales.push(s);ch++;});
+// zrealizowane sprzedaze z OKX -> terminal + portfel Krypto "Total"; bez duplikatow (ox = id transakcji); nieudany wpis do portfela ponawiany przy kolejnym wczytaniu
+function tbMerge(){let ch=0;const W=S.ps.find(p=>/^total$/i.test(String(p.name||"").trim()));
+ TB.sales.filter(x=>!x.buy&&x.qty>0).forEach(x=>{const ox=String(x.id),c=T().coins.find(c=>c.t===x.sym&&c.cy==="w");if(!c)return;
+  let s=c.sales.find(s=>s.ox===ox);if(!s){s={id:uid(),d:x.day,q:x.qty,p:x.price,ox};if(x.fee>0)s.f=x.fee;c.sales.push(s);ch++;}
+  if(!W||s.kp)return;
+  const bk=W.trades.slice(),tr={id:uid(),d:x.day,t:c.t,s:-1,q:x.qty,p:x.price,f:x.fee||0,c:"terminal auto OKX"},am=x.qty*x.price-(x.fee||0);W.trades.push(tr);
+  if(am>0){const au={id:uid(),d:x.day,t:"USDC",s:1,q:+am.toFixed(6),p:1,f:0,c:"auto: sprzedaz "+c.t,auto:tr.id};tr.lk=au.id;W.trades.push(au);}
+  if(K.validTrades(W.trades)){s.kp=W.id;s.kt=tr.id;ch++;}else W.trades=bk;});
  if(ch)K.save();}
 function autoTxt(c){const p=tbP(c.t);if(!p||!p.on||c.cy!=="w")return "";const O=TB.orders.filter(o=>o.sym===c.t),o=O[O.length-1];
  return '<div class="note" style="margin:3px 0 0"><span class="bd go" style="margin-left:0">auto OKX</span> '+(TB.live?"":"REAL wylaczone · ")+(o?"ostatnie: "+esc(o.day)+" · "+qty(o.req)+" · "+esc(o.status)+(o.status!=="done"&&o.msg?" ("+esc(o.msg.slice(0,60))+")":""):"brak zlecen")+'</div>';}

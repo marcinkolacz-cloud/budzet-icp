@@ -601,6 +601,19 @@ persistent actor Budget {
     } catch (e) { stSetSync(n.id, false, Error.message(e)) };
   };
 
+  // korekta dnia z wyplata rewards (claim przy doplacie): nagroda = wyplacone - pending z poprzedniego dnia + pending dzis
+  public shared (msg) func stExtClaim(chain : Text, day : Text, claimed : Nat) : async Result.Result<Text, Text> {
+    if (not Principal.isController(msg.caller)) return #err("Tylko kontroler");
+    let cur = switch (Array.find<StExt>(stExt, func(x) { x.chain == chain and x.day == day })) { case (?r) r; case null return #err("Brak wpisu " # chain # " " # day) };
+    var prev : ?StExt = null;
+    for (r in stExt.vals()) { if (r.chain == chain and r.day < day) { switch (prev) { case (?x) { if (r.day > x.day) prev := ?r }; case null prev := ?r } } };
+    let pp : Int = switch (prev) { case (?x) x.pending; case null 0 };
+    let rw : Int = claimed - pp + cur.pending;
+    if (rw < 0) return #err("Wynik ujemny - sprawdz kwote");
+    stExt := Array.map<StExt, StExt>(stExt, func(x) { if (x.chain == chain and x.day == day) { { x with reward = rw } } else x });
+    #ok("reward " # day # " = " # Int.toText(rw))
+  };
+
   func stLastExt(chain : Text) : ?StExt {
     var f : ?StExt = null;
     for (r in stExt.vals()) { if (r.chain == chain) { switch (f) { case (?x) { if (r.day > x.day) f := ?r }; case null f := ?r } } };
@@ -1227,6 +1240,7 @@ persistent actor Budget {
       #stRewardDelete : () -> (Nat64, Int);
       #stRewardsImport : () -> [StRew];
       #stExtImport : () -> [StExt];
+      #stExtClaim : () -> (Text, Text, Nat);
       #stSetKey : () -> Text;
       #stSyncNow : () -> ();
       #stSyncNeurons : () -> ();
@@ -1249,6 +1263,7 @@ persistent actor Budget {
       case (#sgLiveAll _) { stCan(caller) };
       case (#sgOrdRetry _ or #sgBalance _) { Principal.isController(caller) or isAdmin(caller) };
       case (#tbAll _) { Principal.isController(caller) or isAdmin(caller) };
+      case (#stExtClaim _) { Principal.isController(caller) and arg.size() <= 500 };
       case (#tbPut _) { (Principal.isController(caller) or isAdmin(caller)) and arg.size() <= 2_000 };
       case (#sgBotPut _ or #sgBotPut2 _) { stCan(caller) and arg.size() <= 2_000 };
       case (#sgBotsAll _ or #sgBotStop _ or #sgBotDelete _) { stCan(caller) };

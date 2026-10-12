@@ -617,7 +617,8 @@ persistent actor Budget {
           base + (if (d > 0) d else 0)
         } else {
           let d : Int = pending - p.pending;
-          if (p.day == day) { p.reward + (if (d > 0) d else 0) } else if (d >= 0) d else p.pending - pending
+          // d<0 = rewards wyplacone (claim / dopłata do stake) -> liczymy tylko to, co narosło po wyplacie
+          if (p.day == day) { p.reward + (if (d >= 0) d else pending) } else if (d >= 0) d else pending
         }
       };
     };

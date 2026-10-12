@@ -116,11 +116,12 @@
   <div id="kList"></div>
   <input id="kFile" type="file" accept=".csv,.txt" hidden />
 </div>
-<script>addEventListener("error",e=>{const d=document.createElement("div");d.style.cssText="position:fixed;left:12px;right:12px;bottom:12px;z-index:10003;background:#c23b3b;color:#fff;padding:10px 14px;border-radius:12px;font:12px/1.4 monospace;white-space:pre-wrap";d.textContent="Blad strony: "+e.message+" ("+(e.filename||"").split("/").pop()+":"+e.lineno+":"+e.colno+")";document.body.append(d);});</script>
+<script>addEventListener("error",e=>{const d=document.createElement("div");d.style.cssText="background:#c23b3b;color:#fff;padding:10px 14px;border-radius:12px;font:12px/1.4 monospace;white-space:pre-wrap";d.textContent="Blad strony: "+e.message+" ("+(e.filename||"").split("/").pop()+":"+e.lineno+":"+e.colno+")";(document.getElementById("errbar")||document.body.appendChild(Object.assign(document.createElement("div"),{id:"errbar",style:"position:fixed;left:12px;right:12px;bottom:12px;z-index:10003;display:grid;gap:6px"}))).append(d);});</script>
 <script src="auth.js"></script>
 <script type="text/x-after-auth" src="backup.js"></script>
 <script type="text/x-after-auth" src="io.js"></script>
 <script type="text/x-after-auth">
+;(function(){ // zakres lokalny: brak kolizji nazw z innymi skryptami
 const KEY = "budzet-app-v3";
 const seed = () => ({
   month: 0,
@@ -416,6 +417,7 @@ bMount();
 render();
 if(location.hash==="#kredyty") setTab("K");
 
+})();
 </script>
 </body>
 </html>

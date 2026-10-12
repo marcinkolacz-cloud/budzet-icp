@@ -52,14 +52,16 @@ function restoreOne(e){const {type,data:d}=e.i;
  if(type==="k-trade"){const p=pf(K.S,d.pid),n=p.trades.length;p.trades.push(...d.ts);if(!K.validTrades(p.trades)){p.trades.length=n;return "sprzedaz przekroczylaby stan";}K.save();return "";}
  if(type==="k-ps"){addPs(K,d.p);K.save();return "";}
  if(type==="k-term"){const T=K.S.term=K.S.term||{coins:[]};if(T.coins.some(c=>c.t===d.c.t&&c.cy===d.c.cy))return "plan tego aktywa i cyklu juz istnieje";T.coins.push(d.c);K.save();return "";}
- const b=bLoad();if(!b)return "brak danych budzetu";b.rows=b.rows||[];b.loans=b.loans||{};b.expenses=b.expenses||[];b.incomes=b.incomes||[];
+ const R=bLoad();if(!R)return "brak danych budzetu";
+ if(type==="b-budget"){R.bx=R.bx||[];if(R.bx.some(x=>x.id===d.x.id))return "budzet juz istnieje";if(R.bx.some(x=>x.name===d.x.name))d.x.name=(d.x.name+" (przywrocony)").slice(0,40);R.bx.push(d.x);bSave(R);return "";}
+ const b=d&&d.bid?((R.bx||[]).find(x=>x.id===d.bid)||{}).b:R;if(!b)return "budzet tej pozycji zostal usuniety - najpierw go przywroc";b.rows=b.rows||[];b.loans=b.loans||{};b.expenses=b.expenses||[];b.incomes=b.incomes||[];
  const byData=x=>b.rows.find(r=>r.data===x);
- if(type==="b-month"){b.rows.splice(Math.min(d.idx,b.rows.length),0,d.row);bSave(b);return "";}
+ if(type==="b-month"){b.rows.splice(Math.min(d.idx,b.rows.length),0,d.row);bSave(R);return "";}
  if(type==="b-credit"){b.credits=b.credits||[];if(b.credits.some(c=>c.name===d.c.name))return "kredyt o tej nazwie juz istnieje";
   b.credits.push(d.c);d.keys.forEach((k,j)=>{if(!b.expenses.includes(k))b.expenses.splice(d.ex[j]<0?b.expenses.length:Math.min(d.ex[j],b.expenses.length),0,k);if(d.loans[j]!=null)b.loans[k]=d.loans[j];});
-  d.rows.forEach(x=>{const r=byData(x.data);if(!r)return;d.keys.forEach((k,j)=>{if(x.v[j]!=null)r[k]=x.v[j];if(x.p[j]){r.paid=r.paid||{};r.paid[k]=true;}});});bSave(b);return "";}
+  d.rows.forEach(x=>{const r=byData(x.data);if(!r)return;d.keys.forEach((k,j)=>{if(x.v[j]!=null)r[k]=x.v[j];if(x.p[j]){r.paid=r.paid||{};r.paid[k]=true;}});});bSave(R);return "";}
  if(type==="b-item"){const L=d.kind==="in"?b.incomes:b.expenses;if(!L.includes(d.key))L.splice(d.li<0?L.length:Math.min(d.li,L.length),0,d.key);if(d.loan!=null&&b.loans[d.key]==null)b.loans[d.key]=d.loan;
-  d.rows.forEach(x=>{const r=byData(x.data);if(!r)return;if(x.v!=null)r[d.key]=x.v;if(x.p){r.paid=r.paid||{};r.paid[d.key]=true;}if(r.del){if(x.d)r.del[d.key]=true;else delete r.del[d.key];}});bSave(b);return "";}
+  d.rows.forEach(x=>{const r=byData(x.data);if(!r)return;if(x.v!=null)r[d.key]=x.v;if(x.p){r.paid=r.paid||{};r.paid[d.key]=true;}if(r.del){if(x.d)r.del[d.key]=true;else delete r.del[d.key];}});bSave(R);return "";}
  return "nieznany typ";}
 function restore(list){const err=[],ok=[];list.forEach(e=>{const m=restoreOne(e);m?err.push(e.i.label+": "+m):ok.push(e);});drop(ok);
  if(err.length)alert("Nie przywrocono:\n"+err.join("\n"));$("st").textContent=ok.length?"Przywrocono: "+ok.length:"";render();}

@@ -77,11 +77,11 @@
 <div class="app">
 <nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html" class="on">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html">Staking</a><a href="signals.html">Signals</a><a href="kosz.html">Kosz</a></nav>
   <header>
-    <div><h1>Budzet</h1><div class="sub">Miesiac, saldo i zbiorczy podglad okresu.</div></div>
+    <div><h1>Budzet</h1><div class="sub">Miesiac, saldo i zbiorczy podglad okresu.</div><select id="bsel" aria-label="Wybierz budzet" style="margin-top:8px;max-width:260px"></select></div>
     <div class="bar">
       <button id="addIn" type="button">Przychod</button>
       <button id="addEx" type="button">Koszt</button>
-      <div class="mnu"><button type="button" class="mnb" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>Wiecej</button><div class="mnp" role="menu" hidden><b>Miesiac</b><button id="addMonth" type="button">Nowy miesiac</button><button id="cloneMonth" type="button">Klonuj na nastepny</button><button id="delMonth" type="button" class="neg">Usun miesiac</button><b>Dane</b><button id="xlB" type="button" title="Eksport budzetu i kredytow do Excela">Eksport Excel</button></div></div>
+      <div class="mnu"><button type="button" class="mnb" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>Wiecej</button><div class="mnp" role="menu" hidden><b>Budzet</b><button id="newB" type="button">Nowy budzet</button><button id="renB" type="button">Zmien nazwe budzetu</button><button id="delB" type="button" class="neg">Usun budzet</button><b>Miesiac</b><button id="addMonth" type="button">Nowy miesiac</button><button id="cloneMonth" type="button">Klonuj na nastepny</button><button id="delMonth" type="button" class="neg">Usun miesiac</button><b>Dane</b><button id="xlB" type="button" title="Eksport budzetu i kredytow do Excela">Eksport Excel</button></div></div>
     </div>
   </header>
   <div class="tabs"><button id="tB" class="on" type="button">Budzet</button><button id="tK" type="button">Kredyty</button></div>
@@ -136,12 +136,19 @@ const seed = () => ({
     {data:"lut-25", przychod:24317, vat:5296, ppe:1945, zus:498, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:7000, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":1000, paid:{}}
   ]
 });
-let state = JSON.parse(localStorage.getItem(KEY) || "null") || seed();
+const R = JSON.parse(localStorage.getItem(KEY) || "null") || seed();
+// dodatkowe budzety (projekty): R.bx=[{id,name,b}]; budzet glowny = R (bez zmian dla Dashboard, Excel, Kosz)
+R.bx = R.bx || [];
+const BSK = "budzet-bsel";
+const bxOf = id => R.bx.find(x=>x.id===id);
+let bcur = 0; try{ bcur = +localStorage.getItem(BSK) || 0; }catch{}
+if(bcur && !bxOf(bcur)) bcur = 0;
+let state = bcur ? bxOf(bcur).b : R;
 const zl = n => new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN",maximumFractionDigits:0}).format(n||0);
 const num = v => { const n = Number(String(v??"").replace(/\s/g,"").replace(",",".")); return Number.isFinite(n)?n:0; };
-const save = () => localStorage.setItem(KEY, JSON.stringify(state));
+const save = () => localStorage.setItem(KEY, JSON.stringify(R));
 state.credits = state.credits || [];
-const toBin=(type,label,data)=>{(state.bin=state.bin||[]).push({id:Date.now()*1000+Math.floor(Math.random()*1000),ts:Date.now(),type,label,data:JSON.parse(JSON.stringify(data))});};
+const toBin=(type,label,data)=>{const x=bcur?bxOf(bcur):null;(R.bin=R.bin||[]).push({id:Date.now()*1000+Math.floor(Math.random()*1000),ts:Date.now(),type,label:(x?"["+x.name+"] ":"")+label,data:JSON.parse(JSON.stringify(x?{...data,bid:x.id}:data))});};
 const $ = id => document.getElementById(id);
 const zl2 = n => new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN"}).format(n||0);
 const ASC = t => String(t??"").toLowerCase().replace(/ł/g,"l").normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -383,6 +390,24 @@ document.getElementById("addEx").onclick=()=>{ const n=prompt("Nazwa kosztu"); i
 document.getElementById("showPeriod").onclick=showPeriod;
 document.getElementById("hidePeriod").onclick=()=>document.getElementById("preview").className="";
 $("xlB").onclick=()=>IO.excel("budzet");
+// --- wybor / dodawanie / zmiana nazwy / usuwanie budzetow
+const bName = () => bcur ? bxOf(bcur).name : (R.bname || "Budzet glowny");
+function bMount(){ const el=$("bsel"); el.innerHTML=""; const add=(v,t)=>{ const o=document.createElement("option"); o.value=v; o.textContent=t; el.append(o); };
+  add(0,R.bname||"Budzet glowny"); R.bx.forEach(x=>add(x.id,x.name)); el.value=bcur; $("delB").disabled=!bcur; }
+function bPick(id){ bcur=id&&bxOf(id)?id:0; try{ bcur?localStorage.setItem(BSK,bcur):localStorage.removeItem(BSK); }catch{}
+  state=bcur?bxOf(bcur).b:R; state.credits=state.credits||[]; state.loans=state.loans||{}; state.month=state.month||0; bMount(); render(); }
+$("bsel").onchange=()=>bPick(+$("bsel").value);
+const bFree = n => n && n!==(R.bname||"Budzet glowny") && !R.bx.some(x=>x.name===n);
+$("newB").onclick=()=>{ const n=(prompt("Nazwa nowego budzetu")||"").trim().slice(0,40); if(!n) return; if(!bFree(n)) return alert("Budzet o tej nazwie juz istnieje");
+  const d=new Date(), id=Date.now(); R.bx.push({id,name:n,b:{month:0,incomes:["przychod"],expenses:[],rows:[{data:MON[d.getMonth()]+"-"+String(d.getFullYear()).slice(2),paid:{}}],loans:{},credits:[]}});
+  save(); bPick(id); };
+$("renB").onclick=()=>{ const o=bName(), n=(prompt("Nowa nazwa budzetu",o)||"").trim().slice(0,40); if(!n||n===o) return; if(!bFree(n)) return alert("Budzet o tej nazwie juz istnieje");
+  if(bcur) bxOf(bcur).name=n; else R.bname=n; save(); bMount(); };
+$("delB").onclick=()=>{ if(!bcur) return; const x=bxOf(bcur);
+  if((prompt('Aby usunac budzet "'+x.name+'", wpisz jego nazwe:')||"").trim()!==x.name) return;
+  (R.bin=R.bin||[]).push({id:Date.now()*1000+Math.floor(Math.random()*1000),ts:Date.now(),type:"b-budget",label:"Budzet „"+x.name+"” ("+x.b.rows.length+" mies.)",data:JSON.parse(JSON.stringify({x}))});
+  R.bx=R.bx.filter(y=>y.id!==x.id); save(); bPick(0); };
+bMount();
 render();
 if(location.hash==="#kredyty") setTab("K");
 

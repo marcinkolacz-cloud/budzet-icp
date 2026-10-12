@@ -116,6 +116,7 @@
   <div id="kList"></div>
   <input id="kFile" type="file" accept=".csv,.txt" hidden />
 </div>
+<script>addEventListener("error",e=>{const d=document.createElement("div");d.style.cssText="position:fixed;left:12px;right:12px;bottom:12px;z-index:10003;background:#c23b3b;color:#fff;padding:10px 14px;border-radius:12px;font:12px/1.4 monospace;white-space:pre-wrap";d.textContent="Blad strony: "+e.message+" ("+(e.filename||"").split("/").pop()+":"+e.lineno+":"+e.colno+")";document.body.append(d);});</script>
 <script src="auth.js"></script>
 <script type="text/x-after-auth" src="backup.js"></script>
 <script type="text/x-after-auth" src="io.js"></script>
@@ -136,9 +137,13 @@ const seed = () => ({
     {data:"lut-25", przychod:24317, vat:5296, ppe:1945, zus:498, "wyd. specjalny":1000, oplaty:950, daga:100, nju:200, mbank:7000, "nadplata mbank":1000, "XTB Daga":3000, "XTB Marcin":1000, paid:{}}
   ]
 });
-const R = JSON.parse(localStorage.getItem(KEY) || "null") || seed();
+let R0 = JSON.parse(localStorage.getItem(KEY) || "null"); if(typeof R0==="string"){ try{ R0=JSON.parse(R0); }catch{} } // naprawa podwojnie zakodowanych danych
+const R = R0 && typeof R0==="object" && !Array.isArray(R0) ? R0 : seed();
 // dodatkowe budzety (projekty): R.bx=[{id,name,b}]; budzet glowny = R (bez zmian dla Dashboard, Excel, Kosz)
-R.bx = R.bx || [];
+// uzupelnij brakujace pola (bez nadpisywania danych)
+const bNorm = b => { b.rows=Array.isArray(b.rows)?b.rows:[]; b.incomes=Array.isArray(b.incomes)?b.incomes:[]; b.expenses=Array.isArray(b.expenses)?b.expenses:[];
+  b.loans=b.loans&&typeof b.loans==="object"?b.loans:{}; b.credits=Array.isArray(b.credits)?b.credits:[]; b.month=+b.month||0; return b; };
+bNorm(R); R.bx = Array.isArray(R.bx) ? R.bx.filter(x=>x&&x.id&&x.b) : []; R.bx.forEach(x=>bNorm(x.b));
 const BSK = "budzet-bsel";
 const bxOf = id => R.bx.find(x=>x.id===id);
 let bcur = 0; try{ bcur = +localStorage.getItem(BSK) || 0; }catch{}

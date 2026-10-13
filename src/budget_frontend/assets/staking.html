@@ -172,8 +172,8 @@ function render(){
  const capW=W.reduce((a,x)=>a+x.s.paid,0),apyW=capW?W.reduce((a,x)=>a+x.s.apy*x.s.paid,0)/capW:0;
  const row=(nm,stake,u,t,a7,a30,apy,tr,v)=>`<tr><td><b>${nm}</b></td><td>${f(stake,2)} ${u}</td><td class="hm">${t?f(t,4):"–"}</td><td class="hm">${a7?f(a7,4):"–"}</td><td class="hm">${a30?f(a30,4):"–"}</td><td>${pct(apy)}</td><td>${f(tr,3)} ${u}</td><td>${zl(v)}</td></tr>`;
  // srednia dzienna: suma z ostatnich n dni kalendarzowych / n (krocej, jesli historia jest krotsza)
- const first={},avg=(k,n)=>{if(!first[k])return 0;const d0=new Date(today+"T12:00:00Z");d0.setUTCDate(d0.getUTCDate()-n+1);const from=d0.toISOString().slice(0,10);
-  let sum=0;for(const [d,o] of dm)if(d>=from&&d<=today)sum+=o[k];const span=Math.round((Date.parse(today)-Date.parse(first[k]>from?first[k]:from))/864e5)+1;return sum/Math.max(1,Math.min(n,span));};
+ const first={},avg=(k,n)=>{if(!first[k])return 0;const de=new Date(today+"T12:00:00Z");if(!((dm.get(today)||{})[k]>0))de.setUTCDate(de.getUTCDate()-1);const end=de.toISOString().slice(0,10);const d0=new Date(end+"T12:00:00Z");d0.setUTCDate(d0.getUTCDate()-n+1);const from=d0.toISOString().slice(0,10);
+  let sum=0;for(const [d,o] of dm)if(d>=from&&d<=end)sum+=o[k];const span=Math.round((Date.parse(end)-Date.parse(first[k]>from?first[k]:from))/864e5)+1;return sum/Math.max(1,Math.min(n,span));};
  for(const [d,o] of dm)for(const k of ["icp","nicp","near","inj"])if(o[k]>0&&(!first[k]||d<first[k]))first[k]=d;
  $("ta").innerHTML=row("ICP neurony",icpStake,"ICP",td.icp,avg("icp",7),avg("icp",30),apyN,nRew,vIcp)+row("WaterNeuron",wtnV,"ICP",td.nicp,avg("nicp",7),avg("nicp",30),apyW,W.reduce((a,x)=>a+x.s.earned,0),vW)+
   row("NEAR",near.staked,"NEAR",near.today,avg("near",7),avg("near",30),near.apy,near.tot,vN)+row("INJ",inj.staked,"INJ",inj.today,avg("inj",7),avg("inj",30),inj.apy,inj.tot,vI);

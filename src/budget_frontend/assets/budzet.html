@@ -52,6 +52,7 @@
   .filt{display:flex;gap:6px;margin:0 0 6px}
   .filt select{padding:6px 10px}
   .note{color:var(--muted);font-size:12px;margin:0 0 6px}
+  .stat .pd{display:block;margin-top:4px;font-size:12px;color:var(--muted)} .stat .pd b{color:#16a34a;font-weight:600}
   .row.cost .span3{grid-column:3 / 6;display:flex}
   .row.cost .span3 button{padding:5px 12px}
   input[readonly]{color:var(--muted);background:transparent;border-color:var(--line)}
@@ -67,7 +68,8 @@
   td{padding:6px;border-top:1px solid #f0ebe3;text-align:right;white-space:nowrap}
   th:first-child,td:first-child{text-align:left}
   tr.past td{color:var(--muted)}
-  tr.cur td{background:var(--soft);font-weight:600}
+  tr.cur td{font-weight:600} tr.cur td:first-child{box-shadow:inset 3px 0 0 var(--ink)}
+  tr.paid td{background:var(--soft);color:inherit}
   tfoot td{font-weight:700;border-top:2px solid var(--line)}
   @media (max-width:800px) { .stats,.grid,.plist { grid-template-columns:1fr; } .stat strong { font-size:24px; } }
 </style>
@@ -96,8 +98,8 @@
   </div>
   <div class="stats">
     <div class="stat bal"><span id="balLabel">Zostaje</span><strong id="bal">0 zl</strong></div>
-    <div class="stat"><span>Przychod</span><strong id="inc">0 zl</strong></div>
-    <div class="stat"><span>Wydatki</span><strong id="out">0 zl</strong></div>
+    <div class="stat"><span>Przychod</span><strong id="inc">0 zl</strong><small class="pd" id="pIn"></small></div>
+    <div class="stat"><span>Wydatki</span><strong id="out">0 zl</strong><small class="pd" id="pEx"></small></div>
   </div>
   <section id="preview"><h2 id="previewTitle">Podglad</h2>
     <button id="hidePeriod" type="button">Zamknij podglad</button><div class="plist" id="previewList"></div></section>
@@ -143,7 +145,10 @@ const R = R0 && typeof R0==="object" && !Array.isArray(R0) ? R0 : seed();
 // dodatkowe budzety (projekty): R.bx=[{id,name,b}]; budzet glowny = R (bez zmian dla Dashboard, Excel, Kosz)
 // uzupelnij brakujace pola (bez nadpisywania danych)
 const bNorm = b => { b.rows=Array.isArray(b.rows)?b.rows:[]; b.incomes=Array.isArray(b.incomes)?b.incomes:[]; b.expenses=Array.isArray(b.expenses)?b.expenses:[];
-  b.loans=b.loans&&typeof b.loans==="object"?b.loans:{}; b.credits=Array.isArray(b.credits)?b.credits:[]; b.month=+b.month||0; return b; };
+  b.loans=b.loans&&typeof b.loans==="object"?b.loans:{}; b.credits=Array.isArray(b.credits)?b.credits:[]; b.month=+b.month||0;
+  // raty/zostalo/uwaga per miesiac (r.ln) - jednorazowa migracja z globalnego b.loans
+  if(!b.lnv){ b.rows.forEach(r=>{ r.ln=r.ln&&typeof r.ln==="object"?r.ln:{}; Object.keys(b.loans).forEach(k=>{ if(!(k in r.ln)) r.ln[k]={...b.loans[k]}; }); }); b.lnv=1; }
+  return b; };
 bNorm(R); R.bx = Array.isArray(R.bx) ? R.bx.filter(x=>x&&x.id&&x.b) : []; R.bx.forEach(x=>bNorm(x.b));
 const BSK = "budzet-bsel";
 const bxOf = id => R.bx.find(x=>x.id===id);
@@ -256,6 +261,14 @@ const row = () => state.rows[state.month] || state.rows[0];
 const earned = r => state.incomes.reduce((a,k)=>a+num(r[k]),0);
 const spent = r => state.expenses.reduce((a,k)=>a+num(r[k]),0);
 function rename(list,i,next){ const prev=list[i]; if(!next||next===prev||list.includes(next)) return; list[i]=next; state.rows.forEach(r=>{ if(prev in r){ r[next]=r[prev]; delete r[prev]; } if(r.paid&&prev in r.paid){ r.paid[next]=r.paid[prev]; delete r.paid[prev]; } if(r.del&&prev in r.del){ r.del[next]=r.del[prev]; delete r.del[prev]; } }); }
+// zaplacenie raty recznego kredytu: raty a/b -> a+1/b, zostalo -= rata (ten i kolejne miesiace)
+function shiftLoan(key,d,amt){
+  const isN=v=>String(v??"").trim()!==""&&Number.isFinite(Number(String(v).replace(/[\s\u00a0]/g,"").replace(",",".")));
+  state.rows.forEach((rr,ix)=>{ if(ix<state.month) return; const l=rr.ln&&rr.ln[key]; if(!l) return;
+    const m=String(l.raty||"").match(/^\s*(\d+)\s*\/\s*(\d+)\s*$/); if(m) l.raty=Math.max(0,+m[1]+d)+"/"+m[2];
+    if(amt&&isN(l.calosc)) l.calosc=String(Math.round((num(l.calosc)-d*amt)*100)/100); });
+  const c=row().ln&&row().ln[key]; if(c) state.loans[key]={...c};
+}
 function menu(items){ const d=document.createElement("details"); const s=document.createElement("summary"); s.textContent="···"; d.append(s); const box=document.createElement("div"); items.forEach(([t,fn])=>{ const b=document.createElement("button"); b.textContent=t; b.onclick=e=>{ e.preventDefault(); d.open=false; fn(); }; box.append(b); }); d.append(box); return d; }
 function line(list, kind, i){
   const key=list[i], r=row(); r.paid=r.paid||{};
@@ -266,7 +279,7 @@ function line(list, kind, i){
   name.onchange=()=>{ rename(list,i,name.value.trim()); save(); render(); };
   const amt=document.createElement("input"); amt.className="amt"; amt.placeholder="rata"; amt.value=r[key]??""; if(cr){ amt.readOnly=true; amt.title="z harmonogramu"; }
   amt.onchange=()=>{ r[key]=amt.value; save(); render(); };
-  const items=[["zaplacone",()=>{ r.paid[key]=!r.paid[key]; save(); render(); }]];
+  const items=[["zaplacone",()=>{ const on=!r.paid[key]; r.paid[key]=on; if(kind==="ex"&&!cr&&!ov) shiftLoan(key,on?1:-1,num(r[key])); save(); render(); }]];
   if(i>0) items.push(["wyzej",()=>{ [list[i-1],list[i]]=[list[i],list[i-1]]; save(); render(); }]);
   if(i<list.length-1) items.push(["nizej",()=>{ [list[i+1],list[i]]=[list[i],list[i+1]]; save(); render(); }]);
   if(!cr&&!ov&&!(kind==="in"&&key==="przychod")) items.push(["usun",()=>{
@@ -281,12 +294,12 @@ function line(list, kind, i){
     if(num(r[key])>0){ const b=document.createElement("button"); b.type="button"; b.textContent="Import nowego harmonogramu"; b.onclick=()=>pickFile(ov); sp.append(b); }
     el.append(sp);
   } else if(kind==="ex"){
-    const loan=state.loans[key]||{raty:"",calosc:"",uwaga:""};
+    r.ln=r.ln||{}; const loan=r.ln[key]||{raty:"",calosc:"",uwaga:""};
     const raty=document.createElement("input"); raty.placeholder="raty"; raty.value=loan.raty||"";
     const calosc=document.createElement("input"); calosc.placeholder="zostalo"; calosc.value=loan.calosc||"";
     const uwaga=document.createElement("input"); uwaga.placeholder="uwaga"; uwaga.value=loan.uwaga||"";
-    if(cr){ const e=entriesFor(cr,ymOf(r.data)||"")[0]; raty.value=e?e.nr+"/"+cr.schedule.length:""; calosc.value=e?e.saldo:""; raty.readOnly=calosc.readOnly=true; raty.title="rata / wszystkich"; calosc.title="saldo po racie"; }
-    const keep=()=>{ state.loans[key]=cr?{raty:"",calosc:"",uwaga:uwaga.value}:{raty:raty.value,calosc:calosc.value,uwaga:uwaga.value}; save(); };
+    if(cr){ const e=entriesFor(cr,ymOf(r.data)||"")[0]; raty.value=e?state.rows.filter(rr=>{ const y=ymOf(rr.data); return y&&y<=ymOf(r.data)&&rr.paid&&rr.paid[key]; }).length+"/"+cr.schedule.length:""; calosc.value=e?e.saldo:""; raty.readOnly=calosc.readOnly=true; raty.title="zaplacone / wszystkich"; calosc.title="saldo po racie"; }
+    const keep=()=>{ const v=cr?{raty:"",calosc:"",uwaga:uwaga.value}:{raty:raty.value,calosc:calosc.value,uwaga:uwaga.value}; r.ln[key]=v; state.loans[key]={...v}; save(); };
     raty.onchange=keep; calosc.onchange=keep; uwaga.onchange=keep;
     el.append(raty, calosc, uwaga);
   }
@@ -314,6 +327,8 @@ function render(){
   const act=k=>flt[k].q||flt[k].m||flt[k].n, fa=act("in")||act("ex"), I=act("in")?sums.in:earned(r), E=act("ex")?sums.ex:spent(r);
   $("sIn").textContent=act("in")?"Suma widocznych: "+zl(sums.in):""; $("sEx").textContent=act("ex")?"Suma widocznych: "+zl(sums.ex):"";
   $("balLabel").textContent="Zostaje · "+(r.data||"")+(fa?" · filtr":"");
+  const pd=(L,k)=>L.reduce((a,x)=>a+(r.paid&&r.paid[x]&&passes(k,x,r)?num(r[x]):0),0), PI=pd(state.incomes,"in"), PE=pd(state.expenses,"ex");
+  $("pIn").innerHTML="Wplynelo <b>"+zl(PI)+"</b> · czeka "+zl(I-PI); $("pEx").innerHTML="Oplacone <b>"+zl(PE)+"</b> · do zaplaty "+zl(E-PE);
   $("bal").textContent=zl(I-E); $("inc").textContent=zl(I); $("out").textContent=zl(E);
   if($("preview").className==="open") showPeriod();
   renderK();
@@ -327,7 +342,8 @@ function renderK(){
     head.append(mk("h2",c.name+(c.meta.typ?" · "+c.meta.typ:"")));
     const bar=mk("div",null,"bar"), ib=mk("button","Import nowego harmonogramu"), db=mk("button","Usun kredyt");
     ib.type=db.type="button"; ib.onclick=()=>pickFile(c); db.onclick=()=>removeCredit(c); bar.append(ib,db); head.append(bar); sec.append(head);
-    const past=c.schedule.filter(x=>x.date<T), fut=c.schedule.filter(x=>x.date>=T), next=fut[0];
+    const pm=new Set(state.rows.filter(rr=>rr.paid&&rr.paid[c.name]).map(rr=>ymOf(rr.data)).filter(Boolean)), done=x=>x.date<T||pm.has(x.date.slice(0,7));
+    const past=c.schedule.filter(done), fut=c.schedule.filter(x=>!done(x)), next=fut[0];
     const left=past.length?past[past.length-1].saldo:(c.schedule[0].saldo+c.schedule[0].kap);
     const m=mk("div",null,"meta");
     [["Nr umowy",c.meta.umowa||"–"],["Kwota kredytu",c.meta.kwota||"–"],["Oprocentowanie",c.meta.oproc||"–"],["Okres",c.meta.okres||"–"],["Harmonogram z dnia",c.meta.data||"–"],
@@ -337,7 +353,7 @@ function renderK(){
     const wrap=mk("div",null,"sch"), t=mk("table"), th=mk("thead"), htr=mk("tr");
     ["Nr","Termin","Kapital","Odsetki","Rata","Saldo po racie"].forEach(h=>htr.append(mk("th",h))); th.append(htr); t.append(th);
     const tb=mk("tbody");
-    c.schedule.forEach(x=>{ const tr=mk("tr",null,x.date<T?"past":(x===next?"cur":""));
+    c.schedule.forEach(x=>{ const tr=mk("tr",null,pm.has(x.date.slice(0,7))?"paid":x.date<T?"past":(x===next?"cur":""));
       [x.nr,dmy(x.date),zl2(x.kap),zl2(x.ods),zl2(x.rata),zl2(x.saldo)].forEach(v=>tr.append(mk("td",v))); tb.append(tr); });
     t.append(tb);
     const tf=mk("tfoot"), ftr=mk("tr"), sm=k=>c.schedule.reduce((a,x)=>a+x[k],0);
@@ -361,7 +377,7 @@ function showPeriod(){
   add("Przychod", inn); add("Wydatki", out); add("Zostaje", inn-out);
   state.expenses.forEach(k=>{ const v=sumKey(k,"ex"); if(v||slice.some(r=>passes("ex",k,r))) add(k, v); });
 }
-document.getElementById("addMonth").onclick=()=>{ const n=prompt("Nazwa miesiaca","mar-25"); if(!n) return; const prevRow=state.rows[state.rows.length-1]; state.rows.push({data:n,paid:{},del:prevRow&&prevRow.del?{...prevRow.del}:{}}); state.month=state.rows.length-1; save(); render(); };
+document.getElementById("addMonth").onclick=()=>{ const n=prompt("Nazwa miesiaca","mar-25"); if(!n) return; const prevRow=state.rows[state.rows.length-1]; state.rows.push({data:n,paid:{},del:prevRow&&prevRow.del?{...prevRow.del}:{},ln:prevRow&&prevRow.ln?JSON.parse(JSON.stringify(prevRow.ln)):{}}); state.month=state.rows.length-1; save(); render(); };
 document.getElementById("cloneMonth").onclick=()=>{
   const src=row();
   const copy=JSON.parse(JSON.stringify(src));
@@ -405,7 +421,7 @@ function bPick(id){ bcur=id&&bxOf(id)?id:0; try{ bcur?localStorage.setItem(BSK,b
 $("bsel").onchange=()=>bPick(+$("bsel").value);
 const bFree = n => n && n!==(R.bname||"Budzet glowny") && !R.bx.some(x=>x.name===n);
 $("newB").onclick=()=>{ const n=(prompt("Nazwa nowego budzetu")||"").trim().slice(0,40); if(!n) return; if(!bFree(n)) return alert("Budzet o tej nazwie juz istnieje");
-  const d=new Date(), id=Date.now(); R.bx.push({id,name:n,b:{month:0,incomes:["przychod"],expenses:[],rows:[{data:MON[d.getMonth()]+"-"+String(d.getFullYear()).slice(2),paid:{}}],loans:{},credits:[]}});
+  const d=new Date(), id=Date.now(); R.bx.push({id,name:n,b:{month:0,incomes:["przychod"],expenses:[],rows:[{data:MON[d.getMonth()]+"-"+String(d.getFullYear()).slice(2),paid:{}}],loans:{},credits:[],lnv:1}});
   save(); bPick(id); };
 $("renB").onclick=()=>{ const o=bName(), n=(prompt("Nowa nazwa budzetu",o)||"").trim().slice(0,40); if(!n||n===o) return; if(!bFree(n)) return alert("Budzet o tej nazwie juz istnieje");
   if(bcur) bxOf(bcur).name=n; else R.bname=n; save(); bMount(); };

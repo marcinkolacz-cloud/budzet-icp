@@ -1,0 +1,30 @@
+diff --git a/src/budget_backend/main.mo b/src/budget_backend/main.mo
+--- a/src/budget_backend/main.mo
++++ b/src/budget_backend/main.mo
+@@ -17,6 +17,7 @@ import Nat64 "mo:base/Nat64";
+ import Int "mo:base/Int";
+ import Float "mo:base/Float";
+ import ExperimentalCycles "mo:base/ExperimentalCycles";
++import Prim "mo:⛔";
+ 
+ persistent actor Budget {
+   public type Kind = { #income; #expense };
+@@ -1195,6 +1196,18 @@ persistent actor Budget {
+     #ok("Usunieto")
+   };
+ 
++  public shared query (msg) func dbgMem() : async Text {
++    if (not Principal.isController(msg.caller)) return "Tylko kontroler";
++    var kvB = 0; for (r in kv.vals()) kvB += r.value.size();
++    var dB = 0; for (d in sgDays.vals()) dB += d.raw.size();
++    "heap=" # Nat.toText(Prim.rts_heap_size()) # " mem=" # Nat.toText(Prim.rts_memory_size())
++    # " alloc=" # Nat.toText(Prim.rts_total_allocation()) # " reclaimed=" # Nat.toText(Prim.rts_reclaimed())
++    # "\nkv=" # Nat.toText(kv.size()) # "/" # Nat.toText(kvB) # "B sgDays=" # Nat.toText(sgDays.size()) # "/" # Nat.toText(dB) # "B"
++    # " sgEvents=" # Nat.toText(sgEvents.size()) # " sgTrades=" # Nat.toText(sgTrades.size()) # " sgOrders=" # Nat.toText(sgOrders.size())
++    # " stRewards=" # Nat.toText(stRewards.size()) # " stExt=" # Nat.toText(stExt.size()) # " stPrices=" # Nat.toText(stPrices.size())
++    # " stWtn=" # Nat.toText(stWtn.size()) # " sgLog=" # Nat.toText(sgLog.size()) # " stLog=" # Nat.toText(stLog.size())
++  };
++
+   system func postupgrade() { stArm<system>(); stNArm<system>(); sgArm<system>() };
+ 
+   public query func health() : async Text { "ok" };

@@ -31,8 +31,8 @@ function mount(){var nav=document.querySelector(".topnav");if(!nav||root)return;
  pop.innerHTML='<b>Ustawienia</b><b>Motyw</b><div class="seg2"><button type="button" data-m="light">Dzien</button><button type="button" data-m="dark">Noc</button><button type="button" data-m="system">Auto</button></div><b>Akcent</b><div class="dots">'+
   ACC.map(function(x){return '<button type="button" data-a="'+x[0]+'" title="'+x[2]+'" aria-label="'+x[2]+'" style="background:'+x[1]+'"></button>'}).join("")+'</div><b>Domyslna waluta</b><div class="seg2"><button type="button" data-c="PLN">PLN</button><button type="button" data-c="USD">USD</button><button type="button" data-c="">Per karta</button></div><small class="hint">Krypto, Terminal, Staking</small>';
  pop.onclick=function(e){var b=e.target.closest("button");if(!b)return;if(b.dataset.m)put(K,b.dataset.m==="system"?null:b.dataset.m);if(b.dataset.c!=null){put("budzet-cur",b.dataset.c||null);if(b.dataset.c){CK.forEach(function(k){put(k,b.dataset.c)});var cs=document.getElementById("cur");if(cs&&cs.value!==b.dataset.c){cs.value=b.dataset.c;cs.dispatchEvent(new Event("change"))}}}if(b.dataset.a)put(A,b.dataset.a==="grafit"?null:b.dataset.a);apply();sync()};
- pb.onclick=function(e){e.stopPropagation();pop.hidden=!pop.hidden;if(!pop.hidden){var r=pb.getBoundingClientRect();pop.style.top=(r.bottom+6)+"px";pop.style.right=Math.max(8,innerWidth-r.right)+"px"}pb.setAttribute("aria-expanded",!pop.hidden)};
- document.addEventListener("click",function(e){if(!pop.hidden&&!root.contains(e.target)){pop.hidden=true;pb.setAttribute("aria-expanded","false")}});
+ pb.onclick=function(e){e.stopPropagation();document.querySelectorAll(".mnp").forEach(function(x){x.hidden=true});pop.hidden=!pop.hidden;if(!pop.hidden){var r=pb.getBoundingClientRect();pop.style.top=(r.bottom+6)+"px";pop.style.right=Math.max(8,innerWidth-r.right)+"px"}pb.setAttribute("aria-expanded",!pop.hidden)};
+ document.addEventListener("click",function(e){if(!pop.hidden&&!root.contains(e.target)&&!pop.contains(e.target)){pop.hidden=true;pb.setAttribute("aria-expanded","false")}});
  addEventListener("resize",function(){pop.hidden=true});document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!pop.hidden){pop.hidden=true;pb.setAttribute("aria-expanded","false");pb.focus()}});
  var pl=document.createElement("label");pl.className="pvs";pl.title="Tryb prywatny - ukrywa wartosci";
  pl.innerHTML='<input type="checkbox" role="switch" aria-label="Tryb prywatny"><i></i><span>Prywatny</span>';sw=pl.firstChild;
@@ -42,13 +42,13 @@ function mount(){var nav=document.querySelector(".topnav");if(!nav||root)return;
  var dm=document.createElement("div");dm.className="mnu dat";
  dm.innerHTML='<button type="button" class="mnb" aria-haspopup="true" aria-expanded="false" title="Kopia zapasowa" aria-label="Kopia zapasowa">'+DB+'</button><div class="mnp" role="menu" hidden><b>Kopia zapasowa</b><button type="button" data-bk="exp">Pobierz pelny backup</button><button type="button" data-bk="pick">Przywroc z backupu</button><small class="hint">Budzet, Gielda, Krypto, Terminal, Staking, Signals, ustawienia</small></div>';
  dm.querySelector(".mnp").addEventListener("click",function(e){var b=e.target.closest("[data-bk]");if(!b)return;if(!window.BK)return alert("Poczekaj na zalogowanie i wczytanie danych.");window.BK[b.dataset.bk]()});
- root.append(pl,dm);if(cs)root.append(cs);if(kz)root.append(kz);root.append(tg,pb,pop);nav.append(root);sync();}
-function menus(){document.querySelectorAll(".mnu").forEach(function(m){var b=m.querySelector(".mnb"),p=m.querySelector(".mnp");if(!b||!p||m.dataset.ok)return;m.dataset.ok=1;
+ root.append(pl,dm);if(cs)root.append(cs);if(kz)root.append(kz);root.append(tg,pb);var ph=document.createElement("div");ph.className="thm";ph.style.display="contents";ph.append(pop);document.body.append(ph);nav.append(root);sync();}
+function menus(){document.querySelectorAll(".mnu").forEach(function(m){var b=m.querySelector(".mnb"),p=m.querySelector(".mnp");if(!b||!p||m.dataset.ok)return;m.dataset.ok=1;document.body.append(p);
  function cl(){p.hidden=true;b.setAttribute("aria-expanded","false")}
- b.onclick=function(e){e.stopPropagation();var o=p.hidden;document.querySelectorAll(".mnp").forEach(function(x){x.hidden=true});p.hidden=!o;b.setAttribute("aria-expanded",o);if(o){var r=b.getBoundingClientRect();p.style.top=(r.bottom+6)+"px";p.style.right=Math.max(8,innerWidth-r.right)+"px";var f=p.querySelector("button");f&&f.focus()}};
+ b.onclick=function(e){e.stopPropagation();var o=p.hidden;document.querySelectorAll(".mnp").forEach(function(x){x.hidden=true});if(pop)pop.hidden=true;p.hidden=!o;b.setAttribute("aria-expanded",o);if(o){var r=b.getBoundingClientRect();p.style.top=(r.bottom+6)+"px";p.style.right=Math.max(8,innerWidth-r.right)+"px";var f=p.querySelector("button");f&&f.focus()}};
  p.addEventListener("click",function(e){if(e.target.closest("button"))cl()});
- document.addEventListener("click",function(e){if(!m.contains(e.target))cl()});
- document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!p.hidden){cl();b.focus()}});addEventListener("resize",cl);addEventListener("scroll",cl,true);});}
+ document.addEventListener("click",function(e){if(!m.contains(e.target)&&!p.contains(e.target))cl()});
+ document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!p.hidden){cl();b.focus()}});addEventListener("resize",cl);addEventListener("scroll",function(e){if(!p.contains(e.target))cl()},true);});}
 function boot(){mount();menus()}
 document.readyState==="loading"?document.addEventListener("DOMContentLoaded",boot):boot();
 })();

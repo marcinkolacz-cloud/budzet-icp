@@ -88,3 +88,6 @@ html[data-theme] .mnp button.neg{color:var(--neg)}
 .thm .mnu.dat>.mnb{width:34px;height:34px;padding:0;display:grid;place-items:center;border-radius:999px}
 .thm .mnu.dat>.mnb svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .mnp .hint{font-size:11px;color:var(--muted);padding:4px 10px 6px;max-width:220px}
+/* Gorna belka przyklejona */
+html .topnav{position:sticky;top:0;z-index:9990;margin:-22px calc(-1 * clamp(16px,3vw,40px)) 14px;padding:12px 230px 12px clamp(16px,3vw,40px);background:color-mix(in srgb,var(--bg) 85%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+@media (max-width:640px){html .topnav{margin:-14px -12px 12px;padding:44px 12px 10px}}

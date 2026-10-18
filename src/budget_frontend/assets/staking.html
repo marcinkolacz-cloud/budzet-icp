@@ -33,7 +33,7 @@ dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
 
 <section><h2>Aktywa</h2><table><thead><tr><th>Aktywo</th><th>Stake</th><th class="hm">Dzis</th><th class="hm">Sr. 7d</th><th class="hm">Sr. 30d</th><th class="hm">Sr. 3m</th><th class="hm">Sr. 6m</th><th class="hm">Sr. 9m</th><th class="hm">Sr. rok</th><th>APY 30d</th><th>Nagrody lacznie</th><th>Wartosc <span class="cu">PLN</span></th></tr></thead><tbody id="ta"></tbody></table></section>
 
-<section><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">Neurony ICP</h2><button id="an" type="button">Dodaj neuron</button></div>
+<section><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">Neurony ICP</h2><div style="display:flex;align-items:center;gap:10px"><label class="note" style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="h0"> Ukryj puste (stake 0)<span id="h0c"></span></label><button id="an" type="button">Dodaj neuron</button></div></div>
 <p class="note">Sync czyta neuron z NNS Governance - canister backendu Budzetu (<code>tj3o4-rqaaa-aaaac-bgdmq-cai</code>) musi byc hotkeyem neuronu.</p>
 <table style="margin-top:8px"><thead><tr><th>Neuron</th><th>Stake ICP</th><th>Dojrzalosc</th><th class="hm">Kapital</th><th>Nagrody</th><th class="hm">Sr. dzienna 30d</th><th>APY 30d</th><th>Sync</th><th></th></tr></thead><tbody id="tn"></tbody></table></section>
 
@@ -148,6 +148,7 @@ function dailyMap(){
 }
 
 // --- render
+let hide0=false;try{hide0=localStorage.getItem("st_hide0")==="1"}catch{}
 function render(){
  const ip=icpPx(),N=D.neurons.map(n=>({n,s:neuronStats(n)})),W=D.wtnPos.map(p=>({p,s:wtnStats(p)})),near=extStats("near"),inj=extStats("inj");
  const icpStake=N.reduce((a,x)=>a+x.s.stake+x.s.mat,0),wtnV=W.reduce((a,x)=>a+x.s.red,0);
@@ -185,7 +186,8 @@ function render(){
   row("NEAR",near.staked,"NEAR",near.today,avg("near",7),avg("near",30),near.apy,near.tot,vN,"near")+row("INJ",inj.staked,"INJ",inj.today,avg("inj",7),avg("inj",30),inj.apy,inj.tot,vI,"inj");
  // neurony
  const syn=id=>D.sync.find(x=>x.nid===id);
- $("tn").innerHTML=N.length?N.map(({n,s})=>{const y=syn(n.id),tg=!y?'<span class="tag">brak</span>':y.ok?`<span class="tag ok" title="${esc(day(y.at))}">OK</span>`:`<span class="tag bad" title="${esc(y.err)}">blad</span>`;
+ const NV=hide0?N.filter(({s})=>s.stake+s.mat>0):N;$("h0").checked=hide0;$("h0c").textContent=hide0&&N.length>NV.length?" · ukryto "+(N.length-NV.length):"";
+ $("tn").innerHTML=NV.length?NV.map(({n,s})=>{const y=syn(n.id),tg=!y?'<span class="tag">brak</span>':y.ok?`<span class="tag ok" title="${esc(day(y.at))}">OK</span>`:`<span class="tag bad" title="${esc(y.err)}">blad</span>`;
   return `<tr><td><b>${esc(n.name||"Neuron")}</b><br><small class="note">${n.id}</small></td><td>${f(s.stake+s.mat,2)}</td><td>${f(s.mat,3)}</td><td class="hm">${f(s.cap,2)}</td><td>${f(s.rew,3)}</td><td class="hm">${f(s.avg,4)}</td><td>${pct(s.apy)}</td><td>${tg}</td>
   <td class="row-act"><button data-en="${n.id}">Edytuj</button> <button data-rn="${n.id}">Usun</button></td></tr>`;}).join(""):'<tr><td colspan="9" class="note">Brak neuronow - dodaj lub zaimportuj kopie.</td></tr>';
  const errs=D.sync.filter(x=>!x.ok);if(errs.length)$("tn").insertAdjacentHTML("beforeend",`<tr><td colspan="9" class="note neg">${errs.map(x=>esc(x.nid+": "+x.err)).join("<br>")}</td></tr>`);
@@ -250,6 +252,7 @@ async function act(fn,msg){try{prog(msg||"Zapisywanie…");await fn();await load
 const nsOf=d=>BigInt(Date.parse(d+"T08:00:00"))*1000000n,dOf=ns=>day(ns);
 function dlg(id,init){return new Promise(res=>{const d=$(id);init&&init();d.returnValue="";d.onclose=()=>res(d.returnValue==="ok");d.showModal();});}
 $("an").onclick=()=>editNeuron(null);
+$("h0").onchange=e=>{hide0=e.target.checked;try{localStorage.setItem("st_hide0",hide0?"1":"")}catch{}render();};
 async function editNeuron(n){
  $("dnt").textContent=n?"Edytuj neuron":"Dodaj neuron";
  const ok=await dlg("dn",()=>{$("nid").value=n?String(n.id):"";$("nid").disabled=!!n;$("nnm").value=n?n.name:"";$("nst").value=n?dOf(n.start):today;});

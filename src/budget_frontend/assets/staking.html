@@ -35,7 +35,7 @@ dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
 
 <section><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">Neurony ICP</h2><button id="an" type="button">Dodaj neuron</button></div>
 <p class="note">Sync czyta neuron z NNS Governance - canister backendu Budzetu (<code>tj3o4-rqaaa-aaaac-bgdmq-cai</code>) musi byc hotkeyem neuronu.</p>
-<table style="margin-top:8px"><thead><tr><th>Neuron</th><th>Stake ICP</th><th>Dojrzalosc</th><th class="hm">Kapital</th><th>Nagrody</th><th class="hm">Sr. dzienna</th><th>APY 30d</th><th>Sync</th><th></th></tr></thead><tbody id="tn"></tbody></table></section>
+<table style="margin-top:8px"><thead><tr><th>Neuron</th><th>Stake ICP</th><th>Dojrzalosc</th><th class="hm">Kapital</th><th>Nagrody</th><th class="hm">Sr. dzienna 30d</th><th>APY 30d</th><th>Sync</th><th></th></tr></thead><tbody id="tn"></tbody></table></section>
 
 <section><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">WaterNeuron (nICP)</h2><div class="form"><button id="aw" type="button">Dodaj pozycje</button><button id="as" class="dark" type="button">Dodaj odczyt</button></div></div>
 <table style="margin-top:8px"><thead><tr><th>Pozycja</th><th>nICP</th><th>Wplacono ICP</th><th>Wartosc ICP</th><th>Zarobione ICP</th><th>Zwrot</th><th>APY 30d</th><th></th></tr></thead><tbody id="tw"></tbody></table></section>
@@ -105,8 +105,14 @@ function neuronStats(n){
   rates.push(g&&cap>0?Number(r.delta)/cap:0);
  }
  const last=h[h.length-1],mat=last?Number(last.un)+Number(last.sm):0;
- const apy=rates.length>=30?(Math.pow(1+rates.slice(-30).reduce((a,x)=>a+x,0)/30,365)-1)*100:0;
- return {h,cap:cap/1e8,rew:rew/1e8,avg:cnt?rew/cnt/1e8:0,today:todayR/1e8,mat:mat/1e8,stake:e8(n.stake),apy};
+ // 30 dni kalendarzowych (nie 30 odczytow): koniec = dzis, albo wczoraj gdy dzis brak nagrody
+ const de=new Date(today+"T12:00:00Z");if(!todayR)de.setUTCDate(de.getUTCDate()-1);
+ const end=de.toISOString().slice(0,10);de.setUTCDate(de.getUTCDate()-29);const from=de.toISOString().slice(0,10);
+ let s30=0,first="";for(const r of h)if(isRew(r)){const d=day(r.ts);if(!first||d<first)first=d;if(d>=from&&d<=end)s30+=Number(r.delta);}
+ const span=first?Math.min(30,Math.round((Date.parse(end)-Date.parse(first>from?first:from))/864e5)+1):0;
+ const avg30=span>0?s30/span/1e8:0,base=e8(n.stake);
+ const apy=span>=30&&base>0?(Math.pow(1+avg30/base,365)-1)*100:0;
+ return {h,cap:cap/1e8,rew:rew/1e8,avg:avg30,today:todayR/1e8,mat:mat/1e8,stake:base,apy};
 }
 function wtnStats(p){
  const s=D.wtn.filter(x=>x.pid===p.id).sort((a,b)=>Number(a.date-b.date));let earned=0,todayR=0;const ev=[];

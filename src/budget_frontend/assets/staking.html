@@ -33,7 +33,7 @@ dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
 
 <section><h2>Aktywa</h2><table><thead><tr><th>Aktywo</th><th>Stake</th><th class="hm">Dzis</th><th class="hm">Sr. 7d</th><th class="hm">Sr. 30d</th><th class="hm">Sr. 3m</th><th class="hm">Sr. 6m</th><th class="hm">Sr. 9m</th><th class="hm">Sr. rok</th><th>APY 30d</th><th>Nagrody lacznie</th><th>Wartosc <span class="cu">PLN</span></th></tr></thead><tbody id="ta"></tbody></table></section>
 
-<section><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">Neurony ICP</h2><div style="display:flex;align-items:center;gap:10px"><label class="note" style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="h0"> Ukryj puste (stake 0)<span id="h0c"></span></label><button id="an" type="button">Dodaj neuron</button></div></div>
+<section><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">Neurony ICP</h2><div style="display:flex;align-items:center;gap:10px"><label class="note" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap"><input type="checkbox" id="h0"> Ukryj puste (stake 0)<span id="h0c"></span></label><button id="an" type="button">Dodaj neuron</button></div></div>
 <p class="note">Sync czyta neuron z NNS Governance - canister backendu Budzetu (<code>tj3o4-rqaaa-aaaac-bgdmq-cai</code>) musi byc hotkeyem neuronu.</p>
 <table style="margin-top:8px"><thead><tr><th>Neuron</th><th>Stake ICP</th><th>Dojrzalosc</th><th class="hm">Kapital</th><th>Nagrody</th><th class="hm">Sr. dzienna 30d</th><th>APY 30d</th><th>Sync</th><th></th></tr></thead><tbody id="tn"></tbody></table></section>
 
@@ -97,22 +97,23 @@ const prog=t=>{$("prog").textContent=t||"";};
 // nagroda = wzrost dojrzalosci (takze w odczycie z dopłata do stake)
 const isRew=r=>(r.ev==="normalGrowth"||r.ev==="externalTopUp")&&r.delta>0n;
 function neuronStats(n){
- const h=D.rewards.filter(r=>r.nid===n.id);let cap=Number(n.initStake),rew=0,pos=0,cnt=0,todayR=0,rates=[];
+ // APY 30d: suma (nagroda / baza) z odczytow w oknie 30 dni / liczba dni tych przedzialow; baza = stake (kapital + scalona dojrzalosc) + staked maturity
+ const h=D.rewards.filter(r=>r.nid===n.id);let cap=Number(n.initStake),base=cap,rew=0,cnt=0,todayR=0,rs=0,dd=0,w30=0,prev=null;
+ const t30=Date.now()-30*864e5;
  for(const r of h){
-  if(r.ev==="externalTopUp"||r.ev==="neuronMerge")cap+=Number(r.sd);
-  const g=isRew(r);
+  const g=isRew(r),ms=Number(r.ts/1000000n);
+  if(prev&&ms>=t30&&(g||(r.delta===0n&&r.ev!=="neuronMerge"))){
+   const dt=(ms-Number(prev.ts/1000000n))/864e5,b=base+Number(prev.sm);
+   if(dt>0&&b>0){rs+=Number(r.delta)/b;dd+=dt;if(g)w30+=Number(r.delta);}
+  }
+  if(r.ev==="externalTopUp"||r.ev==="neuronMerge"){cap+=Number(r.sd);base+=Number(r.sd);}
+  else if(r.ev==="mergedToStake")base+=Number(r.sd);
   if(g){rew+=Number(r.delta);cnt++;if(day(r.ts)===today)todayR+=Number(r.delta);}
-  rates.push(g&&cap>0?Number(r.delta)/cap:0);
+  prev=r;
  }
  const last=h[h.length-1],mat=last?Number(last.un)+Number(last.sm):0;
- // 30 dni kalendarzowych (nie 30 odczytow): koniec = dzis, albo wczoraj gdy dzis brak nagrody
- const de=new Date(today+"T12:00:00Z");if(!todayR)de.setUTCDate(de.getUTCDate()-1);
- const end=de.toISOString().slice(0,10);de.setUTCDate(de.getUTCDate()-29);const from=de.toISOString().slice(0,10);
- let s30=0,first="";for(const r of h)if(isRew(r)){const d=day(r.ts);if(!first||d<first)first=d;if(d>=from&&d<=end)s30+=Number(r.delta);}
- const span=first?Math.min(30,Math.round((Date.parse(end)-Date.parse(first>from?first:from))/864e5)+1):0;
- const avg30=span>0?s30/span/1e8:0,base=e8(n.stake);
- const apy=span>=30&&base>0?(Math.pow(1+avg30/base,365)-1)*100:0;
- return {h,cap:cap/1e8,rew:rew/1e8,avg:avg30,today:todayR/1e8,mat:mat/1e8,stake:base,apy};
+ const apy=dd>=3?(Math.pow(1+rs/dd,365)-1)*100:0;
+ return {h,cap:cap/1e8,rew:rew/1e8,avg:dd>=1?w30/dd/1e8:(cnt?rew/cnt/1e8:0),today:todayR/1e8,mat:mat/1e8,stake:e8(n.stake),apy};
 }
 function wtnStats(p){
  const s=D.wtn.filter(x=>x.pid===p.id).sort((a,b)=>Number(a.date-b.date));let earned=0,todayR=0;const ev=[];
@@ -175,7 +176,7 @@ function render(){
   t.style.left=(bb.left-mr.left+bb.width/2)+"px";t.style.top=(bb.top-mr.top)+"px";};
  mb.onpointerleave=()=>{mb.querySelector(".tip")?.remove();mb.querySelectorAll("rect.hv").forEach(x=>x.classList.remove("hv"));};
  // aktywa
- const nRew=N.reduce((a,x)=>a+x.s.rew,0),capN=N.reduce((a,x)=>a+x.s.cap,0),apyN=capN?N.reduce((a,x)=>a+x.s.apy*x.s.cap,0)/capN:0;
+ const nRew=N.reduce((a,x)=>a+x.s.rew,0),capN=N.reduce((a,x)=>a+(x.s.apy>0?x.s.stake+x.s.mat:0),0),apyN=capN?N.reduce((a,x)=>a+(x.s.apy>0?x.s.apy*(x.s.stake+x.s.mat):0),0)/capN:0;
  const capW=W.reduce((a,x)=>a+x.s.paid,0),apyW=capW?W.reduce((a,x)=>a+x.s.apy*x.s.paid,0)/capW:0;
  const row=(nm,stake,u,t,a7,a30,apy,tr,v,k)=>`<tr><td><b>${nm}</b></td><td>${f(stake,2)} ${u}</td><td class="hm">${t?f(t,4):"–"}</td><td class="hm">${a7?f(a7,4):"–"}</td><td class="hm">${a30?f(a30,4):"–"}</td>${[90,180,270,365].map(n=>{const a=avg(k,n);return `<td class="hm">${a?f(a,4):"–"}</td>`;}).join("")}<td>${pct(apy)}</td><td>${f(tr,3)} ${u}</td><td>${zl(v)}</td></tr>`;
  // srednia dzienna: suma z ostatnich n dni kalendarzowych / n (krocej, jesli historia jest krotsza)

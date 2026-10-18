@@ -479,6 +479,19 @@ persistent actor Budget {
     #ok("usunieto")
   };
 
+  // oznaczenie odczytu jako merge neuronow (nie liczy sie do nagrod) / cofniecie
+  public shared (msg) func stRewardToggleMerge(nid : Nat64, ts : Int) : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    var out = "";
+    stRewards := Array.map<StRew, StRew>(stRewards, func(x) {
+      if (x.nid == nid and x.ts == ts) {
+        let ev = if (x.ev == "neuronMerge") { if (x.sd > 0) "externalTopUp" else "normalGrowth" } else "neuronMerge";
+        out := ev; { x with ev }
+      } else x
+    });
+    if (out == "") #err("brak odczytu") else #ok(out)
+  };
+
   public shared (msg) func stWtnPosPut(id : Nat, name : Text, start : Int) : async Result.Result<Nat, Text> {
     if (not stCan(msg.caller)) return #err("Brak dostepu");
     if (name.size() > 80) return #err("Za dluga nazwa");
@@ -1252,6 +1265,7 @@ persistent actor Budget {
       #stNeuronPut : () -> StNeuron;
       #stNeuronRemove : () -> Nat64;
       #stRewardDelete : () -> (Nat64, Int);
+      #stRewardToggleMerge : () -> (Nat64, Int);
       #stRewardsImport : () -> [StRew];
       #stExtImport : () -> [StExt];
       #stExtClaim : () -> (Text, Text, Nat);
@@ -1285,7 +1299,7 @@ persistent actor Budget {
       case (#sgAll _ or #sgPosDelete _ or #sgRunNow _ or #sgSetMail _ or #sgTestMail _) { stCan(caller) };
       case (#stTransform _) { false };
       case (#stRewardsImport _ or #stWtnPut _ or #stExtImport _) { stCan(caller) and arg.size() <= 1_900_000 };
-      case (#stAll _ or #stNeuronPut _ or #stNeuronRemove _ or #stRewardDelete _ or #stWtnDelete _ or #stWtnPosPut _ or #stWtnPosRemove _ or #stSyncNow _ or #stSyncNeurons _) { stCan(caller) };
+      case (#stAll _ or #stNeuronPut _ or #stNeuronRemove _ or #stRewardDelete _ or #stRewardToggleMerge _ or #stWtnDelete _ or #stWtnPosPut _ or #stWtnPosRemove _ or #stSyncNow _ or #stSyncNeurons _) { stCan(caller) };
       case (_) { true };
     }
   };

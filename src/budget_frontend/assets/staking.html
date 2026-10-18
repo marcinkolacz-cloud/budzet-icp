@@ -73,7 +73,7 @@ const idl=({IDL})=>{
  const All=IDL.Record({neurons:IDL.Vec(N),rewards:IDL.Vec(R),wtnPos:IDL.Vec(WP),wtn:IDL.Vec(W),ext:IDL.Vec(E),prices:IDL.Vec(P),sync:IDL.Vec(S),lastRun:IDL.Int,log:IDL.Text,nextRunSec:IDL.Nat,hasKey:IDL.Bool});
  const RT=IDL.Variant({ok:IDL.Text,err:IDL.Text}),RN=IDL.Variant({ok:IDL.Nat,err:IDL.Text});
  return IDL.Service({stAll:IDL.Func([],[All],["query"]),stNeuronPut:IDL.Func([N],[RT],[]),stNeuronRemove:IDL.Func([IDL.Nat64],[RT],[]),
-  stRewardsImport:IDL.Func([IDL.Vec(R)],[RN],[]),stRewardDelete:IDL.Func([IDL.Nat64,IDL.Int],[RT],[]),
+  stRewardsImport:IDL.Func([IDL.Vec(R)],[RN],[]),stRewardDelete:IDL.Func([IDL.Nat64,IDL.Int],[RT],[]),stRewardToggleMerge:IDL.Func([IDL.Nat64,IDL.Int],[RT],[]),
   stWtnPosPut:IDL.Func([IDL.Nat,IDL.Text,IDL.Int],[RN],[]),stWtnPosRemove:IDL.Func([IDL.Nat],[RT],[]),
   stWtnPut:IDL.Func([IDL.Vec(W)],[RN],[]),stWtnDelete:IDL.Func([IDL.Nat,IDL.Int],[RT],[]),
   stExtImport:IDL.Func([IDL.Vec(E)],[RN],[]),stSyncNow:IDL.Func([],[RT],[]),stSyncNeurons:IDL.Func([],[RT],[])});
@@ -99,7 +99,7 @@ const isRew=r=>(r.ev==="normalGrowth"||r.ev==="externalTopUp")&&r.delta>0n;
 function neuronStats(n){
  const h=D.rewards.filter(r=>r.nid===n.id);let cap=Number(n.initStake),rew=0,pos=0,cnt=0,todayR=0,rates=[];
  for(const r of h){
-  if(r.ev==="externalTopUp")cap+=Number(r.sd);
+  if(r.ev==="externalTopUp"||r.ev==="neuronMerge")cap+=Number(r.sd);
   const g=isRew(r);
   if(g){rew+=Number(r.delta);cnt++;if(day(r.ts)===today)todayR+=Number(r.delta);}
   rates.push(g&&cap>0?Number(r.delta)/cap:0);
@@ -224,7 +224,7 @@ function renderHist(dm,N,W){
   head="<tr><th>Data</th><th>Neuron</th><th>Zdarzenie</th><th>Zmiana</th><th>Dojrzalosc</th><th class=\"hm\">Stake +</th><th></th></tr>";
   const nm=id=>(D.neurons.find(n=>n.id===id)||{}).name||String(id);
   rows=D.rewards.filter(r=>inR(day(r.ts))).sort((a,b)=>Number(b.ts-a.ts)).map(r=>`<tr><td>${day(r.ts)}</td><td>${esc(nm(r.nid))}</td><td><span class="tag">${esc(r.ev)}</span></td><td class="${r.delta<0n?"neg":"pos"}">${f(e8(r.delta),4)}</td><td>${f(e8(r.un+r.sm),3)}</td><td class="hm">${r.sd?f(e8(r.sd),3):"–"}</td>
-   <td class="row-act"><button data-dr="${r.nid}|${r.ts}">Usun</button></td></tr>`).join("");
+   <td class="row-act">${r.delta>0n&&(r.ev==="neuronMerge"||isRew(r))?`<button data-mg="${r.nid}|${r.ts}">${r.ev==="neuronMerge"?"Cofnij merge":"Merge"}</button> `:""}<button data-dr="${r.nid}|${r.ts}">Usun</button></td></tr>`).join("");
   note=D.rewards.filter(r=>inR(day(r.ts))).length+" odczytow w okresie.";
  }else if(tab==="wtn"){
   head="<tr><th>Data</th><th>Pozycja</th><th>Zdarzenie</th><th>nICP</th><th>Wplacono</th><th>Wartosc</th><th></th></tr>";
@@ -279,6 +279,7 @@ document.addEventListener("click",e=>{
  else if(ds.rn&&confirm("Usunac neuron "+ds.rn+" razem z cala historia?"))act(async()=>unwrap(await A.stNeuronRemove(BigInt(ds.rn))));
  else if(ds.ew)editWtn(D.wtnPos.find(p=>String(p.id)===ds.ew));
  else if(ds.rw&&confirm("Usunac pozycje WaterNeuron razem z historia?"))act(async()=>unwrap(await A.stWtnPosRemove(BigInt(ds.rw))));
+ else if(ds.mg&&confirm("Przelaczyc oznaczenie merge neuronow?")){const [a,c]=ds.mg.split("|");act(async()=>unwrap(await A.stRewardToggleMerge(BigInt(a),BigInt(c))));}
  else if(ds.dr&&confirm("Usunac odczyt?")){const [a,c]=ds.dr.split("|");act(async()=>unwrap(await A.stRewardDelete(BigInt(a),BigInt(c))));}
  else if(ds.dw&&confirm("Usunac odczyt?")){const [a,c]=ds.dw.split("|");act(async()=>unwrap(await A.stWtnDelete(BigInt(a),BigInt(c))));}
 });

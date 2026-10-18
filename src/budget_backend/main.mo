@@ -16,7 +16,6 @@ import Nat32 "mo:base/Nat32";
 import Nat64 "mo:base/Nat64";
 import Int "mo:base/Int";
 import Float "mo:base/Float";
-import ExperimentalCycles "mo:base/ExperimentalCycles";
 import Prim "mo:⛔";
 
 persistent actor Budget {
@@ -279,8 +278,7 @@ persistent actor Budget {
 
   // httpGetRequestBounded: zawsze jawny limit odpowiedzi (4096 B)
   func httpGetRequestBounded(url : Text, headers : [HttpHeader], post : ?Text) : async Text {
-    ExperimentalCycles.add<system>(ST_CYCLES);
-    let r = await IC0.http_request({
+    let r = await (with cycles = ST_CYCLES) IC0.http_request({
       url; max_response_bytes = ?ST_MAX_BYTES;
       headers = Array.append([{ name = "User-Agent"; value = "budzet-icp" }], headers);
       body = switch (post) { case (?b) ?Text.encodeUtf8(b); case null null };
@@ -811,7 +809,7 @@ persistent actor Budget {
     let cid = "b" # Nat.toText(b.id) # "-" # day # "-" # sym # (if (buy) "-B" else "-S") # tag;
     if (Array.find<SgOrd>(sgOrders, func(o) { o.cid == cid }) != null) return "";
     sgOrders := Array.append(sgOrders, [{ cid; bot = b.id; day; sym; buy; req; status = "pending"; tries = 0; msg = ""; at = Time.now() }]);
-    if (sgOrders.size() > 2000) sgOrders := Array.subArray(sgOrders, sgOrders.size() - 2000, 2000);
+    if (sgOrders.size() > 2000) sgOrders := Array.subArray(sgOrders, (sgOrders.size() - 2000 : Nat), 2000);
     "Bot " # b.name # " [REAL]: zlecenie " # (if (buy) "KUPNO " # sym # " " # Float.format(#fix 2, req) # " USD" else "SPRZEDAZ " # sym # " " # Float.format(#fix 6, req)) # "\n"
   };
   var sgTrades : [SgTrade] = [];
@@ -993,7 +991,7 @@ persistent actor Budget {
     let prev : ?SgDay = if (sgDays.size() == 0) null else ?sgDays[sgDays.size() - 1];
     switch (prev) { case (?p) { if (p.day == day) { sgLog := "OK (" # day # " juz zapisany)"; return } }; case null {} };
     sgDays := Array.append(sgDays, [{ day; raw; at = Time.now() }]);
-    if (sgDays.size() > 3000) sgDays := Array.subArray(sgDays, sgDays.size() - 3000, 3000);
+    if (sgDays.size() > 3000) sgDays := Array.subArray(sgDays, (sgDays.size() - 3000 : Nat), 3000);
     let prevRows : [SgRow] = switch (prev) { case (?p) sgParse(p.raw).1; case null [] };
     var botLines = sgBotsStep(day, rows, prevRows);
     botLines #= tbStep(rows);
@@ -1069,7 +1067,7 @@ persistent actor Budget {
   public shared query (msg) func sgLiveAll() : async SgLiveAll {
     if (not stCan(msg.caller)) return { live = false; max = 0; orders = []; owner = false };
     let n = sgOrders.size();
-    { live = sgLive; max = sgLiveMax; orders = if (n > 300) Array.subArray(sgOrders, n - 300, 300) else sgOrders; owner = sgOwner(msg.caller) }
+    { live = sgLive; max = sgLiveMax; orders = if (n > 300) Array.subArray(sgOrders, (n - 300 : Nat), 300) else sgOrders; owner = sgOwner(msg.caller) }
   };
 
   public shared (msg) func sgSetLive(on : Bool, max : Float) : async Result.Result<Text, Text> {
@@ -1154,7 +1152,7 @@ persistent actor Budget {
   public shared query (msg) func sgAll() : async SgAll {
     if (not stCan(msg.caller)) return { days = []; events = []; pos = []; lastRun = 0; log = "Brak dostepu"; nextRunSec = 0; hasKey = false; mail = false };
     let n = sgDays.size();
-    { days = if (n > 400) Array.subArray(sgDays, n - 400, 400) else sgDays; events = sgEvents; pos = sgPos;
+    { days = if (n > 400) Array.subArray(sgDays, (n - 400 : Nat), 400) else sgDays; events = sgEvents; pos = sgPos;
       lastRun = sgLastRun; log = sgLog; nextRunSec = secsToNextAt(SG_AT); hasKey = sgKey != ""; mail = sgMail }
   };
 

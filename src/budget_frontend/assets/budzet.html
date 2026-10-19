@@ -72,6 +72,21 @@
   tr.paid td{background:var(--soft);color:inherit}
   tfoot td{font-weight:700;border-top:2px solid var(--line)}
   @media (max-width:800px) { .stats,.grid,.plist { grid-template-columns:1fr; } .stat strong { font-size:24px; } }
+.row{padding:2px 0;gap:6px;grid-template-columns:1fr 104px 26px}
+  .row.cost{grid-template-columns:minmax(120px,1.5fr) 92px 60px 92px minmax(70px,1fr) 26px}
+  .row input{padding:4px 8px;font-size:13px;border-radius:8px}
+  .row.paid{padding:2px 6px;border-radius:8px}
+  .row summary{padding:2px 6px}
+  .lst{max-height:calc(100vh - 230px);min-height:220px;overflow:auto;margin:0 -6px;padding:0 6px}
+  .lh{display:grid;gap:6px;grid-template-columns:1fr 104px 26px;position:sticky;top:0;z-index:2;background:var(--card);padding:4px 0;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .lh.cost{grid-template-columns:minmax(120px,1.5fr) 92px 60px 92px minmax(70px,1fr) 26px}
+  .lh span:nth-child(2),.lh span:nth-child(4){text-align:right}
+  .qa{display:grid;grid-template-columns:22px 1fr 104px 26px;gap:6px;align-items:center;position:sticky;bottom:0;z-index:2;background:var(--card);border-top:1px dashed var(--line);padding:6px 0 4px}
+  .qa i{font-style:normal;color:var(--muted);text-align:center;font-size:16px}
+  .qa input{padding:5px 8px;font-size:13px;border-radius:8px}
+  .qa button{padding:0;width:26px;height:26px;border-radius:8px}
+  .qa:focus-within{border-top-color:var(--ink)}
+  @media (max-width:800px){.lst{max-height:none}.row.cost,.lh.cost{grid-template-columns:1fr 84px 26px}.row.cost>input:nth-child(n+3){grid-column:span 1}.lh.cost span:nth-child(n+3){display:none}}
 </style>
 <link rel="stylesheet" href="theme.css"><script src="theme.js"></script>
 </head>
@@ -106,10 +121,10 @@
   <div class="grid">
     <section><h2 id="hIn">Wplywy</h2>
       <div class="filt"><input id="qIn" placeholder="Szukaj..." /><select id="mIn"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option></select></div>
-      <div class="note" id="sIn"></div><div id="inList"></div></section>
+      <div class="note" id="sIn"></div><div class="lst"><div class="lh"><span>Nazwa</span><span>Kwota</span><span></span></div><div id="inList"></div><form class="qa" id="qaIn" autocomplete="off"><i>+</i><input placeholder="Dodaj wplyw…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
     <section><h2 id="hEx">Koszty</h2>
       <div class="filt"><input id="qEx" placeholder="Szukaj..." /><input id="nEx" placeholder="Uwaga..." /><select id="mEx"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option><option value="paid">Oplacone</option><option value="unpaid">Nieoplacone</option></select></div>
-      <div class="note" id="sEx"></div><div id="exList"></div></section>
+      <div class="note" id="sEx"></div><div class="lst"><div class="lh cost"><span>Nazwa</span><span>Kwota</span><span>Raty</span><span>Zostalo</span><span>Uwaga</span><span></span></div><div id="exList"></div><form class="qa" id="qaEx" autocomplete="off"><i>+</i><input placeholder="Dodaj koszt…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
   </div>
 </div>
 <div id="viewK" hidden>
@@ -278,7 +293,8 @@ function line(list, kind, i){
   const name=document.createElement("input"); name.className="name"; name.value=key; if(cr||ov){ name.readOnly=true; name.title="Powiazane z zakladka Kredyty"; }
   name.onchange=()=>{ rename(list,i,name.value.trim()); save(); render(); };
   const amt=document.createElement("input"); amt.className="amt"; amt.placeholder="rata"; amt.value=r[key]??""; if(cr){ amt.readOnly=true; amt.title="z harmonogramu"; }
-  amt.onchange=()=>{ r[key]=amt.value; save(); render(); };
+  amt.onchange=()=>{ r[key]=amt.value; save(); render(); }; amt.dataset.k=key; amt.inputMode="decimal";
+  amt.onkeydown=e=>{ if(e.key!=="Enter") return; e.preventDefault(); const box=el.parentElement, all=[...box.querySelectorAll("input.amt:not([readonly])")], nx=all[all.indexOf(amt)+1], k=nx?nx.dataset.k:null; amt.blur(); setTimeout(()=>{ const t=k?box.querySelector('input.amt[data-k="'+CSS.escape(k)+'"]'):box.parentElement.querySelector(".qa input"); if(t){ t.focus(); t.select&&t.select(); } },0); };
   const items=[["zaplacone",()=>{ const on=!r.paid[key]; r.paid[key]=on; if(kind==="ex"&&!cr&&!ov) shiftLoan(key,on?1:-1,num(r[key])); save(); render(); }]];
   if(i>0) items.push(["wyzej",()=>{ [list[i-1],list[i]]=[list[i],list[i-1]]; save(); render(); }]);
   if(i<list.length-1) items.push(["nizej",()=>{ [list[i+1],list[i]]=[list[i],list[i+1]]; save(); render(); }]);
@@ -407,8 +423,13 @@ function nextName(name){
 }
 document.getElementById("delMonth").onclick=()=>{ const r=row(); if(!confirm("Przeniesc do kosza miesiac "+(r.data||"")+"?")) return; toBin("b-month","Miesiac "+(r.data||""),{idx:state.month,row:r}); state.rows.splice(state.month,1); state.month=Math.max(0,state.month-1); save(); render(); };
 function addItem(list,n){ n=n.trim(); if(!n) return; if(list.includes(n)){ state.rows.forEach((rr,ix)=>{ if(ix>=state.month&&rr.del) delete rr.del[n]; }); } else list.push(n); save(); render(); }
-document.getElementById("addIn").onclick=()=>{ const n=prompt("Nazwa przychodu"); if(n) addItem(state.incomes,n); };
-document.getElementById("addEx").onclick=()=>{ const n=prompt("Nazwa kosztu"); if(n) addItem(state.expenses,n); };
+function qaBind(id,get){ const f=$(id), [n,a]=f.querySelectorAll("input"), box=f.parentElement;
+  f.onsubmit=e=>{ e.preventDefault(); const name=n.value.trim(); if(!name) return n.focus(); const v=a.value.trim(); if(v) row()[name]=v; n.value=""; a.value=""; addItem(get(),name); n.focus(); box.scrollTop=box.scrollHeight; };
+  n.onkeydown=e=>{ if(e.key==="Enter"&&n.value.trim()&&!a.value){ e.preventDefault(); a.focus(); } };
+  return ()=>{ box.scrollTop=box.scrollHeight; n.focus(); }; }
+const qaIn=qaBind("qaIn",()=>state.incomes), qaEx=qaBind("qaEx",()=>state.expenses);
+document.getElementById("addIn").onclick=qaIn;
+document.getElementById("addEx").onclick=qaEx;
 document.getElementById("showPeriod").onclick=showPeriod;
 document.getElementById("hidePeriod").onclick=()=>document.getElementById("preview").className="";
 $("xlB").onclick=()=>IO.excel("budzet");

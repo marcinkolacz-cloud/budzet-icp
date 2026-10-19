@@ -703,7 +703,11 @@ persistent actor Budget {
   func stNTick() : async () {
     stNArm<system>();
     stNeuronAt := Time.now();
-    for (n in stNeurons.vals()) { await stSyncNeuron(n) };
+    // automat pomija puste neurony (stake 0 i dojrzalosc 0 w ostatnim odczycie, np. zrodlo merge); reczny sync czyta wszystkie
+    for (n in stNeurons.vals()) { if (not stEmpty(n)) await stSyncNeuron(n) };
+  };
+  func stEmpty(n : StNeuron) : Bool {
+    n.stake == 0 and (switch (stLastRew(n.id)) { case (?r) r.un == 0 and r.sm == 0; case null false })
   };
 
   // reczny sync: czlonek, max raz na 10 min

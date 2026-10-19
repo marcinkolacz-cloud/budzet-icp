@@ -76,9 +76,16 @@
   .row.cost{grid-template-columns:minmax(120px,1.5fr) 92px 60px 92px minmax(70px,1fr) 26px}
   .row input{padding:4px 8px;font-size:13px;border-radius:8px}
   .row.paid{padding:2px 6px;border-radius:8px}
+  .row,.row.paid{position:relative;padding-left:16px}
+  .grip{position:absolute;left:0;top:0;bottom:0;width:14px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:grab;touch-action:none;user-select:none;font-size:12px;letter-spacing:-2px;opacity:.45;transition:opacity .15s}
+  .row:hover .grip{opacity:1}
+  .row.drag{opacity:.55;background:var(--line);border-radius:8px}
+  .row.dt-b{box-shadow:0 -2px 0 var(--ink)}
+  .row.dt-a{box-shadow:0 2px 0 var(--ink)}
+  body.dragging,body.dragging *{cursor:grabbing!important;user-select:none}
   .row summary{padding:2px 6px}
   .lst{max-height:calc(100vh - 230px);min-height:220px;overflow:auto;margin:0 -6px;padding:0 6px}
-  .lh{display:grid;gap:6px;grid-template-columns:1fr 104px 26px;position:sticky;top:0;z-index:2;background:var(--card);padding:4px 0;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .lh{padding-left:16px!important;display:grid;gap:6px;grid-template-columns:1fr 104px 26px;position:sticky;top:0;z-index:2;background:var(--card);padding:4px 0;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
   .lh.cost{grid-template-columns:minmax(120px,1.5fr) 92px 60px 92px minmax(70px,1fr) 26px}
   .lh span:nth-child(2),.lh span:nth-child(4){text-align:right}
   .qa{display:grid;grid-template-columns:22px 1fr 104px 26px;gap:6px;align-items:center;position:sticky;bottom:0;z-index:2;background:var(--card);border-top:1px dashed var(--line);padding:6px 0 4px}
@@ -285,6 +292,28 @@ function shiftLoan(key,d,amt){
   const c=row().ln&&row().ln[key]; if(c) state.loans[key]={...c};
 }
 function menu(items){ const d=document.createElement("details"); const s=document.createElement("summary"); s.textContent="···"; d.append(s); const box=document.createElement("div"); items.forEach(([t,fn])=>{ const b=document.createElement("button"); b.textContent=t; b.onclick=e=>{ e.preventDefault(); d.open=false; fn(); }; box.append(b); }); d.append(box); return d; }
+// zlap i przesun (mysz + dotyk): uchwyt ⋮⋮ po lewej, upuszczenie wstawia przed/po wskazanym wierszu
+function dragRow(e,el,list,key){
+  if(e.button>0) return; e.preventDefault();
+  const box=el.parentElement, sc=box.closest(".lst"); let tgt=null, after=false, raf=0, vy=0;
+  el.classList.add("drag"); document.body.classList.add("dragging"); e.target.setPointerCapture(e.pointerId);
+  const clr=()=>box.querySelectorAll(".dt-a,.dt-b").forEach(x=>x.classList.remove("dt-a","dt-b"));
+  const scroll=()=>{ if(sc&&vy){ sc.scrollTop+=vy; raf=requestAnimationFrame(scroll); } else raf=0; };
+  const mv=ev=>{
+    if(sc){ const b=sc.getBoundingClientRect(); vy=ev.clientY<b.top+30?-8:ev.clientY>b.bottom-30?8:0; if(vy&&!raf) raf=requestAnimationFrame(scroll); }
+    const rows=[...box.children].filter(x=>x.dataset&&x.dataset.k&&x!==el); clr(); tgt=null;
+    for(const x of rows){ const b=x.getBoundingClientRect(); if(ev.clientY>=b.top&&ev.clientY<=b.bottom){ tgt=x; after=ev.clientY>b.top+b.height/2; break; } }
+    if(!tgt&&rows.length){ const f=rows[0].getBoundingClientRect(), l=rows[rows.length-1].getBoundingClientRect(); if(ev.clientY<f.top){ tgt=rows[0]; after=false; } else if(ev.clientY>l.bottom){ tgt=rows[rows.length-1]; after=true; } }
+    if(tgt) tgt.classList.add(after?"dt-a":"dt-b");
+  };
+  const up=()=>{
+    removeEventListener("pointermove",mv); removeEventListener("pointerup",up); removeEventListener("pointercancel",up);
+    vy=0; clr(); el.classList.remove("drag"); document.body.classList.remove("dragging");
+    if(!tgt) return; const tk=tgt.dataset.k, from=list.indexOf(key); if(from<0||tk===key) return;
+    list.splice(from,1); const to=list.indexOf(tk)+(after?1:0); list.splice(to,0,key); save(); render();
+  };
+  addEventListener("pointermove",mv); addEventListener("pointerup",up); addEventListener("pointercancel",up);
+}
 function line(list, kind, i){
   const key=list[i], r=row(); r.paid=r.paid||{};
   state.loans=state.loans||{};
@@ -319,6 +348,8 @@ function line(list, kind, i){
     raty.onchange=keep; calosc.onchange=keep; uwaga.onchange=keep;
     el.append(raty, calosc, uwaga);
   }
+  el.dataset.k=key; const gp=document.createElement("span"); gp.className="grip"; gp.textContent="⋮⋮"; gp.title="Zlap i przesun"; gp.setAttribute("aria-hidden","true");
+  gp.onpointerdown=e=>dragRow(e,el,list,key); el.prepend(gp);
   el.append(menu(items)); return el;
 }
 function fillSelect(id){

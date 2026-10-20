@@ -793,10 +793,11 @@ persistent actor Budget {
     for (s in run.vals()) {
       let sZero = switch (Array.find<StNeuron>(stNeurons, func(n) { n.id == s.nid })) { case (?n) n.stake == 0; case null false };
       if (s.ev == "disburseOrSpawn" and sZero) {
-        switch (Array.find<StRew>(run, func(t) { t.nid != s.nid and t.ev == "externalTopUp" and t.sd > 0 })) {
+        // cel: wzrost stake (merge stake+dojrzalosc) albo sam wzrost dojrzalosci >= ubytek zrodla (merge samej dojrzalosci)
+        switch (Array.find<StRew>(run, func(t) { t.nid != s.nid and ((t.ev == "externalTopUp" and t.sd > 0) or (t.ev == "normalGrowth" and t.delta + s.delta >= 0)) })) {
           case (?t) {
             stRewards := Array.map<StRew, StRew>(stRewards, func(x) {
-              if (x.nid == t.nid and x.ts == t.ts) { { x with ev = "neuronMerge"; delta = x.delta + s.delta } }
+              if (x.nid == t.nid and x.ts == t.ts) { { x with ev = if (x.sd > 0) "neuronMerge" else "normalGrowth"; delta = x.delta + s.delta } }
               else if (x.nid == s.nid and x.ts == s.ts) { { x with ev = "mergeOut" } } else x
             });
           };

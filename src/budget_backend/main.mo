@@ -781,9 +781,29 @@ persistent actor Budget {
     stNeuronAt := Time.now();
     // automat pomija puste neurony (stake 0 i dojrzalosc 0 w ostatnim odczycie, np. zrodlo merge); reczny sync czyta wszystkie
     for (n in stNeurons.vals()) { if (not stEmpty(n)) await stSyncNeuron(n) };
+    stFixMerges(stNeuronAt);
   };
+  // pusty = stake 0, dojrzalosc 0 i brak zmian od 14 dni (NNS dopisuje nagrody zrodlu merge jeszcze kilka dni)
   func stEmpty(n : StNeuron) : Bool {
-    n.stake == 0 and (switch (stLastRew(n.id)) { case (?r) r.un == 0 and r.sm == 0; case null false })
+    n.stake == 0 and (switch (stLastRew(n.id)) { case (?r) r.un == 0 and r.sm == 0 and Time.now() - r.ts > 14 * 86_400_000_000_000; case null false })
+  };
+  // merge w jednym syncu: zrodlo (stake->0, dojrzalosc ubyla) + cel (wzrost stake) => cel "neuronMerge" bez przeniesionej dojrzalosci, zrodlo "mergeOut"
+  func stFixMerges(since : Int) {
+    let run = Array.filter<StRew>(stRewards, func(r) { r.ts >= since });
+    for (s in run.vals()) {
+      let sZero = switch (Array.find<StNeuron>(stNeurons, func(n) { n.id == s.nid })) { case (?n) n.stake == 0; case null false };
+      if (s.ev == "disburseOrSpawn" and sZero) {
+        switch (Array.find<StRew>(run, func(t) { t.nid != s.nid and t.ev == "externalTopUp" and t.sd > 0 })) {
+          case (?t) {
+            stRewards := Array.map<StRew, StRew>(stRewards, func(x) {
+              if (x.nid == t.nid and x.ts == t.ts) { { x with ev = "neuronMerge"; delta = x.delta + s.delta } }
+              else if (x.nid == s.nid and x.ts == s.ts) { { x with ev = "mergeOut" } } else x
+            });
+          };
+          case null {};
+        };
+      };
+    };
   };
 
   // reczny sync: czlonek, max raz na 10 min
@@ -793,6 +813,7 @@ persistent actor Budget {
     if (Time.now() - stNeuronAt < 600_000_000_000) return #err("Odczekaj 10 min od poprzedniego syncu neuronow");
     stNeuronAt := Time.now();
     for (n in stNeurons.vals()) { await stSyncNeuron(n) };
+    stFixMerges(stNeuronAt);
     let bad = Array.filter<StSync>(stSync, func(x) { not x.ok }).size();
     #ok(Nat.toText(stNeurons.size() - bad) # "/" # Nat.toText(stNeurons.size()) # " OK")
   };

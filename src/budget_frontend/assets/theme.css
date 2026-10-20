@@ -91,3 +91,45 @@ html[data-theme] .mnp button.neg{color:var(--neg)}
 /* Gorna belka przyklejona */
 html .topnav{position:sticky;top:0;z-index:9990;margin:-22px calc(-1 * clamp(16px,3vw,40px)) 14px;padding:12px 230px 12px clamp(16px,3vw,40px);background:color-mix(in srgb,var(--bg) 85%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 @media (max-width:640px){html .topnav{margin:-14px -12px 12px;padding:44px 12px 10px}}
+
+/* Uklad v2: spojny naglowek, paski narzedzi, zageszczenie */
+html header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px 24px;margin:0 0 14px;padding:2px 0 14px;border-bottom:1px solid var(--line)}
+html header>div:first-child{min-width:0}
+html header h1{font-size:24px;line-height:1.15}
+html header .sub{font-size:13px;margin-top:3px;max-width:80ch}
+html header>:last-child:not(:first-child){display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center;margin:0}
+html header .nav,html .ctrl .tabs{display:inline-flex;gap:2px;margin:10px 0 0;padding:3px;background:var(--field);border:1px solid var(--line);border-radius:12px}
+html[data-theme] header .nav>a:not(#_),html[data-theme] .ctrl .tabs>button:not(#_){border:0;background:transparent;color:var(--muted);border-radius:9px;padding:5px 12px;font-size:13px}
+html[data-theme] header .nav>a.on:not(#_),html[data-theme] .ctrl .tabs>button.on:not(#_){background:var(--card);color:var(--ink);box-shadow:0 1px 3px #0002;font-weight:600}
+html .ctrl{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px;margin:0 0 12px}
+html .ctrl .tabs{margin:0}
+html .ctrl>select{max-width:220px}
+html .ctrlb{display:flex;align-items:center;gap:8px 12px;flex:1 1 420px;min-width:0;flex-wrap:wrap;padding-left:12px;border-left:1px solid var(--line)}
+html body:has(#viewB[hidden]) .ctrlb{display:none}
+html .ctrl .months{flex:1 1 160px;min-width:0;padding:0;gap:4px;scrollbar-width:thin}
+html .ctrl .months button{padding:5px 11px;font-size:13px;white-space:nowrap}
+html .ctrl .period{margin:0;gap:6px;font-size:13px;flex-wrap:nowrap}
+html .ctrl .period select,html .ctrl .period button{padding:5px 10px;font-size:13px}
+html .stats{gap:10px}
+html body:not(:has(#viewB)) .stats{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+html .stat,html .tile{padding:14px 16px}
+html .stat strong,html .tile strong{font-size:26px;margin-top:4px}
+html section{margin-top:10px;padding:14px 16px}
+html .stats+section,html .stats+.grid{margin-top:10px}
+html section h2{font-size:15px}
+@media (max-width:760px){
+ html header{grid-template-columns:1fr;gap:10px;padding-bottom:12px}
+ html header>:last-child:not(:first-child){justify-content:flex-start}
+ html .ctrl{padding:8px}html .ctrl>select{flex:1 1 auto;max-width:none}
+ html .ctrlb{flex-basis:100%;padding:8px 0 0;border-left:0;border-top:1px solid var(--line)}
+ html .ctrl .period{flex-wrap:wrap}
+ html .stat strong,html .tile strong{font-size:19px}
+}
+/* Uklad v2b: pasek .ctrl na wszystkich kartach */
+html .ctrl .nav,html .ctrl .tabs{display:inline-flex;gap:2px;margin:0;padding:3px;background:var(--field);border:1px solid var(--line);border-radius:12px}
+html[data-theme] .ctrl .nav>a:not(#_){border:0;background:transparent;color:var(--muted);border-radius:9px;padding:5px 12px;font-size:13px}
+html[data-theme] .ctrl .nav>a.on:not(#_){background:var(--card);color:var(--ink);box-shadow:0 1px 3px #0002;font-weight:600}
+html .ctrl .chips{margin:0;flex:1 1 auto}
+html .ctrl #ps{min-width:160px;max-width:240px}
+html .ctrl:has(>.chips:only-child:empty){display:none}
+@media (max-width:760px){html .ctrl #ps{flex:1 1 auto;max-width:none}}

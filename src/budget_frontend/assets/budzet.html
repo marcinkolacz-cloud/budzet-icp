@@ -3,7 +3,7 @@
 <head><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="icon" href="favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1c1915"><meta name="apple-mobile-web-app-title" content="Budzet">
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Budzet</title>
+<title>Budget</title>
 <style>
   :root { --bg:#f3f1ec; --ink:#1c1915; --muted:#7a736a; --card:#fffdf9; --line:#e6e0d6; --soft:#e7f6ee; }
   * { box-sizing:border-box; }
@@ -99,25 +99,25 @@
 </head>
 <body>
 <div class="app">
-<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html" class="on">Budzet</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html">Staking</a><a href="signals.html">Signals</a><a href="kosz.html">Kosz</a></nav>
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html" class="on">Budget</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html">Staking</a><a href="signals.html">Signals</a><a href="kosz.html">Kosz</a></nav>
   <header>
-    <div><h1>Budzet</h1><div class="sub">Miesiac, saldo i zbiorczy podglad okresu.</div><select id="bsel" aria-label="Wybierz budzet" style="margin-top:8px;max-width:260px"></select></div>
+    <div><h1>Budget</h1><div class="sub">Miesiac, saldo i zbiorczy podglad okresu.</div></div>
     <div class="bar">
       <button id="addIn" type="button">Przychod</button>
       <button id="addEx" type="button">Koszt</button>
-      <div class="mnu"><button type="button" class="mnb" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>Wiecej</button><div class="mnp" role="menu" hidden><b>Budzet</b><button id="newB" type="button">Nowy budzet</button><button id="renB" type="button">Zmien nazwe budzetu</button><button id="delB" type="button" class="neg">Usun budzet</button><b>Miesiac</b><button id="addMonth" type="button">Nowy miesiac</button><button id="cloneMonth" type="button">Klonuj na nastepny</button><button id="delMonth" type="button" class="neg">Usun miesiac</button><b>Dane</b><button id="xlB" type="button" title="Eksport budzetu i kredytow do Excela">Eksport Excel</button></div></div>
+      <div class="mnu"><button type="button" class="mnb" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>Wiecej</button><div class="mnp" role="menu" hidden><b>Budget</b><button id="newB" type="button">Nowy budzet</button><button id="renB" type="button">Zmien nazwe budzetu</button><button id="delB" type="button" class="neg">Usun budzet</button><b>Miesiac</b><button id="addMonth" type="button">Nowy miesiac</button><button id="cloneMonth" type="button">Klonuj na nastepny</button><button id="delMonth" type="button" class="neg">Usun miesiac</button><b>Dane</b><button id="xlB" type="button" title="Eksport budzetu i kredytow do Excela">Eksport Excel</button></div></div>
     </div>
   </header>
-  <div class="tabs"><button id="tB" class="on" type="button">Budzet</button><button id="tK" type="button">Kredyty</button></div>
-<div id="viewB">
-  <div class="months" id="months"></div>
+  <div class="ctrl"><select id="bsel" aria-label="Wybierz budzet"></select><div class="tabs"><button id="tB" class="on" type="button">Budget</button><button id="tK" type="button">Kredyty</button></div>
+<div class="ctrlb" id="ctrlB"><div class="months" id="months"></div>
   <div class="period">
     <span>Okres</span>
     <select id="from"></select>
     <span>do</span>
     <select id="to"></select>
     <button id="showPeriod" type="button">Podglad zbiorczy</button>
-  </div>
+  </div></div></div>
+<div id="viewB">
   <div class="stats">
     <div class="stat bal"><span id="balLabel">Zostaje</span><strong id="bal">0 zl</strong></div>
     <div class="stat"><span>Przychod</span><strong id="inc">0 zl</strong><small class="pd" id="pIn"></small></div>

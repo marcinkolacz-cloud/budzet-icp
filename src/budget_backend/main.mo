@@ -236,6 +236,7 @@ persistent actor Budget {
   var stWtnPos : [StWtnPos] = [];
   var stWtn : [StWtn] = [];
   var stExt : [StExt] = [];
+  var stInjWdH : Nat = 0; // INJ: ostatnia wysokosc bloku z policzonymi wyplatami nagrod (0 = wylaczone)
   var stPrices : [StPrice] = [];
   var stSync : [StSync] = [];
   var stNextWtn : Nat = 1;
@@ -253,7 +254,7 @@ persistent actor Budget {
   let NEAR_ARGS = "eyJhY2NvdW50X2lkIjoiNTEwYzQ0ZjA0MWY5OTNmYzM5ZDg2ZjJlNWU2MWQ1MTJiNjZiMjg2OGY1ZmY3NWVlNjVjNGRkMDAyOTRiZDBiMyJ9";
   let NEAR_POOLS : [Text] = ["letsnode.poolv1.near", "astro-stakers.poolv1.near", "optimusvalidatornetwork.poolv1.near", "cryptotribe.poolv1.near", "sigmapool.poolv1.near", "allnodes.poolv1.near"];
   let INJ_ACC = "inj1p8z99lcul38vntv8yzfku5vfpk3sesuf4l5n3g";
-  let INJ_VAL = "injvaloper10xhy8xurfwts9ckjkq0ga92mrjz9txyygymqzp";
+  let INJ_VAL = "injvaloper10xhy8xurfwts9ckjkq0ga92mrjz9txyygymqzp"; // nieuzywane, zostaje dla zgodnosci stable
 
   type HttpHeader = { name : Text; value : Text };
   type HttpResp = { status : Nat; headers : [HttpHeader]; body : Blob };
@@ -283,6 +284,19 @@ persistent actor Budget {
       headers = Array.append([{ name = "User-Agent"; value = "budzet-icp" }], headers);
       body = switch (post) { case (?b) ?Text.encodeUtf8(b); case null null };
       method = switch (post) { case (?_) #post; case null #get };
+      transform = ?{ function = stTransform; context = Blob.fromArray([]) };
+      is_replicated = ?false;
+    });
+    if (r.status >= 300) throw Error.reject("HTTP " # Nat.toText(r.status));
+    switch (Text.decodeUtf8(r.body)) { case (?t) t; case null "" }
+  };
+
+  // GET z wiekszym limitem odpowiedzi (tx search INJ), nadwyzka cykli wraca
+  func httpGetMax(url : Text, maxBytes : Nat64) : async Text {
+    let r = await (with cycles = ST_CYCLES * 5) IC0.http_request({
+      url; max_response_bytes = ?maxBytes;
+      headers = [{ name = "User-Agent"; value = "budzet-icp" }];
+      body = null; method = #get;
       transform = ?{ function = stTransform; context = Blob.fromArray([]) };
       is_replicated = ?false;
     });
@@ -356,9 +370,12 @@ persistent actor Budget {
     }
   };
   // Cosmos: suma "amount":"..." (czesc calkowita = jednostki bazowe inj)
-  func injAmounts(body : Text) : Nat {
+  func injAmounts(body : Text) : Nat { injAmountsAfter(body, "") };
+  // suma pol "amount" od miejsca klucza (np. "\"total\":" w rewards, zeby nie liczyc podwojnie)
+  func injAmountsAfter(body : Text, key : Text) : Nat {
     let h = Iter.toArray(body.chars());
-    var total = 0; var from = 0;
+    var total = 0;
+    var from = if (key == "") 0 else switch (stFind(h, key, 0)) { case (?p) p; case null return 0 };
     label l loop {
       switch (stFind(h, "\"amount\":", from)) {
         case null break l;
@@ -366,6 +383,45 @@ persistent actor Budget {
       };
     };
     total
+  };
+  // INJ: suma wyplaconych nagrod (eventy withdraw_rewards, tylko denom inj) + max wysokosc bloku
+  func injWithdrawn(body : Text) : (Nat, Nat) {
+    let h = Array.filter<Char>(Iter.toArray(body.chars()), func(c) { c != ' ' and c != '\n' and c != '\r' and c != '\t' });
+    var sum = 0; var maxH = 0; var from = 0;
+    label hl loop {
+      switch (stFind(h, "\"height\":\"", from)) {
+        case null break hl;
+        case (?p) { let v = stNatAt(h, p + 10); if (v > maxH) maxH := v; from := p + 10 };
+      };
+    };
+    from := 0;
+    label wl loop {
+      switch (stFind(h, "\"type\":\"withdraw_rewards\"", from)) {
+        case null break wl;
+        case (?p) {
+          from := p + 25;
+          let next = switch (stFind(h, "\"type\":\"", from)) { case (?q) q; case null h.size() };
+          switch (stFind(h, "\"key\":\"amount\",\"value\":\"", from)) {
+            case (?q) { if (q < next) sum += injCoin(h, q + 24) };
+            case null {};
+          };
+        };
+      };
+    };
+    (sum, maxH)
+  };
+  // z "123inj,45peggy0x.." zwraca ilosc inj
+  func injCoin(h : [Char], from : Nat) : Nat {
+    var i = from;
+    while (i < h.size() and h[i] != '\"') {
+      var n = 0;
+      while (i < h.size() and isDigit(h[i])) { n := n * 10 + dval(h[i]); i += 1 };
+      let s = i;
+      while (i < h.size() and h[i] != ',' and h[i] != '\"') i += 1;
+      if (i - s == 3 and h[s] == 'i' and h[s + 1] == 'n' and h[s + 2] == 'j') return n;
+      if (i < h.size() and h[i] == ',') i += 1;
+    };
+    0
   };
   func cgPrice(h : [Char], id : Text) : (Float, Float) {
     switch (stFind(h, "\"" # id # "\":{", 0)) {
@@ -626,12 +682,20 @@ persistent actor Budget {
     #ok("reward " # day # " = " # Int.toText(rw))
   };
 
+  // INJ: start liczenia wyplat nagrod od bloku > h (h = wysokosc tx minus 1; 0 = wylaczone)
+  public shared (msg) func stInjWdHeight(h : Nat) : async Result.Result<Text, Text> {
+    if (not Principal.isController(msg.caller)) return #err("Tylko kontroler");
+    stInjWdH := h;
+    #ok("INJ wyplaty liczone od bloku > " # Nat.toText(h))
+  };
+  public query func stInjWdHeightGet() : async Nat { stInjWdH };
+
   func stLastExt(chain : Text) : ?StExt {
     var f : ?StExt = null;
     for (r in stExt.vals()) { if (r.chain == chain) { switch (f) { case (?x) { if (r.day > x.day) f := ?r }; case null f := ?r } } };
     f
   };
-  func stRecordExt(chain : Text, staked : Nat, pending : Nat, usd : Float, pln : Float) {
+  func stRecordExt(chain : Text, staked : Nat, pending : Nat, claimed : Nat, usd : Float, pln : Float) {
     let now = Time.now(); let day = dayKey(now);
     let reward : Int = switch (stLastExt(chain)) {
       case null 0;
@@ -641,7 +705,8 @@ persistent actor Budget {
           let base : Int = if (p.day == day) p.reward else 0;
           base + (if (d > 0) d else 0)
         } else {
-          let d : Int = pending - p.pending;
+          // nagroda za okres = pending teraz + wyplacone w okresie - pending z poprzedniego syncu
+          let d : Int = pending + claimed - p.pending;
           // d<0 = rewards wyplacone (claim / dopłata do stake) -> liczymy tylko to, co narosło po wyplacie
           if (p.day == day) { p.reward + (if (d >= 0) d else pending) } else if (d >= 0) d else pending
         }
@@ -676,12 +741,23 @@ persistent actor Budget {
         nearOk += 1;
       } catch (e) { log #= pool # ": " # Error.message(e) # "; " };
     };
-    if (nearOk == NEAR_POOLS.size() and near > 0) stRecordExt("near", near, 0, nearP.0, nearP.1) else log #= "NEAR: pominieto zapis; ";
+    if (nearOk == NEAR_POOLS.size() and near > 0) stRecordExt("near", near, 0, 0, nearP.0, nearP.1) else log #= "NEAR: pominieto zapis; ";
     try {
       let base = "https://injective-api.polkachu.com";
-      let st = injAmounts(await httpGetRequestBounded(base # "/cosmos/staking/v1beta1/validators/" # INJ_VAL # "/delegations/" # INJ_ACC, [], null));
-      let pe = injAmounts(await httpGetRequestBounded(base # "/cosmos/distribution/v1beta1/delegators/" # INJ_ACC # "/rewards/" # INJ_VAL, [], null));
-      if (st > 0) stRecordExt("inj", st, pe, injP.0, injP.1) else log #= "INJ: brak stake; ";
+      // wszystkie validatory delegatora (redelegacje bez zmian w kodzie)
+      let st = injAmounts(await httpGetRequestBounded(base # "/cosmos/staking/v1beta1/delegations/" # INJ_ACC, [], null));
+      let pe = injAmountsAfter(await httpGetRequestBounded(base # "/cosmos/distribution/v1beta1/delegators/" # INJ_ACC # "/rewards", [], null), "\"total\":");
+      var claimed = 0; var wdOk = true;
+      if (stInjWdH > 0) {
+        try {
+          let q = "withdraw_rewards.delegator%3D%27" # INJ_ACC # "%27%20AND%20tx.height%3E" # Nat.toText(stInjWdH);
+          let (c, mh) = injWithdrawn(await httpGetMax("https://sentry.lcd.injective.network/cosmos/tx/v1beta1/txs?query=" # q # "&order_by=ORDER_BY_ASC&page=1&limit=20", 300_000));
+          claimed := c;
+          if (mh > stInjWdH) stInjWdH := mh;
+        } catch (e) { wdOk := false; log #= "INJ wyplaty: " # Error.message(e) # "; " };
+      };
+      if (not wdOk) log #= "INJ: pominieto zapis; "
+      else if (st > 0) stRecordExt("inj", st, pe, claimed, injP.0, injP.1) else log #= "INJ: brak stake; ";
     } catch (e) { log #= "INJ: " # Error.message(e) # "; " };
     ignore NEAR_ACC;
     stLog := if (log == "") "OK" else log;
@@ -1271,6 +1347,8 @@ persistent actor Budget {
       #stRewardsImport : () -> [StRew];
       #stExtImport : () -> [StExt];
       #stExtClaim : () -> (Text, Text, Nat);
+      #stInjWdHeight : () -> Nat;
+      #stInjWdHeightGet : () -> ();
       #stSetKey : () -> Text;
       #stSyncNow : () -> ();
       #stSyncNeurons : () -> ();
@@ -1293,6 +1371,7 @@ persistent actor Budget {
       case (#sgLiveAll _) { stCan(caller) };
       case (#sgOrdRetry _ or #sgBalance _) { Principal.isController(caller) or isAdmin(caller) };
       case (#tbAll _) { Principal.isController(caller) or isAdmin(caller) };
+      case (#stInjWdHeight _) { Principal.isController(caller) };
       case (#stExtClaim _) { Principal.isController(caller) and arg.size() <= 500 };
       case (#tbPut _) { (Principal.isController(caller) or isAdmin(caller)) and arg.size() <= 2_000 };
       case (#sgBotPut _ or #sgBotPut2 _) { stCan(caller) and arg.size() <= 2_000 };

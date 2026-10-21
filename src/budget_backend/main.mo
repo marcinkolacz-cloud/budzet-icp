@@ -385,7 +385,8 @@ persistent actor Budget {
     total
   };
   // INJ: suma wyplaconych nagrod (eventy withdraw_rewards, tylko denom inj) + max wysokosc bloku
-  func injWithdrawn(body : Text) : (Nat, Nat) {
+  // suma wyplat z tx o czasie (UTC ISO) > after; wyplaty sprzed poprzedniego syncu sa juz w jego pending
+  func injWithdrawn(body : Text, after : Text) : (Nat, Nat) {
     let h = Array.filter<Char>(Iter.toArray(body.chars()), func(c) { c != ' ' and c != '\n' and c != '\r' and c != '\t' });
     var sum = 0; var maxH = 0; var from = 0;
     label hl loop {
@@ -394,21 +395,43 @@ persistent actor Budget {
         case (?p) { let v = stNatAt(h, p + 10); if (v > maxH) maxH := v; from := p + 10 };
       };
     };
-    from := 0;
-    label wl loop {
-      switch (stFind(h, "\"type\":\"withdraw_rewards\"", from)) {
-        case null break wl;
-        case (?p) {
-          from := p + 25;
-          let next = switch (stFind(h, "\"type\":\"", from)) { case (?q) q; case null h.size() };
-          switch (stFind(h, "\"key\":\"amount\",\"value\":\"", from)) {
-            case (?q) { if (q < next) sum += injCoin(h, q + 24) };
-            case null {};
+    // segmenty tx: od "timestamp" do nastepnego "timestamp" (eventy sa po timestamp)
+    var ts = stFind(h, "\"timestamp\":\"", 0);
+    label tl loop {
+      switch (ts) {
+        case null break tl;
+        case (?t) {
+          let st = t + 13;
+          var iso = ""; var i = st;
+          while (i < h.size() and i < st + 19) { iso #= Text.fromChar(h[i]); i += 1 };
+          let nextTs = stFind(h, "\"timestamp\":\"", st);
+          let end = switch (nextTs) { case (?q) q; case null h.size() };
+          if (iso > after) {
+            var f = st;
+            label wl loop {
+              switch (stFind(h, "\"type\":\"withdraw_rewards\"", f)) {
+                case null break wl;
+                case (?p) {
+                  if (p >= end) break wl;
+                  f := p + 25;
+                  let next = switch (stFind(h, "\"type\":\"", f)) { case (?q) q; case null h.size() };
+                  switch (stFind(h, "\"key\":\"amount\",\"value\":\"", f)) {
+                    case (?q) { if (q < next and q < end) sum += injCoin(h, q + 24) };
+                    case null {};
+                  };
+                };
+              };
+            };
           };
+          ts := nextTs;
         };
       };
     };
     (sum, maxH)
+  };
+  func isoUtc(ns : Int) : Text {
+    let s = (ns / 1_000_000_000) % 86_400;
+    dayKey(ns) # "T" # pad2(Int.abs(s / 3600)) # ":" # pad2(Int.abs((s % 3600) / 60)) # ":" # pad2(Int.abs(s % 60))
   };
   // z "123inj,45peggy0x.." zwraca ilosc inj
   func injCoin(h : [Char], from : Nat) : Nat {
@@ -682,6 +705,18 @@ persistent actor Budget {
     #ok("reward " # day # " = " # Int.toText(rw))
   };
 
+  // reczna korekta nagrody dnia (e8/e18 jak w danych)
+  public shared (msg) func stExtSetReward(chain : Text, day : Text, reward : Int) : async Result.Result<Text, Text> {
+    if (not Principal.isController(msg.caller)) return #err("Tylko kontroler");
+    if (Array.find<StExt>(stExt, func(x) { x.chain == chain and x.day == day }) == null) return #err("Brak wpisu");
+    stExt := Array.map<StExt, StExt>(stExt, func(x) { if (x.chain == chain and x.day == day) { { x with reward } } else x });
+    #ok("ok")
+  };
+  public query func stExtGet(chain : Text, n : Nat) : async [StExt] {
+    let a = Array.filter<StExt>(stExt, func(x) { x.chain == chain });
+    let k : Nat = if (a.size() > n) (a.size() - n : Nat) else 0;
+    Array.subArray<StExt>(a, k, (a.size() - k : Nat))
+  };
   // INJ: start liczenia wyplat nagrod od bloku > h (h = wysokosc tx minus 1; 0 = wylaczone)
   public shared (msg) func stInjWdHeight(h : Nat) : async Result.Result<Text, Text> {
     if (not Principal.isController(msg.caller)) return #err("Tylko kontroler");
@@ -750,8 +785,18 @@ persistent actor Budget {
       var claimed = 0; var wdOk = true;
       if (stInjWdH > 0) {
         try {
-          let q = "withdraw_rewards.delegator%3D%27" # INJ_ACC # "%27%20AND%20tx.height%3E" # Nat.toText(stInjWdH);
-          let (c, mh) = injWithdrawn(await httpGetMax("https://sentry.lcd.injective.network/cosmos/tx/v1beta1/txs?query=" # q # "&order_by=ORDER_BY_ASC&page=1&limit=20", 300_000));
+          // Injective: event withdraw_rewards nie ma atrybutu delegator -> szukamy tx wyslanych przez konto
+          // bez filtra wysokosci (publicnode zwraca 0 dla AND); filtr po czasie tx > poprzedni sync w injWithdrawn
+          let q = "message.sender%3D%27" # INJ_ACC # "%27";
+          // kolejne LCD przy bledzie (sentry bywa 500)
+          let path = "/cosmos/tx/v1beta1/txs?query=" # q # "&order_by=ORDER_BY_DESC&page=1&limit=20";
+          var body : ?Text = null; var lastErr = "";
+          for (h in ["https://sentry.lcd.injective.network", "https://injective-rest.publicnode.com", "https://injective-api.polkachu.com"].vals()) {
+            if (body == null) {
+              try { body := ?(await httpGetMax(h # path, 300_000)) } catch (e) { lastErr #= Error.message(e) # " "; };
+            };
+          };
+          let (c, mh) = switch (body) { case (?t) injWithdrawn(t, switch (stLastExt("inj")) { case (?p) isoUtc(p.at); case null "" }); case null throw Error.reject(lastErr) };
           claimed := c;
           if (mh > stInjWdH) stInjWdH := mh;
         } catch (e) { wdOk := false; log #= "INJ wyplaty: " # Error.message(e) # "; " };
@@ -1369,6 +1414,8 @@ persistent actor Budget {
       #stRewardsImport : () -> [StRew];
       #stExtImport : () -> [StExt];
       #stExtClaim : () -> (Text, Text, Nat);
+      #stExtGet : () -> (Text, Nat);
+      #stExtSetReward : () -> (Text, Text, Int);
       #stInjWdHeight : () -> Nat;
       #stInjWdHeightGet : () -> ();
       #stSetKey : () -> Text;
@@ -1395,6 +1442,8 @@ persistent actor Budget {
       case (#tbAll _) { Principal.isController(caller) or isAdmin(caller) };
       case (#stInjWdHeight _) { Principal.isController(caller) };
       case (#stExtClaim _) { Principal.isController(caller) and arg.size() <= 500 };
+      case (#stExtSetReward _) { Principal.isController(caller) and arg.size() <= 500 };
+      case (#stExtGet _) { true };
       case (#tbPut _) { (Principal.isController(caller) or isAdmin(caller)) and arg.size() <= 2_000 };
       case (#sgBotPut _ or #sgBotPut2 _) { stCan(caller) and arg.size() <= 2_000 };
       case (#sgBotsAll _ or #sgBotStop _ or #sgBotDelete _) { stCan(caller) };

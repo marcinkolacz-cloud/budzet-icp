@@ -114,7 +114,8 @@ function neuronStats(n){
  }
  const last=h[h.length-1],mat=last?Number(last.un)+Number(last.sm):0;
  const apy=dd>=3?(Math.pow(1+rs/dd,365)-1)*100:0;
- return {h,cap:cap/1e8,rew:rew/1e8,avg:dd>=1?w30/dd/1e8:(cnt?rew/cnt/1e8:0),today:todayR/1e8,mat:mat/1e8,stake:e8(n.stake),apy};
+ // stake 0 (zrodlo merge / disburse): kapital przeszedl gdzie indziej
+ return {h,cap:Number(n.stake)===0?0:cap/1e8,rew:rew/1e8,avg:dd>=1?w30/dd/1e8:(cnt?rew/cnt/1e8:0),today:todayR/1e8,mat:mat/1e8,stake:e8(n.stake),apy};
 }
 function wtnStats(p){
  const s=D.wtn.filter(x=>x.pid===p.id).sort((a,b)=>Number(a.date-b.date));let earned=0,todayR=0;const ev=[];

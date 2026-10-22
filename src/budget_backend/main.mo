@@ -278,6 +278,16 @@ persistent actor Budget {
   };
 
   // httpGetRequestBounded: zawsze jawny limit odpowiedzi (4096 B)
+  let NEAR_RPCS : [Text] = ["https://free.rpc.fastnear.com", "https://rpc.mainnet.near.org", "https://near.lava.build"];
+  func nearRpc(body : Text) : async Text {
+    var err = "";
+    for (u in NEAR_RPCS.vals()) {
+      try { return await httpGetRequestBounded(u, [{ name = "Content-Type"; value = "application/json" }], ?body) }
+      catch (e) { err := Error.message(e) };
+    };
+    throw Error.reject(err);
+  };
+
   func httpGetRequestBounded(url : Text, headers : [HttpHeader], post : ?Text) : async Text {
     let r = await (with cycles = ST_CYCLES) IC0.http_request({
       url; max_response_bytes = ?ST_MAX_BYTES;
@@ -772,7 +782,7 @@ persistent actor Budget {
     for (pool in NEAR_POOLS.vals()) {
       let body = "{\"jsonrpc\":\"2.0\",\"id\":\"1\",\"method\":\"query\",\"params\":{\"request_type\":\"call_function\",\"finality\":\"final\",\"account_id\":\"" # pool # "\",\"method_name\":\"get_account_total_balance\",\"args_base64\":\"" # NEAR_ARGS # "\"}}";
       try {
-        near += nearYocto(await httpGetRequestBounded("https://rpc.mainnet.near.org", [{ name = "Content-Type"; value = "application/json" }], ?body));
+        near += nearYocto(await nearRpc(body));
         nearOk += 1;
       } catch (e) { log #= pool # ": " # Error.message(e) # "; " };
     };

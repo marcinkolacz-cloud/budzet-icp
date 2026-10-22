@@ -38,6 +38,10 @@
   details button { border:0; background:#fff; text-align:left; padding:6px 8px; border-radius:8px; }
   .bar { display:flex; gap:8px; flex-wrap:wrap; }
   #preview { display:none; margin-top:12px; }
+  #kPrev { margin-top:12px; } #kPrev[hidden]{display:none}
+  .kp { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
+  .kp div { border:1px solid #f0ebe3; border-radius:10px; padding:10px 12px; display:grid; gap:2px; font-size:13px; }
+  .kp b { font-size:14px; } .kp small { color:#8a8278; }
   #preview.open { display:block; }
   .plist { display:grid; grid-template-columns:1fr 1fr; gap:8px 18px; }
   .plist div { display:flex; justify-content:space-between; border-bottom:1px solid #f0ebe3; padding:6px 0; }
@@ -123,6 +127,7 @@
     <div class="stat"><span>Przychod</span><strong id="inc">0 zl</strong><small class="pd" id="pIn"></small></div>
     <div class="stat"><span>Wydatki</span><strong id="out">0 zl</strong><small class="pd" id="pEx"></small></div>
   </div>
+  <section id="kPrev" hidden><h2>Kredyty</h2><div class="kp" id="kPrevList"></div></section>
   <section id="preview"><h2 id="previewTitle">Podglad</h2>
     <button id="hidePeriod" type="button">Zamknij podglad</button><div class="plist" id="previewList"></div></section>
   <div class="grid">
@@ -352,10 +357,41 @@ function line(list, kind, i){
   gp.onpointerdown=e=>dragRow(e,el,list,key); el.prepend(gp);
   el.append(menu(items)); return el;
 }
+// okres: miesiace budzetu + przyszle/przeszle miesiace z harmonogramow kredytow (wirtualne, tylko raty)
+let PIT=[];
+function periodItems(){
+  const it=state.rows.map((r,i)=>({lab:r.data||("miesiac "+(i+1)),ym:ymOf(r.data),i}));
+  const have=new Set(it.map(x=>x.ym).filter(Boolean));
+  state.credits.forEach(c=>c.schedule.forEach(x=>{ const ym=x.date.slice(0,7); if(!have.has(ym)){ have.add(ym); it.push({lab:MON[+ym.slice(5)-1]+"-"+ym.slice(2,4),ym,i:-1}); } }));
+  const key=x=>x.ym||("0000-"+String(x.i).padStart(5,"0"));
+  return it.sort((a,b)=>key(a)<key(b)?-1:key(a)>key(b)?1:0);
+}
+function itemRow(x){
+  if(x.i>=0) return state.rows[x.i];
+  const r={data:x.lab,paid:{}};
+  state.credits.forEach(c=>{ const e=entriesFor(c,x.ym); if(e.length) r[c.name]=Math.round(e.reduce((a,y)=>a+y.rata,0)*100)/100; });
+  return r;
+}
 function fillSelect(id){
-  const sel=document.getElementById(id); const cur=sel.value; sel.innerHTML="";
-  state.rows.forEach((item,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=item.data||("miesiac "+(i+1)); sel.append(o); });
-  if (cur!=="" && state.rows[cur]) sel.value=cur;
+  const sel=document.getElementById(id); const cur=sel.value?PIT[+sel.value]:null; sel.innerHTML="";
+  PIT.forEach((x,j)=>{ const o=document.createElement("option"); o.value=j; o.textContent=x.lab+(x.i<0?" (kredyt)":""); sel.append(o); });
+  const j=cur?PIT.findIndex(x=>x.lab===cur.lab&&x.i===cur.i):-1;
+  sel.value=j>=0?j:Math.max(0,PIT.findIndex(x=>x.i===state.month));
+}
+function renderKPrev(){
+  const box=$("kPrev"), host=$("kPrevList"); host.innerHTML=""; box.hidden=!state.credits.length; if(!state.credits.length) return;
+  const T=todayIso();
+  state.credits.forEach(c=>{
+    const pm=new Set(state.rows.filter(rr=>rr.paid&&rr.paid[c.name]).map(rr=>ymOf(rr.data)).filter(Boolean)), done=x=>x.date<T||pm.has(x.date.slice(0,7));
+    const past=c.schedule.filter(done), fut=c.schedule.filter(x=>!done(x)), next=fut[0], last=c.schedule[c.schedule.length-1];
+    const left=past.length?past[past.length-1].saldo:(c.schedule[0].saldo+c.schedule[0].kap);
+    const d=document.createElement("div");
+    d.innerHTML="<b></b><span></span><small></small>";
+    d.children[0].textContent=c.name+(c.meta.typ?" · "+c.meta.typ:"");
+    d.children[1].textContent=next?"Nastepna rata "+dmy(next.date)+" · "+zl2(next.rata):"Splacony";
+    d.children[2].textContent="Zostalo "+zl2(left)+" · raty "+past.length+"/"+c.schedule.length+" · koniec "+dmy(last.date);
+    host.append(d);
+  });
 }
 function render(){
   if(!state.rows.length) state.rows.push({data:"nowy", paid:{}});
@@ -364,7 +400,7 @@ function render(){
   const r=row();
   const months=document.getElementById("months"); months.innerHTML="";
   state.rows.forEach((item,i)=>{ const b=document.createElement("button"); b.textContent=item.data||"miesiac"; if(i===state.month) b.className="on"; b.onclick=()=>{ state.month=i; save(); render(); }; months.append(b); });
-  fillSelect("from"); fillSelect("to");
+  PIT=periodItems(); fillSelect("from"); fillSelect("to"); renderKPrev();
   document.getElementById("inList").innerHTML="";
   const shown={in:0,ex:0}, sums={in:0,ex:0};
   state.incomes.forEach((k,i)=>{ if(!passes("in",k,r)) return; shown.in++; sums.in+=num(r[k]); document.getElementById("inList").append(line(state.incomes,"in",i)); });
@@ -414,11 +450,11 @@ $("tB").onclick=()=>setTab("B"); $("tK").onclick=()=>setTab("K");
 function showPeriod(){
   let a=+document.getElementById("from").value, b=+document.getElementById("to").value;
   if(a>b) [a,b]=[b,a];
-  const slice=state.rows.slice(a,b+1);
+  const its=PIT.slice(a,b+1), slice=its.map(itemRow);
   const sumKey=(k,kind)=>slice.reduce((s,r)=>s+(!kind||passes(kind,k,r)?num(r[k]):0),0);
   const inn=state.incomes.reduce((s,k)=>s+sumKey(k,"in"),0), out=state.expenses.reduce((s,k)=>s+sumKey(k,"ex"),0);
   document.getElementById("preview").className="open";
-  document.getElementById("previewTitle").textContent="Okres "+(state.rows[a].data||"")+" – "+(state.rows[b].data||"")+" · "+slice.length+" mies.";
+  document.getElementById("previewTitle").textContent="Okres "+PIT[a].lab+" – "+PIT[b].lab+" · "+slice.length+" mies."+(its.some(x=>x.i<0)?" (miesiace spoza budzetu: tylko raty kredytow)":"");
   const host=document.getElementById("previewList"); host.innerHTML="";
   const add=(name,val)=>{ const d=document.createElement("div"),a=document.createElement("span"),b=document.createElement("strong"); a.textContent=name; b.textContent=zl(val); d.append(a,b); host.append(d); };
   add("Przychod", inn); add("Wydatki", out); add("Zostaje", inn-out);

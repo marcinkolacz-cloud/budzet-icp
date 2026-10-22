@@ -180,12 +180,15 @@ function render(){
  // aktywa
  const nRew=N.reduce((a,x)=>a+x.s.rew,0),capN=N.reduce((a,x)=>a+(x.s.apy>0?x.s.stake+x.s.mat:0),0),apyN=capN?N.reduce((a,x)=>a+(x.s.apy>0?x.s.apy*(x.s.stake+x.s.mat):0),0)/capN:0;
  const capW=W.reduce((a,x)=>a+x.s.paid,0),apyW=capW?W.reduce((a,x)=>a+x.s.apy*x.s.paid,0)/capW:0;
- const row=(nm,stake,u,t,a7,a30,apy,tr,v,k)=>`<tr><td><b>${nm}</b></td><td>${f(stake,2)} ${u}</td><td class="hm">${t?f(t,4):"–"}</td><td class="hm">${a7?f(a7,4):"–"}</td><td class="hm">${a30?f(a30,4):"–"}</td>${[90,180,270,365].map(n=>{const a=avg(k,n);return `<td class="hm">${a?f(a,4):"–"}</td>`;}).join("")}<td>${pct(apy)}</td><td>${f(tr,3)} ${u}</td><td>${zl(v)}</td></tr>`;
+ const row=(nm,stake,u,t,a7,a30,apy,tr,v,k,c="")=>`<tr${c}><td><b>${nm}</b></td><td>${f(stake,2)} ${u}</td><td class="hm">${t?f(t,4):"–"}</td><td class="hm">${a7?f(a7,4):"–"}</td><td class="hm">${a30?f(a30,4):"–"}</td>${[90,180,270,365].map(n=>{const a=av(k,n);return `<td class="hm">${a?f(a,4):"–"}</td>`;}).join("")}<td>${pct(apy)}</td><td>${f(tr,3)} ${u}</td><td>${zl(v)}</td></tr>`;
  // srednia dzienna: suma z ostatnich n dni kalendarzowych / n (krocej, jesli historia jest krotsza)
  const first={},avg=(k,n)=>{if(!first[k])return 0;const de=new Date(today+"T12:00:00Z");if(!((dm.get(today)||{})[k]>0))de.setUTCDate(de.getUTCDate()-1);const end=de.toISOString().slice(0,10);const d0=new Date(end+"T12:00:00Z");d0.setUTCDate(d0.getUTCDate()-n+1);const from=d0.toISOString().slice(0,10);
   let sum=0;for(const [d,o] of dm)if(d>=from&&d<=end)sum+=o[k];const span=Math.round((Date.parse(end)-Date.parse(first[k]>from?first[k]:from))/864e5)+1;return sum/Math.max(1,Math.min(n,span));};
+ // ICP razem = neurony + WaterNeuron
+ const av=(k,n)=>k==="icpAll"?avg("icp",n)+avg("nicp",n):avg(k,n);
  for(const [d,o] of dm)for(const k of ["icp","nicp","near","inj"])if(o[k]>0&&(!first[k]||d<first[k]))first[k]=d;
  $("ta").innerHTML=row("ICP neurony",icpStake,"ICP",td.icp,avg("icp",7),avg("icp",30),apyN,nRew,vIcp,"icp")+row("WaterNeuron",wtnV,"ICP",td.nicp,avg("nicp",7),avg("nicp",30),apyW,W.reduce((a,x)=>a+x.s.earned,0),vW,"nicp")+
+  row("ICP razem",icpStake+wtnV,"ICP",(td.icp||0)+(td.nicp||0),av("icpAll",7),av("icpAll",30),(icpStake+wtnV)?(apyN*icpStake+apyW*wtnV)/(icpStake+wtnV):0,nRew+W.reduce((a,x)=>a+x.s.earned,0),vIcp+vW,"icpAll",' style="background:var(--field,#f7f4ee);border-bottom:2px solid rgba(127,127,127,.25)"')+
   row("NEAR",near.staked,"NEAR",near.today,avg("near",7),avg("near",30),near.apy,near.tot,vN,"near")+row("INJ",inj.staked,"INJ",inj.today,avg("inj",7),avg("inj",30),inj.apy,inj.tot,vI,"inj");
  // neurony
  const syn=id=>D.sync.find(x=>x.nid===id);

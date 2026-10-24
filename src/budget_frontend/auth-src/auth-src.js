@@ -62,8 +62,11 @@ function push(k){
   try{
    const v=gi.call(LS,NS+k);if(v==null)return;
    if(v===synced[k]){if(!Object.keys(timers).length)setSt("zsynchronizowano");return;}
+   // snapshoty wartosci: do backendu max raz na godzine (lokalnie aktualne zawsze)
+   const sk="snap-push-ts:"+NS+k,isSnap=k.endsWith("-snaps");
+   if(isSnap&&synced[k]!=null&&Date.now()-(+gi.call(LS,sk)||0)<3600e3){if(!Object.keys(timers).length)setSt("zsynchronizowano");return;}
    const r=await actor.kvPut(k,v,BigInt(revs[k]||0));
-   if("ok" in r){revs[k]=Number(r.ok);synced[k]=v;if(!Object.keys(timers).length)setSt("zsynchronizowano");}
+   if("ok" in r){revs[k]=Number(r.ok);synced[k]=v;if(isSnap)try{si.call(LS,sk,String(Date.now()));}catch{}if(!Object.keys(timers).length)setSt("zsynchronizowano");}
    else if(r.err==="conflict")await resolveConflict(k,v);
    else setSt("blad zapisu: "+r.err,true);
   }catch(e){setSt("brak polaczenia - zmiany nie zapisane",true);}

@@ -816,7 +816,16 @@ persistent actor Budget {
       let st = injAmounts(await httpGetRequestBounded(base # "/cosmos/staking/v1beta1/delegations/" # INJ_ACC, [], null));
       let pe = injAmountsAfter(await httpGetRequestBounded(base # "/cosmos/distribution/v1beta1/delegators/" # INJ_ACC # "/rewards", [], null), "\"total\":");
       var claimed = 0; var wdOk = true;
-      if (stInjWdH > 0) {
+      // tx search (300 KB outcall) tylko gdy mogla byc wyplata: pending urosl mniej niz ~80% wczorajszej nagrody,
+      // zmienil sie stake, brak syncu z wczoraj lub brak nagrody bazowej; inaczej claimed = 0 (wynik identyczny)
+      let needWd = switch (stLastExt("inj")) {
+        case null true;
+        case (?p) {
+          let grow : Int = pe - p.pending;
+          p.day != dayKey(Time.now() - 86_400_000_000_000) or st != p.staked or p.reward <= 0 or grow * 10 < p.reward * 8
+        };
+      };
+      if (stInjWdH > 0 and needWd) {
         try {
           // Injective: event withdraw_rewards nie ma atrybutu delegator -> szukamy tx wyslanych przez konto
           // bez filtra wysokosci (publicnode zwraca 0 dla AND); filtr po czasie tx > poprzedni sync w injWithdrawn
@@ -1162,9 +1171,23 @@ persistent actor Budget {
     #ok("Bot usuniety")
   };
 
+  // sygnaly wylaczone (domyslnie): bez zapisu dni/zdarzen/botow; dzienny odczyt cen tylko gdy terminal ma aktywny plan REAL
+  var sgOff : Bool = true;
+  func tbActive() : Bool { sgLive and Array.find<TbPlan>(tbPlans, func(p) { p.on }) != null };
   func sgRun() : async () {
     sgLastRun := Time.now();
     if (sgKey == "") { sgLog := "Brak klucza (sgSetKey)"; return };
+    if (sgOff) {
+      if (not tbActive()) { sgLog := "Sygnaly wylaczone, terminal nieaktywny (bez outcalla)"; return };
+      let rawT = try { await httpGetRequestBounded(SG_URL # "/sig", sgHdr(), null) } catch (e) { sgLog := "sig: " # Error.message(e); return };
+      let (dayT, rowsT) = sgParse(rawT);
+      if (dayT == "" or rowsT.size() == 0) { sgLog := "sig: zla odpowiedz"; return };
+      var tl = tbStep(rowsT);
+      tl #= await sgExec();
+      if (tl != "" and sgMail) { try { ignore await sgSend("Terminal sprzedazy\n" # tl # "\nSwieca dzienna " # dayT) } catch (_) {} };
+      sgLog := "Terminal " # dayT # (if (tl == "") " (bez zlecen)" else ": zlecenia") # " · sygnaly wylaczone";
+      return;
+    };
     let raw = try { await httpGetRequestBounded(SG_URL # "/sig", sgHdr(), null) } catch (e) { sgLog := "sig: " # Error.message(e); return };
     let (day, rows) = sgParse(raw);
     if (day == "" or rows.size() == 0) { sgLog := "sig: zla odpowiedz"; return };
@@ -1343,6 +1366,12 @@ persistent actor Budget {
     #ok(if (sgKey == "") "Klucz usuniety" else "Klucz zapisany")
   };
 
+  public shared (msg) func sgSetOff(off : Bool) : async Result.Result<Text, Text> {
+    if (not Principal.isController(msg.caller)) return #err("Tylko kontroler");
+    sgOff := off;
+    #ok(if (off) "Sygnaly WYLACZONE (terminal dziala)" else "Sygnaly WLACZONE")
+  };
+
   public shared (msg) func sgSetMail(on : Bool) : async Result.Result<Text, Text> {
     if (not stCan(msg.caller)) return #err("Brak dostepu");
     sgMail := on;
@@ -1439,6 +1468,7 @@ persistent actor Budget {
       #sgRunNow : () -> ();
       #sgSetKey : () -> Text;
       #sgSetMail : () -> Bool;
+      #sgSetOff : () -> Bool;
       #sgTestMail : () -> ();
       #stNeuronPut : () -> StNeuron;
       #stNeuronRemove : () -> Nat64;
@@ -1472,7 +1502,7 @@ persistent actor Budget {
       case (#kvPut _) { isMember(caller) and arg.size() <= 1_100_000 };
       case (#kvGetAll _) { isMember(caller) };
       case (#stSetKey _) { Principal.isController(caller) };
-      case (#sgSetKey _ or #sgSetLive _) { Principal.isController(caller) };
+      case (#sgSetKey _ or #sgSetLive _ or #sgSetOff _) { Principal.isController(caller) };
       case (#sgLiveAll _) { stCan(caller) };
       case (#sgOrdRetry _ or #sgBalance _) { Principal.isController(caller) or isAdmin(caller) };
       case (#tbAll _) { Principal.isController(caller) or isAdmin(caller) };

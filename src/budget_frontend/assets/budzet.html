@@ -16,7 +16,7 @@
   button, select { border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 12px; cursor:pointer; font:inherit; color:var(--ink); }
   .months button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
   .period { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; color:var(--muted); }
-  .stats { display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:12px; }
+  .stats { display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:12px; }
   .stat { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px 18px; }
   .stat span { color:var(--muted); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
   .stat strong { display:block; margin-top:6px; font-size:30px; letter-spacing:-.04em; }
@@ -77,7 +77,8 @@
   tfoot td{font-weight:700;border-top:2px solid var(--line)}
   @media (max-width:800px) { .stats,.grid,.plist { grid-template-columns:1fr; } .stat strong { font-size:24px; } }
 .row{padding:2px 0;gap:6px;grid-template-columns:1fr 104px 26px}
-  .row.cost{grid-template-columns:minmax(120px,1.5fr) 92px 60px 92px minmax(70px,1fr) 26px}
+  .row.cost{grid-template-columns:minmax(120px,1.5fr) 92px 60px 92px minmax(70px,1fr) 38px 26px}
+  .ksef{display:flex;align-items:center;justify-content:center;cursor:pointer}.ksef input{width:15px;height:15px;margin:0;accent-color:var(--ink);cursor:pointer}
   .row input{padding:4px 8px;font-size:13px;border-radius:8px}
   .row.paid{padding:2px 6px;border-radius:8px}
   .row,.row.paid{position:relative;padding-left:16px}
@@ -90,7 +91,8 @@
   .row summary{padding:2px 6px}
   .lst{max-height:calc(100vh - 230px);min-height:220px;overflow:auto;margin:0 -6px;padding:0 6px}
   .lh{padding-left:16px!important;display:grid;gap:6px;grid-template-columns:1fr 104px 26px;position:sticky;top:0;z-index:2;background:var(--card);padding:4px 0;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-  .lh.cost{grid-template-columns:minmax(120px,1.5fr) 92px 60px 92px minmax(70px,1fr) 26px}
+  .lh.cost{grid-template-columns:minmax(120px,1.5fr) 92px 60px 92px minmax(70px,1fr) 38px 26px}
+  .lh.cost span:nth-child(6){text-align:center}
   .lh span:nth-child(2),.lh span:nth-child(4){text-align:right}
   .qa{display:grid;grid-template-columns:22px 1fr 104px 26px;gap:6px;align-items:center;position:sticky;bottom:0;z-index:2;background:var(--card);border-top:1px dashed var(--line);padding:6px 0 4px}
   .qa i{font-style:normal;color:var(--muted);text-align:center;font-size:16px}
@@ -126,6 +128,7 @@
     <div class="stat bal"><span id="balLabel">Zostaje</span><strong id="bal">0 zl</strong></div>
     <div class="stat"><span>Przychod</span><strong id="inc">0 zl</strong><small class="pd" id="pIn"></small></div>
     <div class="stat"><span>Wydatki</span><strong id="out">0 zl</strong><small class="pd" id="pEx"></small></div>
+    <div class="stat"><span>W kasie</span><strong id="cash">0 zl</strong><small class="pd" id="pCash"></small></div>
   </div>
   <section id="kPrev" hidden><h2>Kredyty</h2><div class="kp" id="kPrevList"></div></section>
   <section id="preview"><h2 id="previewTitle">Podglad</h2>
@@ -136,7 +139,7 @@
       <div class="note" id="sIn"></div><div class="lst"><div class="lh"><span>Nazwa</span><span>Kwota</span><span></span></div><div id="inList"></div><form class="qa" id="qaIn" autocomplete="off"><i>+</i><input placeholder="Dodaj wplyw…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
     <section><h2 id="hEx">Koszty</h2>
       <div class="filt"><input id="qEx" placeholder="Szukaj..." /><input id="nEx" placeholder="Uwaga..." /><select id="mEx"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option><option value="paid">Oplacone</option><option value="unpaid">Nieoplacone</option></select></div>
-      <div class="note" id="sEx"></div><div class="lst"><div class="lh cost"><span>Nazwa</span><span>Kwota</span><span>Raty</span><span>Zostalo</span><span>Uwaga</span><span></span></div><div id="exList"></div><form class="qa" id="qaEx" autocomplete="off"><i>+</i><input placeholder="Dodaj koszt…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
+      <div class="note" id="sEx"></div><div class="lst"><div class="lh cost"><span>Nazwa</span><span>Kwota</span><span>Raty</span><span>Zostalo</span><span>Uwaga</span><span>KSeF</span><span></span></div><div id="exList"></div><form class="qa" id="qaEx" autocomplete="off"><i>+</i><input placeholder="Dodaj koszt…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
   </div>
 </div>
 <div id="viewK" hidden>
@@ -287,7 +290,7 @@ $("nEx").oninput=()=>{ flt.ex.n=$("nEx").value; render(); };
 const row = () => state.rows[state.month] || state.rows[0];
 const earned = r => state.incomes.reduce((a,k)=>a+num(r[k]),0);
 const spent = r => state.expenses.reduce((a,k)=>a+num(r[k]),0);
-function rename(list,i,next){ const prev=list[i]; if(!next||next===prev||list.includes(next)) return; list[i]=next; state.rows.forEach(r=>{ if(prev in r){ r[next]=r[prev]; delete r[prev]; } if(r.paid&&prev in r.paid){ r.paid[next]=r.paid[prev]; delete r.paid[prev]; } if(r.del&&prev in r.del){ r.del[next]=r.del[prev]; delete r.del[prev]; } }); }
+function rename(list,i,next){ const prev=list[i]; if(!next||next===prev||list.includes(next)) return; list[i]=next; state.rows.forEach(r=>{ if(prev in r){ r[next]=r[prev]; delete r[prev]; } if(r.paid&&prev in r.paid){ r.paid[next]=r.paid[prev]; delete r.paid[prev]; } if(r.del&&prev in r.del){ r.del[next]=r.del[prev]; delete r.del[prev]; } if(r.ks&&prev in r.ks){ r.ks[next]=r.ks[prev]; delete r.ks[prev]; } }); }
 // zaplacenie raty recznego kredytu: raty a/b -> a+1/b, zostalo -= rata (ten i kolejne miesiace)
 function shiftLoan(key,d,amt){
   const isN=v=>String(v??"").trim()!==""&&Number.isFinite(Number(String(v).replace(/[\s\u00a0]/g,"").replace(",",".")));
@@ -342,7 +345,7 @@ function line(list, kind, i){
   if(ov){
     const sp=document.createElement("div"); sp.className="span3";
     if(num(r[key])>0){ const b=document.createElement("button"); b.type="button"; b.textContent="Import nowego harmonogramu"; b.onclick=()=>pickFile(ov); sp.append(b); }
-    el.append(sp);
+    el.append(sp, document.createElement("span"));
   } else if(kind==="ex"){
     r.ln=r.ln||{}; const loan=r.ln[key]||{raty:"",calosc:"",uwaga:""};
     const raty=document.createElement("input"); raty.placeholder="raty"; raty.value=loan.raty||"";
@@ -351,7 +354,8 @@ function line(list, kind, i){
     if(cr){ const e=entriesFor(cr,ymOf(r.data)||"")[0]; raty.value=e?state.rows.filter(rr=>{ const y=ymOf(rr.data); return y&&y<=ymOf(r.data)&&rr.paid&&rr.paid[key]; }).length+"/"+cr.schedule.length:""; calosc.value=e?e.saldo:""; raty.readOnly=calosc.readOnly=true; raty.title="zaplacone / wszystkich"; calosc.title="saldo po racie"; }
     const keep=()=>{ const v=cr?{raty:"",calosc:"",uwaga:uwaga.value}:{raty:raty.value,calosc:calosc.value,uwaga:uwaga.value}; r.ln[key]=v; state.loans[key]={...v}; save(); };
     raty.onchange=keep; calosc.onchange=keep; uwaga.onchange=keep;
-    el.append(raty, calosc, uwaga);
+    r.ks=r.ks||{}; const kl=document.createElement("label"); kl.className="ksef"; kl.title="Faktura w KSeF"; const kc=document.createElement("input"); kc.type="checkbox"; kc.checked=!!r.ks[key]; kc.setAttribute("aria-label","KSeF: "+key); kc.onchange=()=>{ if(kc.checked) r.ks[key]=true; else delete r.ks[key]; save(); }; kl.append(kc);
+    el.append(raty, calosc, uwaga, kl);
   }
   el.dataset.k=key; const gp=document.createElement("span"); gp.className="grip"; gp.textContent="⋮⋮"; gp.title="Zlap i przesun"; gp.setAttribute("aria-hidden","true");
   gp.onpointerdown=e=>dragRow(e,el,list,key); el.prepend(gp);
@@ -412,6 +416,7 @@ function render(){
   $("balLabel").textContent="Zostaje · "+(r.data||"")+(fa?" · filtr":"");
   const pd=(L,k)=>L.reduce((a,x)=>a+(r.paid&&r.paid[x]&&passes(k,x,r)?num(r[x]):0),0), PI=pd(state.incomes,"in"), PE=pd(state.expenses,"ex");
   $("pIn").innerHTML="Wplynelo <b>"+zl(PI)+"</b> · czeka "+zl(I-PI); $("pEx").innerHTML="Oplacone <b>"+zl(PE)+"</b> · do zaplaty "+zl(E-PE);
+  $("cash").textContent=zl(PI-PE); $("cash").style.color=PI-PE<0?"var(--neg,#c0392b)":""; $("pCash").innerHTML="Wplynelo − Oplacone · zaplanowane <b>"+zl(Math.min(Math.max(E-PE,0),Math.max(PI-PE,0)))+"</b>";
   $("bal").textContent=zl(I-E); $("inc").textContent=zl(I); $("out").textContent=zl(E);
   if($("preview").className==="open") showPeriod();
   renderK();
@@ -464,7 +469,7 @@ document.getElementById("addMonth").onclick=()=>{ const n=prompt("Nazwa miesiaca
 document.getElementById("cloneMonth").onclick=()=>{
   const src=row();
   const copy=JSON.parse(JSON.stringify(src));
-  copy.paid={};
+  copy.paid={}; copy.ks={};
   copy.data=nextName(src.data||"");
   state.rows.splice(state.month+1,0,copy);
   state.month+=1;

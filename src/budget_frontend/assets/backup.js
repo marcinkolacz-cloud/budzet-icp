@@ -22,7 +22,9 @@ const idl=({IDL})=>{
  const Pl=IDL.Record({sym:IDL.Text,lv:IDL.Vec(IDL.Tuple(IDL.Float64,IDL.Float64)),tot:IDL.Float64,on:IDL.Bool,at:IDL.Int});
  const RT=IDL.Variant({ok:IDL.Text,err:IDL.Text}),RN=IDL.Variant({ok:IDL.Nat,err:IDL.Text});
  return IDL.Service({stAll:IDL.Func([],[StAll],["query"]),stNeuronPut:IDL.Func([N],[RT],[]),stRewardsImport:IDL.Func([IDL.Vec(R)],[RN],[]),
-  stWtnPosPut:IDL.Func([IDL.Nat,IDL.Text,IDL.Int],[RN],[]),stWtnPut:IDL.Func([IDL.Vec(W)],[RN],[]),stExtImport:IDL.Func([IDL.Vec(E)],[RN],[]),
+  stWtnPosPut:IDL.Func([IDL.Nat,IDL.Text,IDL.Int],[RN],[]),stWtnPut:IDL.Func([IDL.Vec(W)],[RN],[]),
+  stWtnCloses:IDL.Func([],[IDL.Vec(IDL.Record({pid:IDL.Nat,date:IDL.Int,nicp:IDL.Float64,icp:IDL.Float64,val:IDL.Float64}))],["query"]),
+  stWtnClosePut:IDL.Func([IDL.Record({pid:IDL.Nat,date:IDL.Int,nicp:IDL.Float64,icp:IDL.Float64,val:IDL.Float64})],[RT],[]),stExtImport:IDL.Func([IDL.Vec(E)],[RN],[]),
   sgAll:IDL.Func([],[SgAll],["query"]),sgPosPut:IDL.Func([Ps],[RN],[]),
   sgBotsAll:IDL.Func([],[IDL.Record({bots:IDL.Vec(Bot),trades:IDL.Vec(Tr),cfg:IDL.Vec(IDL.Tuple(IDL.Nat,Cfg))})],["query"]),
   tbAll:IDL.Func([],[IDL.Record({plans:IDL.Vec(Pl),sales:IDL.Vec(Tr),orders:IDL.Vec(Od),live:IDL.Bool,owner:IDL.Bool})],["query"]),tbPut:IDL.Func([Pl],[RT],[])});
@@ -38,7 +40,7 @@ async function exp(){
  PREF.forEach(k=>{const v=localStorage.getItem(k);if(v!=null)o.prefs[k]=v});
  const tryq=async(n,f)=>{try{return await f()}catch(e){o.errors.push(n+": "+(e&&e.message||e));return null}};
  if(A){
-  const st=await tryq("staking",()=>A.stAll());if(st)o.staking={neurons:st.neurons,rewards:st.rewards,wtnPos:st.wtnPos,wtn:st.wtn,ext:st.ext};
+  const st=await tryq("staking",()=>A.stAll());if(st){o.staking={neurons:st.neurons,rewards:st.rewards,wtnPos:st.wtnPos,wtn:st.wtn,ext:st.ext};try{o.staking.wtnClose=await A.stWtnCloses();}catch(e){}}
   const sg=await tryq("signals",()=>A.sgAll());if(sg)o.signals={pos:sg.pos};
   const sb=await tryq("boty",()=>A.sgBotsAll());if(sb&&o.signals){o.signals.bots=sb.bots;o.signals.cfg=sb.cfg;o.signals.trades=sb.trades;}
   const tb=await tryq("terminal",()=>A.tbAll());if(tb&&tb.owner)o.terminal={plans:tb.plans,sales:tb.sales};
@@ -74,6 +76,7 @@ async function imp(file){
    say("Staking: WaterNeuron…");const pm=new Map();
    for(const p of st.wtnPos||[]){const ex=cur.wtnPos.find(x=>x.name===p.name);if(ex){pm.set(String(p.id),ex.id);continue}const r=await A.stWtnPosPut(0n,p.name,B(p.start));if("err" in r){er.push("WTN "+p.name+": "+r.err);continue}pm.set(String(p.id),r.ok);}
    await batches((st.wtn||[]).filter(x=>pm.has(String(x.pid))).map(x=>({pid:pm.get(String(x.pid)),date:B(x.date),nicp:+x.nicp,paid:+x.paid,red:+x.red})),1500,x=>A.stWtnPut(x));
+   for(const c of st.wtnClose||[]){if(!pm.has(String(c.pid)))continue;const r=await A.stWtnClosePut({pid:pm.get(String(c.pid)),date:B(c.date),nicp:+c.nicp,icp:+c.icp,val:+c.val});if("err" in r)er.push("WTN zamkniecie: "+r.err);}
    say("Staking: NEAR/INJ…");await batches((st.ext||[]).map(x=>({chain:x.chain,day:x.day,staked:B(x.staked),pending:B(x.pending),reward:B(x.reward),usd:+x.usd||0,pln:+x.pln||0,at:B(x.at)})),1500,x=>A.stExtImport(x));}
   if(A&&sg&&sg.pos){say("Signals: pozycje…");const cur=(await A.sgAll()).pos,key=p=>[p.sym,p.opened,+p.entry,+p.qty].join("|");const have=new Set(cur.map(key));
    for(const p of sg.pos){if(have.has(key(p)))continue;const r=await A.sgPosPut({id:0n,sym:p.sym,status:p.status,opened:p.opened,entry:+p.entry,qty:+p.qty,stop:+p.stop,closed:p.closed||"",exit:+p.exit||0,note:p.note||"",evId:B(p.evId),at:B(p.at)});if("err" in r)er.push("Pozycja "+p.sym+": "+r.err);}}

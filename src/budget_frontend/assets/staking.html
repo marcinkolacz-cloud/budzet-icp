@@ -51,6 +51,12 @@ dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
 <dialog id="dw"><form method="dialog"><h3>Pozycja WaterNeuron</h3>
 <label>Nazwa<input id="wnm" maxlength="80" required></label><label>Data rozpoczecia<input id="wst" type="date"></label>
 <div class="act"><button value="x" formnovalidate>Anuluj</button><button value="ok" class="dark">Zapisz</button></div></form></dialog>
+<dialog id="dc"><form method="dialog"><h3>Zamknij pozycje WaterNeuron</h3>
+<label>Data sprzedazy<input id="cdt" type="date" required></label>
+<label>nICP sprzedane<input id="cn" inputmode="decimal" required></label><label>ICP otrzymane<input id="ci" inputmode="decimal" required></label>
+<label>Wartosc wg kursu protokolu (ICP)<input id="cv" inputmode="decimal" required></label>
+<small class="note">Zapis doda tez odczyt koncowy (0 nICP), zarobione nagrody zostaja w statystykach.</small>
+<div class="act"><button value="x" formnovalidate>Anuluj</button><button value="ok" class="dark">Zamknij pozycje</button></div></form></dialog>
 <dialog id="ds"><form method="dialog"><h3>Odczyt WaterNeuron</h3>
 <label>Pozycja<select id="spid"></select></label><label>Data<input id="sdt" type="date" required></label>
 <label>nICP posiadane<input id="sn" inputmode="decimal" required></label><label>Wplacono lacznie (ICP)<input id="sp" inputmode="decimal" required></label>
@@ -71,12 +77,14 @@ const idl=({IDL})=>{
  const E=IDL.Record({chain:IDL.Text,day:IDL.Text,staked:IDL.Nat,pending:IDL.Nat,reward:IDL.Int,usd:IDL.Float64,pln:IDL.Float64,at:IDL.Int});
  const P=IDL.Record({day:IDL.Text,icpUsd:IDL.Float64,icpPln:IDL.Float64,nearUsd:IDL.Float64,nearPln:IDL.Float64,injUsd:IDL.Float64,injPln:IDL.Float64});
  const S=IDL.Record({nid:IDL.Nat64,ok:IDL.Bool,err:IDL.Text,at:IDL.Int});
+ const WC=IDL.Record({pid:IDL.Nat,date:IDL.Int,nicp:IDL.Float64,icp:IDL.Float64,val:IDL.Float64});
  const All=IDL.Record({neurons:IDL.Vec(N),rewards:IDL.Vec(R),wtnPos:IDL.Vec(WP),wtn:IDL.Vec(W),ext:IDL.Vec(E),prices:IDL.Vec(P),sync:IDL.Vec(S),lastRun:IDL.Int,log:IDL.Text,nextRunSec:IDL.Nat,hasKey:IDL.Bool});
  const RT=IDL.Variant({ok:IDL.Text,err:IDL.Text}),RN=IDL.Variant({ok:IDL.Nat,err:IDL.Text});
  return IDL.Service({stAll:IDL.Func([],[All],["query"]),stNeuronPut:IDL.Func([N],[RT],[]),stNeuronRemove:IDL.Func([IDL.Nat64],[RT],[]),
   stRewardsImport:IDL.Func([IDL.Vec(R)],[RN],[]),stRewardDelete:IDL.Func([IDL.Nat64,IDL.Int],[RT],[]),stRewardToggleMerge:IDL.Func([IDL.Nat64,IDL.Int],[RT],[]),
   stWtnPosPut:IDL.Func([IDL.Nat,IDL.Text,IDL.Int],[RN],[]),stWtnPosRemove:IDL.Func([IDL.Nat],[RT],[]),
   stWtnPut:IDL.Func([IDL.Vec(W)],[RN],[]),stWtnDelete:IDL.Func([IDL.Nat,IDL.Int],[RT],[]),
+  stWtnCloses:IDL.Func([],[IDL.Vec(WC)],["query"]),stWtnClosePut:IDL.Func([WC],[RT],[]),stWtnCloseDelete:IDL.Func([IDL.Nat],[RT],[]),
   stExtImport:IDL.Func([IDL.Vec(E)],[RN],[]),stSyncNow:IDL.Func([],[RT],[]),stSyncNeurons:IDL.Func([],[RT],[])});
 };
 const A=Auth.mk(idl);
@@ -199,7 +207,7 @@ function render(){
  const errs=D.sync.filter(x=>!x.ok);if(errs.length)$("tn").insertAdjacentHTML("beforeend",`<tr><td colspan="9" class="note neg">${errs.map(x=>esc(x.nid+": "+x.err)).join("<br>")}</td></tr>`);
  // wtn
  $("tw").innerHTML=W.length?W.map(({p,s})=>`<tr><td><b>${esc(p.name)}</b><br><small class="note">${s.s.length} odczytow</small></td><td>${f(s.nicp,4)}</td><td>${f(s.paid,4)}</td><td>${f(s.red,4)}</td><td>${f(s.earned,4)}</td><td>${pct(s.ret)}</td><td>${pct(s.apy)}</td>
-  <td class="row-act"><button data-ew="${p.id}">Edytuj</button> <button data-rw="${p.id}">Usun</button></td></tr>`).join(""):'<tr><td colspan="8" class="note">Brak pozycji.</td></tr>';
+  <td class="row-act"><button data-ew="${p.id}">Edytuj</button> ${wtnCl(p)?`<button data-uw="${p.id}">Cofnij zamkniecie</button>`:`<button data-cw="${p.id}">Zamknij</button>`} <button data-rw="${p.id}">Usun</button></td></tr>${wtnClRow(p,s)}`).join(""):'<tr><td colspan="8" class="note">Brak pozycji.</td></tr>';
  renderHist(dm,N,W);
  // status
  const nx=Number(D.nextRunSec),h=Math.floor(nx/3600),mi=Math.floor(nx%3600/60);
@@ -247,7 +255,7 @@ function renderHist(dm,N,W){
  $("hh").innerHTML=head;$("hb").innerHTML=rows||'<tr><td colspan="7" class="note">Brak danych.</td></tr>';$("hn").textContent=note;
 }
 
-async function load(){D=await A.stAll();render();}
+async function load(){D=await A.stAll();try{D.close=await A.stWtnCloses();}catch(e){D.close=[];}render();}
 async function livePrices(){
  try{const r=await fetch("https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,near,injective-protocol&vs_currencies=usd,pln&include_24hr_change=true");const j=await r.json();
   live={icp:j["internet-computer"],near:j.near,inj:j["injective-protocol"]};if(D)render();}catch{}
@@ -266,6 +274,18 @@ async function editNeuron(n){
  act(async()=>unwrap(await A.stNeuronPut({id,name:$("nnm").value.trim(),start:nsOf($("nst").value||today),dissolve:n?n.dissolve:0n,initStake:n?n.initStake:0n,stake:n?n.stake:0n})));
 }
 $("aw").onclick=()=>editWtn(null);
+const wtnCl=p=>(D.close||[]).find(c=>c.pid===p.id);
+function wtnClRow(p,s){const c=wtnCl(p);if(!c)return "";const sl=c.icp-c.val,res=c.icp-s.paid;
+ return `<tr><td colspan="8" class="note"><span class="tag">Zamknieta ${dOf(c.date)}</span> Sprzedano ${f(c.nicp,4)} nICP za <b>${f(c.icp,4)} ICP</b> · wartosc wg protokolu ${f(c.val,4)} ICP · poslizg <span class="${sl<0?"neg":"pos"}">${f(sl,4)} ICP (${c.val?f(sl/c.val*100,2):"0"}%)</span> · wynik vs wplacone <span class="${res<0?"neg":"pos"}">${res>=0?"+":""}${f(res,4)} ICP (${s.paid?f(res/s.paid*100,2):"0"}%)</span> · nagrody ${f(s.earned,4)} ICP</td></tr>`;}
+async function closeWtn(p){
+ const ls=D.wtn.filter(x=>x.pid===p.id),l=ls.slice(-1)[0],lo=ls.filter(x=>x.nicp>0).slice(-1)[0];
+ const ok=await dlg("dc",()=>{$("cdt").value=today;$("cn").value=lo?lo.nicp:"";$("ci").value="";$("cv").value=lo?lo.red:"";});
+ if(!ok)return;const n=v=>Number(String(v).replace(/\s/g,"").replace(",","."));
+ const c={pid:p.id,date:nsOf($("cdt").value),nicp:n($("cn").value),icp:n($("ci").value),val:n($("cv").value)};
+ if(![c.nicp,c.icp,c.val].every(Number.isFinite)||c.icp<=0){prog("Nieprawidlowe liczby");return;}
+ act(async()=>{unwrap(await A.stWtnClosePut(c));
+  if(l&&l.nicp>0)unwrap(await A.stWtnPut([{pid:p.id,date:BigInt(Date.parse($("cdt").value+"T20:00:00"))*1000000n,nicp:0,paid:l.paid,red:0}]));});
+}
 async function editWtn(p){
  const ok=await dlg("dw",()=>{$("wnm").value=p?p.name:"";$("wst").value=p?dOf(p.start):today;});
  if(ok)act(async()=>unwrap(await A.stWtnPosPut(p?p.id:0n,$("wnm").value.trim(),nsOf($("wst").value||today))));
@@ -287,6 +307,8 @@ document.addEventListener("click",e=>{
  else if(ds.en)editNeuron(D.neurons.find(n=>String(n.id)===ds.en));
  else if(ds.rn&&confirm("Usunac neuron "+ds.rn+" razem z cala historia?"))act(async()=>unwrap(await A.stNeuronRemove(BigInt(ds.rn))));
  else if(ds.ew)editWtn(D.wtnPos.find(p=>String(p.id)===ds.ew));
+ else if(ds.cw)closeWtn(D.wtnPos.find(p=>String(p.id)===ds.cw));
+ else if(ds.uw&&confirm("Cofnac zamkniecie pozycji? (odczyt koncowy 0 nICP usun recznie w historii)"))act(async()=>unwrap(await A.stWtnCloseDelete(BigInt(ds.uw))));
  else if(ds.rw&&confirm("Usunac pozycje WaterNeuron razem z historia?"))act(async()=>unwrap(await A.stWtnPosRemove(BigInt(ds.rw))));
  else if(ds.mg&&confirm("Przelaczyc oznaczenie merge neuronow?")){const [a,c]=ds.mg.split("|");act(async()=>unwrap(await A.stRewardToggleMerge(BigInt(a),BigInt(c))));}
  else if(ds.dr&&confirm("Usunac odczyt?")){const [a,c]=ds.dr.split("|");act(async()=>unwrap(await A.stRewardDelete(BigInt(a),BigInt(c))));}

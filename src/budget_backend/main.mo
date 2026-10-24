@@ -223,6 +223,8 @@ persistent actor Budget {
   public type StRew = { nid : Nat64; ts : Int; un : Nat64; sm : Nat64; auto : Bool; delta : Int; sd : Nat64; ev : Text };
   public type StWtnPos = { id : Nat; name : Text; start : Int };
   public type StWtn = { pid : Nat; date : Int; nicp : Float; paid : Float; red : Float };
+  // zamkniecie pozycji WTN (sprzedaz nICP): nicp sprzedane, icp otrzymane, val = wartosc wg kursu protokolu
+  public type StWtnClose = { pid : Nat; date : Int; nicp : Float; icp : Float; val : Float };
   public type StExt = { chain : Text; day : Text; staked : Nat; pending : Nat; reward : Int; usd : Float; pln : Float; at : Int };
   public type StPrice = { day : Text; icpUsd : Float; icpPln : Float; nearUsd : Float; nearPln : Float; injUsd : Float; injPln : Float };
   public type StSync = { nid : Nat64; ok : Bool; err : Text; at : Int };
@@ -235,6 +237,7 @@ persistent actor Budget {
   var stRewards : [StRew] = [];
   var stWtnPos : [StWtnPos] = [];
   var stWtn : [StWtn] = [];
+  var stWtnClose : [StWtnClose] = [];
   var stExt : [StExt] = [];
   var stInjWdH : Nat = 0; // INJ: ostatnia wysokosc bloku z policzonymi wyplatami nagrod (0 = wylaczone)
   var stPrices : [StPrice] = [];
@@ -602,6 +605,7 @@ persistent actor Budget {
     if (not stCan(msg.caller)) return #err("Brak dostepu");
     stWtnPos := Array.filter<StWtnPos>(stWtnPos, func(x) { x.id != id });
     stWtn := Array.filter<StWtn>(stWtn, func(x) { x.pid != id });
+    stWtnClose := Array.filter<StWtnClose>(stWtnClose, func(x) { x.pid != id });
     #ok("usunieto")
   };
 
@@ -617,6 +621,25 @@ persistent actor Budget {
     };
     stWtn := Array.sort<StWtn>(cur, func(a, c) { Int.compare(a.date, c.date) });
     #ok(rows.size())
+  };
+
+  public shared query (msg) func stWtnCloses() : async [StWtnClose] {
+    if (not stCan(msg.caller)) return [];
+    stWtnClose
+  };
+
+  // upsert po pid (jedno zamkniecie na pozycje)
+  public shared (msg) func stWtnClosePut(c : StWtnClose) : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (Array.find<StWtnPos>(stWtnPos, func(x) { x.id == c.pid }) == null) return #err("Brak pozycji " # Nat.toText(c.pid));
+    stWtnClose := Array.append(Array.filter<StWtnClose>(stWtnClose, func(x) { x.pid != c.pid }), [c]);
+    #ok("zapisano")
+  };
+
+  public shared (msg) func stWtnCloseDelete(pid : Nat) : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    stWtnClose := Array.filter<StWtnClose>(stWtnClose, func(x) { x.pid != pid });
+    #ok("usunieto")
   };
 
   public shared (msg) func stWtnDelete(pid : Nat, date : Int) : async Result.Result<Text, Text> {
@@ -1432,6 +1455,9 @@ persistent actor Budget {
       #stSyncNow : () -> ();
       #stSyncNeurons : () -> ();
       #stTransform : () -> { response : HttpResp; context : Blob };
+      #stWtnCloseDelete : () -> Nat;
+      #stWtnClosePut : () -> StWtnClose;
+      #stWtnCloses : () -> ();
       #stWtnDelete : () -> (Nat, Int);
       #stWtnPosPut : () -> (Nat, Text, Int);
       #stWtnPosRemove : () -> Nat;
@@ -1461,7 +1487,7 @@ persistent actor Budget {
       case (#sgAll _ or #sgPosDelete _ or #sgRunNow _ or #sgSetMail _ or #sgTestMail _) { stCan(caller) };
       case (#stTransform _) { false };
       case (#stRewardsImport _ or #stWtnPut _ or #stExtImport _) { stCan(caller) and arg.size() <= 1_900_000 };
-      case (#stAll _ or #stNeuronPut _ or #stNeuronRemove _ or #stRewardDelete _ or #stRewardToggleMerge _ or #stWtnDelete _ or #stWtnPosPut _ or #stWtnPosRemove _ or #stSyncNow _ or #stSyncNeurons _) { stCan(caller) };
+      case (#stAll _ or #stNeuronPut _ or #stNeuronRemove _ or #stRewardDelete _ or #stRewardToggleMerge _ or #stWtnDelete _ or #stWtnCloses _ or #stWtnClosePut _ or #stWtnCloseDelete _ or #stWtnPosPut _ or #stWtnPosRemove _ or #stSyncNow _ or #stSyncNeurons _) { stCan(caller) };
       case (_) { true };
     }
   };

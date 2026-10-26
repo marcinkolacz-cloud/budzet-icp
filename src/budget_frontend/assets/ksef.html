@@ -131,7 +131,7 @@ function render(){
  if(!c){tb.innerHTML='<tr><td colspan="7" class="empty">Wybierz miesiac i kliknij „Pobierz z KSeF”</td></tr>';return;}
  if(!c.rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">Brak faktur w tym miesiacu</td></tr>';}
  const pln=c.rows.filter(r=>r.cur==="PLN");
- [["Faktur",String(c.rows.length)],["Netto PLN",fmt(pln.reduce((a,r)=>a+r.net,0))],["Brutto PLN",fmt(pln.reduce((a,r)=>a+r.gr,0))],["Pobrano",new Date(c.at).toLocaleString("pl-PL",{dateStyle:"short",timeStyle:"short"})]]
+ [["Faktur",String(c.rows.length)],["Netto PLN",fmt(pln.reduce((a,r)=>a+r.net,0))],["VAT PLN",fmt(pln.reduce((a,r)=>a+r.vat,0))],["Brutto PLN",fmt(pln.reduce((a,r)=>a+r.gr,0))],["Pobrano",new Date(c.at).toLocaleString("pl-PL",{dateStyle:"short",timeStyle:"short"})]]
   .forEach(([l,v])=>{const s=document.createElement("div");s.className="stat";const a=document.createElement("span");a.textContent=l;const b=document.createElement("strong");b.textContent=v;s.append(a,b);$("sum").append(s);});
  c.rows.slice().sort((a,b)=>b.dt.localeCompare(a.dt)).forEach(r=>{
   const tr=document.createElement("tr"), td=(t,cl)=>{const e=document.createElement("td");if(cl) e.className=cl;e.textContent=t;tr.append(e);return e;};

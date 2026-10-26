@@ -184,6 +184,67 @@ async function placeOrder(env, body) {
   return o ? ordLine(cid, o, sym) : `WAIT|${cid}|wyslane`;
 }
 
+// ===== KSeF 2.0: tylko odczyt faktur (token KSeF w sekretach KSEF_TOKEN / KSEF_NIP, opcj. KSEF_ENV=test) =====
+const KB = env => env.KSEF_ENV === "test" ? "https://api-test.ksef.mf.gov.pl/v2" : "https://api.ksef.mf.gov.pl/v2";
+let KS = { tok: "", exp: 0, key: null, kid: "" };
+async function kf(env, path, opt = {}, tok) {
+  const h = { Accept: "application/json", ...(opt.body ? { "Content-Type": "application/json" } : {}), ...(tok ? { Authorization: "Bearer " + tok } : {}), ...(opt.h || {}) };
+  const r = await fetch(KB(env) + path, { method: opt.m || "GET", headers: h, body: opt.body ? JSON.stringify(opt.body) : undefined });
+  const t = await r.text();
+  if (!r.ok) throw new Error(`KSeF ${r.status} ${path.split("?")[0]}: ${t.slice(0, 300)}`);
+  return opt.raw ? t : (t ? JSON.parse(t) : {});
+}
+// DER X.509 -> SubjectPublicKeyInfo
+function spki(der) {
+  const L = i => { let n = der[i + 1], o = i + 2; if (n & 0x80) { const k = n & 0x7f; n = 0; for (let j = 0; j < k; j++) n = n * 256 + der[o++]; } return { t: der[i], s: i, h: o, e: o + n }; };
+  const tbs = L(L(0).h); let p = tbs.h, c = L(p);
+  if (c.t === 0xa0) p = c.e;
+  for (let k = 0; k < 5; k++) p = L(p).e; // serial, sigAlg, issuer, validity, subject
+  const k = L(p); return der.slice(k.s, k.e);
+}
+async function ksKey(env) {
+  if (KS.key) return KS;
+  const L = await kf(env, "/security/public-key-certificates"), now = Date.now();
+  const c = L.find(x => (x.usage || []).includes("KsefTokenEncryption") && Date.parse(x.validFrom) <= now && Date.parse(x.validTo) > now) || L.find(x => (x.usage || []).includes("KsefTokenEncryption"));
+  if (!c) throw new Error("brak klucza KSeF");
+  const der = Uint8Array.from(atob(c.certificate), x => x.charCodeAt(0));
+  KS.key = await crypto.subtle.importKey("spki", spki(der), { name: "RSA-OAEP", hash: "SHA-256" }, false, ["encrypt"]);
+  KS.kid = c.publicKeyId || "";
+  return KS;
+}
+async function ksAuth(env) {
+  if (KS.tok && Date.now() < KS.exp) return KS.tok;
+  if (!env.KSEF_TOKEN || !/^\d{10}$/.test(env.KSEF_NIP || "")) throw new Error("brak KSEF_TOKEN/KSEF_NIP");
+  const ch = await kf(env, "/auth/challenge", { m: "POST" }), k = await ksKey(env);
+  const enc = new Uint8Array(await crypto.subtle.encrypt({ name: "RSA-OAEP" }, k.key, new TextEncoder().encode(`${env.KSEF_TOKEN}|${ch.timestampMs}`)));
+  const init = await kf(env, "/auth/ksef-token", { m: "POST", body: { challenge: ch.challenge, contextIdentifier: { type: "Nip", value: env.KSEF_NIP }, encryptedToken: btoa(String.fromCharCode(...enc)) } });
+  const at = init.authenticationToken.token;
+  for (let i = 0; ; i++) {
+    const st = (await kf(env, "/auth/" + init.referenceNumber, {}, at)).status || {};
+    if (st.code === 200) break;
+    if (st.code !== 100 || i > 15) throw new Error(`auth ${st.code} ${st.description || ""} ${(st.details || []).join(" ")}`);
+    await sleep(800);
+  }
+  const t = await kf(env, "/auth/token/redeem", { m: "POST" }, at);
+  KS.tok = t.accessToken.token; KS.exp = Math.min(Date.parse(t.accessToken.validUntil) || 0, Date.now() + 14 * 60e3) - 60e3;
+  return KS.tok;
+}
+const ksC = v => String(v ?? "").replace(/[|\n\r]/g, " ").trim();
+async function ksef(env, body) {
+  const f = body.trim().split("|");
+  let tok = await ksAuth(env);
+  const run = async fn => { try { return await fn(tok); } catch (e) { if (!/ 401 /.test(e.message)) throw e; KS.tok = ""; tok = await ksAuth(env); return fn(tok); } };
+  if (f[0] === "X" && /^[0-9A-Z-]{10,48}$/.test(f[1] || "")) return run(t => kf(env, "/invoices/ksef/" + f[1], { raw: true, h: { Accept: "application/xml" } }, t));
+  if (f[0] !== "L" || !["Subject1", "Subject2"].includes(f[1]) || !/^\d{4}-\d\d-\d\d$/.test(f[2] || "") || !/^\d{4}-\d\d-\d\d$/.test(f[3] || "")) return "ERR zle dane";
+  const pg = Math.min(40, Math.max(0, +f[4] || 0));
+  const r = await run(t => kf(env, `/invoices/query/metadata?sortOrder=Desc&pageOffset=${pg}&pageSize=250`, { m: "POST",
+    body: { subjectType: f[1], dateRange: { dateType: "Issue", from: f[2] + "T00:00:00+01:00", to: f[3] + "T23:59:59+01:00" } } }, t));
+  const out = ["H|" + (r.hasMore ? 1 : 0) + "|" + (r.isTruncated ? 1 : 0)];
+  for (const x of r.invoices || []) out.push(["R", x.ksefNumber, x.invoiceNumber, (x.issueDate || "").slice(0, 10), x.seller?.nip, x.seller?.name,
+    x.buyer?.identifier?.value, x.buyer?.name, x.netAmount, x.vatAmount, x.grossAmount, x.currency, x.invoiceType].map(ksC).join("|"));
+  return out.join("\n");
+}
+
 async function canister(req, env, u) {
   const T = (t, s = 200) => new Response(t, { status: s, headers: { "Content-Type": "text/plain" } });
   if (u.pathname === "/sig") {
@@ -194,6 +255,7 @@ async function canister(req, env, u) {
     if (!env.RESEND_KEY || !env.MAIL_TO) return T("ERR config", 500);
     return T(await sendMail(env, (await req.text()).slice(0, 5000)));
   }
+  if (u.pathname === "/ksef" && req.method === "POST") { try { return T(await ksef(env, (await req.text()).slice(0, 300))); } catch (e) { return T("ERR " + e.message); } }
   if (u.pathname === "/ord" && req.method === "POST") { try { return T(await placeOrder(env, (await req.text()).slice(0, 200))); } catch (e) { return T("ERR " + e.message); } }
   if (u.pathname === "/bal") {
     if (!hasK(env)) return T("ERR brak kluczy");

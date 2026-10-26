@@ -1432,6 +1432,49 @@ persistent actor Budget {
 
   public query func health() : async Text { "ok" };
 
+  // ===== KSeF: pobieranie faktur przez worker gielda-quote (token KSeF tylko w sekretach workera, brak timerow) =====
+  transient var ksAt : Int = 0;
+  let KS_MAX : Nat64 = 200_000;
+  func ksOkDay(t : Text) : Bool {
+    if (t.size() != 10) return false;
+    var i = 0;
+    for (c in t.chars()) { if (not ((i == 4 or i == 7) and c == '-') and not (i != 4 and i != 7 and Char.isDigit(c))) return false; i += 1 };
+    true
+  };
+  func ksOkNo(t : Text) : Bool {
+    if (t.size() < 10 or t.size() > 48) return false;
+    for (c in t.chars()) { if (not (Char.isDigit(c) or Char.isUppercase(c) or c == '-')) return false };
+    true
+  };
+  func ksPost(b : Text) : async Result.Result<Text, Text> {
+    if (sgKey == "") return #err("Brak klucza workera (sgSetKey)");
+    if (Time.now() - ksAt < 3_000_000_000) return #err("Odczekaj 3 s");
+    ksAt := Time.now();
+    try {
+      let r = await (with cycles = ST_CYCLES * 3) IC0.http_request({
+        url = SG_URL # "/ksef"; max_response_bytes = ?KS_MAX;
+        headers = Array.append(sgHdr(), [{ name = "Content-Type"; value = "text/plain" }]);
+        body = ?Text.encodeUtf8(b); method = #post;
+        transform = ?{ function = stTransform; context = Blob.fromArray([]) };
+        is_replicated = ?false;
+      });
+      let t = switch (Text.decodeUtf8(r.body)) { case (?x) x; case null "" };
+      if (r.status >= 300) return #err("HTTP " # Nat.toText(r.status) # " " # t);
+      if (Text.startsWith(t, #text "ERR")) #err(t) else #ok(t)
+    } catch (e) { #err(Error.message(e)) }
+  };
+  // subject: Subject1 = wystawione (sprzedaz), Subject2 = otrzymane (zakupy); daty RRRR-MM-DD
+  public shared (msg) func ksefList(subject : Text, from : Text, to : Text, page : Nat) : async Result.Result<Text, Text> {
+    if (not sgOwner(msg.caller)) return #err("Tylko wlasciciel");
+    if ((subject != "Subject1" and subject != "Subject2") or not ksOkDay(from) or not ksOkDay(to) or page > 40) return #err("Zle dane");
+    await ksPost("L|" # subject # "|" # from # "|" # to # "|" # Nat.toText(page))
+  };
+  public shared (msg) func ksefXml(n : Text) : async Result.Result<Text, Text> {
+    if (not sgOwner(msg.caller)) return #err("Tylko wlasciciel");
+    if (not ksOkNo(n)) return #err("Zly numer KSeF");
+    await ksPost("X|" # n)
+  };
+
   system func inspect({
     caller : Principal;
     arg : Blob;
@@ -1444,6 +1487,8 @@ persistent actor Budget {
       #health : () -> ();
       #kvGetAll : () -> ();
       #kvPut : () -> (Text, Text, Nat);
+      #ksefList : () -> (Text, Text, Text, Nat);
+      #ksefXml : () -> Text;
       #listInvites : () -> ();
       #listMembers : () -> ();
       #myAccess : () -> ();
@@ -1501,6 +1546,7 @@ persistent actor Budget {
       case (#addMember _ or #createInvite _ or #deleteInvite _ or #removeMember _ or #listInvites _ or #listMembers _) { isAdmin(caller) };
       case (#kvPut _) { isMember(caller) and arg.size() <= 1_100_000 };
       case (#kvGetAll _) { isMember(caller) };
+      case (#ksefList _ or #ksefXml _) { sgOwner(caller) and arg.size() <= 300 };
       case (#stSetKey _) { Principal.isController(caller) };
       case (#sgSetKey _ or #sgSetLive _ or #sgSetOff _) { Principal.isController(caller) };
       case (#sgLiveAll _) { stCan(caller) };

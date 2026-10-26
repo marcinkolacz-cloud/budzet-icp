@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pl"><head><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="icon" href="favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1c1915"><meta name="apple-mobile-web-app-title" content="Budget"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>KSeF</title><link rel="stylesheet" href="base.css"><link rel="stylesheet" href="theme.css"><script src="theme.js"></script>
+<style>
+.flt{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.flt input[type=month]{width:160px}.flt .sp{flex:1}
+.stats{margin-top:12px}.stat span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.stat strong{font-size:22px;letter-spacing:-.02em}
+table.kt th,table.kt td{vertical-align:middle}table.kt td.l,table.kt th.l{text-align:left}
+table.kt td.k small{display:block;color:var(--muted);font-size:11px}table.kt td.k{max-width:280px;overflow:hidden;text-overflow:ellipsis}
+.ac{display:inline-flex;gap:6px}.ac button{padding:5px 10px;font-size:12px}
+.bd{display:inline-block;padding:2px 9px;border-radius:999px;background:var(--field);color:var(--pos);font-size:11px;letter-spacing:.04em}
+.empty{padding:28px 0;text-align:center;color:var(--muted)}
+#msg{min-height:18px}#msg.e{color:var(--neg)}
+@media (max-width:760px){table.kt .hm{display:none}}
+</style></head>
+<body><div class="app">
+<nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html" class="on">Budget</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html">Staking</a><a href="signals.html">Signals</a><a href="kosz.html">Kosz</a></nav>
+<header><div><h1>KSeF</h1><div class="sub">Faktury z Krajowego Systemu e-Faktur · tylko odczyt</div></div></header>
+<div class="ctrl"><div class="nav"><a href="budzet.html">Budget</a><a href="budzet.html#kredyty">Kredyty</a><a class="on" href="ksef.html">KSeF</a></div></div>
+<section>
+<div class="flt">
+ <select id="typ" aria-label="Rodzaj faktur"><option value="Subject2">Zakupowe (koszty)</option><option value="Subject1">Sprzedazowe (wplywy)</option></select>
+ <input id="mies" type="month" aria-label="Miesiac">
+ <button id="get" class="dark" type="button">Pobierz z KSeF</button>
+ <span class="sp"></span>
+ <select id="bud" aria-label="Budzet docelowy"></select>
+ <select id="kw" aria-label="Kwota"><option value="g">brutto</option><option value="n">netto</option></select>
+</div>
+<div id="msg" class="note"></div>
+<div class="stats" id="sum"></div>
+<div style="overflow-x:auto;margin-top:12px"><table class="kt"><thead><tr><th class="l">Data</th><th class="l">Numer</th><th class="l">Kontrahent</th><th class="hm">Netto</th><th class="hm">VAT</th><th>Brutto</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+</section>
+</div>
+<script src="auth.js"></script>
+<script type="text/x-after-auth">
+;(function(){
+const $=id=>document.getElementById(id), BK="budzet-app-v3", CK="ksef-cache", IK="ksef-imp";
+const ld=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k)||"null");return v==null?d:v}catch{return d}};
+const sv=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const fmt=(n,c)=>new Intl.NumberFormat("pl-PL",{style:"currency",currency:c||"PLN"}).format(n||0);
+const ASC=t=>String(t??"").toLowerCase().replace(/ł/g,"l").normalize("NFD").replace(/[̀-ͯ]/g,"");
+const MON=["sty","lut","mar","kwi","maj","cze","lip","sie","wrz","paz","lis","gru"];
+function ymOf(name){const t=ASC(String(name||"").trim());let m=t.match(/^(\d{1,2})[-./ ](\d{4})$/);
+ if(m&&+m[1]>=1&&+m[1]<=12) return m[2]+"-"+m[1].padStart(2,"0");
+ m=t.match(/^([a-z]+)[-./ ](\d{2}|\d{4})$/);if(!m) return null;const i=MON.indexOf(m[1].slice(0,3));if(i<0) return null;
+ return (m[2].length===2?2000+ +m[2]:+m[2])+"-"+String(i+1).padStart(2,"0");}
+const idl=({IDL})=>{const R=IDL.Variant({ok:IDL.Text,err:IDL.Text});
+ return IDL.Service({ksefList:IDL.Func([IDL.Text,IDL.Text,IDL.Text,IDL.Nat],[R],[]),ksefXml:IDL.Func([IDL.Text],[R],[])});};
+let A=null;try{A=Auth.mk(idl);}catch{}
+const msg=(t,e)=>{$("msg").textContent=t||"";$("msg").className="note"+(e?" e":"");};
+const d=new Date();$("mies").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+const key=()=>$("typ").value+"|"+$("mies").value;
+function budgets(){const R=ld(BK,null);if(!R) return [];return [{id:0,name:R.bname||"Budzet glowny",b:R},...(Array.isArray(R.bx)?R.bx:[]).filter(x=>x&&x.id&&x.b)];}
+function mountB(){const el=$("bud"),v=+el.value||+localStorage.getItem("budzet-bsel")||0;el.innerHTML="";
+ budgets().forEach(x=>{const o=document.createElement("option");o.value=x.id;o.textContent="do: "+x.name;el.append(o);});el.value=budgets().some(x=>x.id===v)?v:0;}
+function parse(t){const rows=[];let more=false;
+ t.split("\n").forEach(l=>{const f=l.split("|");if(f[0]==="H") more=f[1]==="1";
+  else if(f[0]==="R"&&f.length>=13) rows.push({no:f[1],num:f[2],dt:f[3],sn:f[4],sname:f[5],bn:f[6],bname:f[7],net:+f[8]||0,vat:+f[9]||0,gr:+f[10]||0,cur:f[11]||"PLN",typ:f[12]});});
+ return {rows,more};}
+async function fetchAll(){
+ if(!A) return msg("Brak polaczenia z backendem",1);
+ const [y,m]=$("mies").value.split("-").map(Number);if(!y) return;
+ const from=$("mies").value+"-01", to=$("mies").value+"-"+String(new Date(y,m,0).getDate()).padStart(2,"0");
+ $("get").disabled=true;msg("Pobieram z KSeF…");let all=[];
+ try{for(let p=0;p<40;p++){const r=await A.ksefList($("typ").value,from,to,BigInt(p));
+   if("err" in r) throw new Error(r.err);const x=parse(r.ok);all=all.concat(x.rows);if(!x.more) break;
+   if(p<39){msg("Pobieram z KSeF… "+all.length);await new Promise(z=>setTimeout(z,3200));}}
+  const C=ld(CK,{});C[key()]={at:Date.now(),rows:all};sv(CK,C);msg("");render();
+ }catch(e){msg(String(e.message||e).slice(0,300),1);}
+ $("get").disabled=false;}
+const lbl=r=>{const n=($("typ").value==="Subject2"?r.sname:r.bname)||r.sn||"";return (n.replace(/\s+/g," ").slice(0,22).trim()+" "+r.num).slice(0,40);};
+function imp(r){
+ const R=ld(BK,null);if(!R) return msg("Brak danych budzetu",1);
+ const bid=+$("bud").value, b=bid?(R.bx||[]).find(x=>x.id===bid)?.b:R;if(!b) return msg("Nie znaleziono budzetu",1);
+ if(r.cur!=="PLN"&&!confirm("Faktura w "+r.cur+" – kwota zostanie wpisana bez przeliczenia na PLN. Kontynuowac?")) return;
+ const ym=r.dt.slice(0,7), row=(b.rows||[]).find(x=>ymOf(x.data)===ym);
+ if(!row) return msg("W budzecie brak miesiaca "+ym+" – dodaj go w zakladce Budget",1);
+ const inc=$("typ").value==="Subject1", list=inc?(b.incomes=b.incomes||[]):(b.expenses=b.expenses||[]);
+ let k=lbl(r),i=2;while(row[k]!=null&&row[k]!=="") k=lbl(r).slice(0,36)+" #"+(i++);
+ if(!list.includes(k)) list.push(k);
+ row[k]=Math.round(($("kw").value==="n"?r.net:r.gr)*100)/100;
+ if(!inc){row.dt=row.dt||{};row.dt[k]=r.dt;}
+ sv(BK,R);const I=ld(IK,{});I[r.no]={b:bid,ym,k,at:Date.now()};sv(IK,I);msg("Dodano „"+k+"” do "+(inc?"wplywow":"kosztow")+" ("+ym+")");render();}
+async function xml(r,btn){
+ if(!A) return;btn.disabled=true;
+ try{const x=await A.ksefXml(r.no);if("err" in x) throw new Error(x.err);
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([x.ok],{type:"application/xml"}));a.download=r.no+".xml";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5e3);
+ }catch(e){msg(String(e.message||e).slice(0,300),1);}
+ btn.disabled=false;}
+function render(){
+ mountB();const c=ld(CK,{})[key()], tb=$("tb"), I=ld(IK,{}), inc=$("typ").value==="Subject1";tb.innerHTML="";$("sum").innerHTML="";
+ if(!c){tb.innerHTML='<tr><td colspan="7" class="empty">Wybierz miesiac i kliknij „Pobierz z KSeF”</td></tr>';return;}
+ if(!c.rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">Brak faktur w tym miesiacu</td></tr>';}
+ const pln=c.rows.filter(r=>r.cur==="PLN");
+ [["Faktur",String(c.rows.length)],["Netto PLN",fmt(pln.reduce((a,r)=>a+r.net,0))],["Brutto PLN",fmt(pln.reduce((a,r)=>a+r.gr,0))],["Pobrano",new Date(c.at).toLocaleString("pl-PL",{dateStyle:"short",timeStyle:"short"})]]
+  .forEach(([l,v])=>{const s=document.createElement("div");s.className="stat";const a=document.createElement("span");a.textContent=l;const b=document.createElement("strong");b.textContent=v;s.append(a,b);$("sum").append(s);});
+ c.rows.slice().sort((a,b)=>b.dt.localeCompare(a.dt)).forEach(r=>{
+  const tr=document.createElement("tr"), td=(t,cl)=>{const e=document.createElement("td");if(cl) e.className=cl;e.textContent=t;tr.append(e);return e;};
+  td(r.dt.split("-").reverse().join("."),"l");td(r.num,"l");
+  const k=td(inc?(r.bname||r.bn):(r.sname||r.sn),"l k");const s=document.createElement("small");s.textContent=(inc?"":"NIP ")+(inc?r.bn:r.sn)+(r.typ&&r.typ!=="Vat"?" · "+r.typ:"");k.title=k.textContent;k.append(s);
+  td(fmt(r.net,r.cur),"hm");td(fmt(r.vat,r.cur),"hm");td(fmt(r.gr,r.cur));
+  const a=td("");const w=document.createElement("span");w.className="ac";
+  const bx=document.createElement("button");bx.type="button";bx.textContent="XML";bx.title="Pobierz fakture (XML)";bx.onclick=()=>xml(r,bx);w.append(bx);
+  if(I[r.no]){const z=document.createElement("span");z.className="bd";z.textContent="w budzecie";z.title=I[r.no].k+" · "+I[r.no].ym;w.append(z);}
+  else{const bi=document.createElement("button");bi.type="button";bi.textContent=inc?"Do wplywow":"Do kosztow";bi.onclick=()=>imp(r);w.append(bi);}
+  a.append(w);tb.append(tr);});}
+$("get").onclick=fetchAll;$("typ").onchange=render;$("mies").onchange=render;
+render();
+})();
+</script></body></html>

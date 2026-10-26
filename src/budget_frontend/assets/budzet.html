@@ -134,7 +134,7 @@
       <div class="mnu"><button type="button" class="mnb" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>Wiecej</button><div class="mnp" role="menu" hidden><b>Budget</b><button id="newB" type="button">Nowy budzet</button><button id="renB" type="button">Zmien nazwe budzetu</button><button id="delB" type="button" class="neg">Usun budzet</button><b>Miesiac</b><button id="addMonth" type="button">Nowy miesiac</button><button id="cloneMonth" type="button">Klonuj na nastepny</button><button id="delMonth" type="button" class="neg">Usun miesiac</button><b>Dane</b><button id="xlB" type="button" title="Eksport budzetu i kredytow do Excela">Eksport Excel</button></div></div>
     </div>
   </header>
-  <div class="ctrl"><select id="bsel" aria-label="Wybierz budzet"></select><div class="tabs"><button id="tB" class="on" type="button">Budget</button><button id="tK" type="button">Kredyty</button></div>
+  <div class="ctrl"><select id="bsel" aria-label="Wybierz budzet"></select><div class="tabs"><button id="tB" class="on" type="button">Budget</button><button id="tK" type="button">Kredyty</button><button id="tF" type="button">KSeF</button></div>
 <div class="ctrlb" id="ctrlB"><div class="mp" id="months"></div>
   <div class="period">
     <span>Okres</span>
@@ -511,7 +511,7 @@ function renderK(){
 }
 function setTab(k){ $("viewB").hidden=k!=="K"?false:true; $("viewK").hidden=k!=="K"; document.querySelector("header .bar").hidden=k==="K";
   $("tB").className=k==="K"?"":"on"; $("tK").className=k==="K"?"on":""; try{ history.replaceState(null,"",k==="K"?"#kredyty":"#"); }catch{} }
-$("tB").onclick=()=>setTab("B"); $("tK").onclick=()=>setTab("K");
+$("tB").onclick=()=>setTab("B"); $("tK").onclick=()=>setTab("K"); $("tF").onclick=()=>{ location.href="ksef.html"; };
 function showPeriod(){
   let a=+document.getElementById("from").value, b=+document.getElementById("to").value;
   if(a>b) [a,b]=[b,a];

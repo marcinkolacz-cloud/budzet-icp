@@ -39,9 +39,28 @@
   .bar { display:flex; gap:8px; flex-wrap:wrap; }
   #preview { display:none; margin-top:12px; }
   #kPrev { margin-top:12px; } #kPrev[hidden]{display:none}
-  .kp { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
-  .kp div { border:1px solid #f0ebe3; border-radius:10px; padding:10px 12px; display:grid; gap:2px; font-size:13px; }
-  .kp b { font-size:14px; } .kp small { color:#8a8278; }
+  .kp { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px; }
+  .kc { border:1px solid var(--line); border-radius:14px; padding:14px 16px; display:grid; gap:10px; background:var(--card); }
+  .kc .kh { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .kc .kh b { font-size:15px; } .kc .kh small { color:var(--muted); font-size:12px; }
+  .kc .kg { display:grid; grid-template-columns:repeat(2,1fr); gap:8px 16px; }
+  .kc .kg span { display:block; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  .kc .kg strong { font-size:16px; font-variant-numeric:tabular-nums; }
+  .kc .pb { height:6px; border-radius:99px; background:var(--line); overflow:hidden; } .kc .pb i { display:block; height:100%; background:var(--acc,#1c1915); border-radius:99px; }
+  .kc .pf { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); }
+  .mp { position:relative; display:flex; align-items:center; gap:6px; padding:16px 0 8px; }
+  .mp .mnav { width:34px; padding:7px 0; text-align:center; }
+  .mp .mcur { min-width:130px; font-weight:600; display:inline-flex; gap:8px; align-items:center; justify-content:center; }
+  .mp .mcur small { color:var(--muted); font-weight:400; }
+  .mpp { position:absolute; top:100%; left:0; z-index:30; background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 12px 32px rgba(0,0,0,.12); padding:12px; width:300px; display:grid; gap:10px; }
+  .mpp[hidden]{display:none}
+  .mpp .yh { display:flex; justify-content:space-between; align-items:center; font-weight:600; }
+  .mpp .yh button { padding:4px 10px; }
+  .mpp .mg { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .mpp .mg button { border-radius:10px; padding:8px 0; font-size:13px; }
+  .mpp .mg button:disabled { opacity:.35; cursor:default; }
+  .mpp .mg button.on { background:var(--acc,#1c1915); color:var(--acc-ink,#fff); border-color:var(--acc,#1c1915); }
+  .mpp .mx { display:flex; flex-wrap:wrap; gap:6px; border-top:1px solid var(--line); padding-top:8px; }
   #preview.open { display:block; }
   .plist { display:grid; grid-template-columns:1fr 1fr; gap:8px 18px; }
   .plist div { display:flex; justify-content:space-between; border-bottom:1px solid #f0ebe3; padding:6px 0; }
@@ -115,7 +134,7 @@
     </div>
   </header>
   <div class="ctrl"><select id="bsel" aria-label="Wybierz budzet"></select><div class="tabs"><button id="tB" class="on" type="button">Budget</button><button id="tK" type="button">Kredyty</button></div>
-<div class="ctrlb" id="ctrlB"><div class="months" id="months"></div>
+<div class="ctrlb" id="ctrlB"><div class="mp" id="months"></div>
   <div class="period">
     <span>Okres</span>
     <select id="from"></select>
@@ -382,6 +401,39 @@ function fillSelect(id){
   const j=cur?PIT.findIndex(x=>x.lab===cur.lab&&x.i===cur.i):-1;
   sel.value=j>=0?j:Math.max(0,PIT.findIndex(x=>x.i===state.month));
 }
+let MPY=null;
+function renderMonths(){
+  const host=$("months"), wasOpen=!!(host.querySelector(".mpp")&&!host.querySelector(".mpp").hidden); host.innerHTML="";
+  const go=i=>{ if(i<0||i>=state.rows.length) return; state.month=i; save(); render(); };
+  const mk=(t,c,txt)=>{ const e=document.createElement(t); if(c) e.className=c; if(txt!=null) e.textContent=txt; if(t==="button") e.type="button"; return e; };
+  const cur=state.rows[state.month]||{}, ym=ymOf(cur.data||"");
+  const prev=mk("button","mnav","‹"), next=mk("button","mnav","›"), btn=mk("button","mcur");
+  prev.title="Poprzedni miesiac"; next.title="Nastepny miesiac"; prev.disabled=state.month<=0; next.disabled=state.month>=state.rows.length-1;
+  prev.onclick=()=>go(state.month-1); next.onclick=()=>go(state.month+1);
+  btn.append(document.createTextNode(ym?MON[+ym.slice(5)-1]+" "+ym.slice(0,4):(cur.data||"miesiac")),mk("small",null,(state.month+1)+"/"+state.rows.length));
+  btn.setAttribute("aria-haspopup","true");
+  const pop=mk("div","mpp"); pop.hidden=!wasOpen;
+  const byYm=new Map(), other=[]; state.rows.forEach((r,i)=>{ const y=ymOf(r.data||""); if(y) byYm.set(y,i); else other.push(i); });
+  const years=[...new Set([...byYm.keys()].map(y=>+y.slice(0,4)))].sort((a,b)=>a-b);
+  if(MPY==null||!years.includes(MPY)) MPY=ym?+ym.slice(0,4):(years[years.length-1]||new Date().getFullYear());
+  const draw=()=>{ pop.innerHTML="";
+    const yh=mk("div","yh"), yp=mk("button",null,"‹"), yn=mk("button",null,"›"); const yi=years.indexOf(MPY);
+    yp.disabled=yi<=0; yn.disabled=yi<0||yi>=years.length-1;
+    yp.onclick=e=>{ e.stopPropagation(); MPY=years[yi-1]; draw(); }; yn.onclick=e=>{ e.stopPropagation(); MPY=years[yi+1]; draw(); };
+    yh.append(yp,mk("span",null,String(MPY)),yn); pop.append(yh);
+    const g=mk("div","mg");
+    MON.forEach((m,k)=>{ const key=MPY+"-"+String(k+1).padStart(2,"0"), i=byYm.get(key), b=mk("button",i===state.month?"on":"",m);
+      if(i==null) b.disabled=true; else b.onclick=()=>{ pop.hidden=true; go(i); }; g.append(b); });
+    pop.append(g);
+    if(other.length){ const x=mk("div","mx"); other.forEach(i=>{ const b=mk("button",i===state.month?"on":"",state.rows[i].data||"miesiac"); b.onclick=()=>{ pop.hidden=true; go(i); }; x.append(b); }); pop.append(x); }
+  };
+  draw();
+  btn.onclick=e=>{ e.stopPropagation(); pop.hidden=!pop.hidden; if(!pop.hidden){ MPY=ym?+ym.slice(0,4):MPY; draw(); } };
+  pop.onclick=e=>e.stopPropagation();
+  host.append(prev,btn,next,pop);
+}
+document.addEventListener("click",()=>{ const p=document.querySelector("#months .mpp"); if(p) p.hidden=true; });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ const p=document.querySelector("#months .mpp"); if(p) p.hidden=true; } });
 function renderKPrev(){
   const box=$("kPrev"), host=$("kPrevList"); host.innerHTML=""; box.hidden=!state.credits.length; if(!state.credits.length) return;
   const T=todayIso();
@@ -389,11 +441,16 @@ function renderKPrev(){
     const pm=new Set(state.rows.filter(rr=>rr.paid&&rr.paid[c.name]).map(rr=>ymOf(rr.data)).filter(Boolean)), done=x=>x.date<T||pm.has(x.date.slice(0,7));
     const past=c.schedule.filter(done), fut=c.schedule.filter(x=>!done(x)), next=fut[0], last=c.schedule[c.schedule.length-1];
     const left=past.length?past[past.length-1].saldo:(c.schedule[0].saldo+c.schedule[0].kap);
-    const d=document.createElement("div");
-    d.innerHTML="<b></b><span></span><small></small>";
-    d.children[0].textContent=c.name+(c.meta.typ?" · "+c.meta.typ:"");
-    d.children[1].textContent=next?"Nastepna rata "+dmy(next.date)+" · "+zl2(next.rata):"Splacony";
-    d.children[2].textContent="Zostalo "+zl2(left)+" · raty "+past.length+"/"+c.schedule.length+" · koniec "+dmy(last.date);
+    const d=document.createElement("div"); d.className="kc";
+    const pct=c.schedule.length?Math.round(past.length/c.schedule.length*100):0, ods=fut.reduce((a,x)=>a+x.ods,0);
+    d.innerHTML="<div class='kh'><b></b><small></small></div><div class='kg'></div><div class='pb'><i></i></div><div class='pf'><span></span><span></span></div>";
+    d.querySelector(".kh b").textContent=c.name+(c.meta.typ?" · "+c.meta.typ:"");
+    d.querySelector(".kh small").textContent=c.meta.oproc?"opr. "+c.meta.oproc:"";
+    const g=d.querySelector(".kg");
+    [["Nastepna rata",next?zl2(next.rata):"splacony"],["Termin",next?dmy(next.date):"–"],["Kapital do splaty",zl2(left)],["Pozostale odsetki",zl2(ods)]]
+      .forEach(([a,b])=>{ const e=document.createElement("div"); e.innerHTML="<span></span><strong></strong>"; e.children[0].textContent=a; e.children[1].textContent=b; g.append(e); });
+    d.querySelector(".pb i").style.width=pct+"%";
+    const pf=d.querySelectorAll(".pf span"); pf[0].textContent="Raty "+past.length+"/"+c.schedule.length+" · "+pct+"%"; pf[1].textContent="Koniec "+dmy(last.date);
     host.append(d);
   });
 }
@@ -402,8 +459,7 @@ function render(){
   if(syncCredits()) save();
   if(state.month>=state.rows.length) state.month=state.rows.length-1;
   const r=row();
-  const months=document.getElementById("months"); months.innerHTML="";
-  state.rows.forEach((item,i)=>{ const b=document.createElement("button"); b.textContent=item.data||"miesiac"; if(i===state.month) b.className="on"; b.onclick=()=>{ state.month=i; save(); render(); }; months.append(b); });
+  renderMonths();
   PIT=periodItems(); fillSelect("from"); fillSelect("to"); renderKPrev();
   document.getElementById("inList").innerHTML="";
   const shown={in:0,ex:0}, sums={in:0,ex:0};

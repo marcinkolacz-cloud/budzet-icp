@@ -79,10 +79,51 @@ function imp(r){
  row[k]=Math.round(($("kw").value==="n"?r.net:r.gr)*100)/100;
  if(!inc){row.dt=row.dt||{};row.dt[k]=r.dt;}
  sv(BK,R);const I=ld(IK,{});I[r.no]={b:bid,ym,k,at:Date.now()};sv(IK,I);msg("Dodano „"+k+"” do "+(inc?"wplywow":"kosztow")+" ("+ym+")");render();}
+const XC={};
+async function getXml(r){if(XC[r.no]) return XC[r.no];const x=await A.ksefXml(r.no);if("err" in x) throw new Error(x.err);return XC[r.no]=x.ok;}
 async function xml(r,btn){
  if(!A) return;btn.disabled=true;
- try{const x=await A.ksefXml(r.no);if("err" in x) throw new Error(x.err);
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([x.ok],{type:"application/xml"}));a.download=r.no+".xml";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5e3);
+ try{const t=await getXml(r);
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"application/xml"}));a.download=r.no+".xml";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5e3);
+ }catch(e){msg(String(e.message||e).slice(0,300),1);}
+ btn.disabled=false;}
+// Wizualizacja FA(2)/FA(3) -> druk do PDF (KSeF API zwraca tylko XML)
+const E=t=>String(t??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function faHtml(t,r){
+ const D=new DOMParser().parseFromString(t,"application/xml");if(D.getElementsByTagName("parsererror").length) throw new Error("Nie mozna odczytac XML");
+ const all=(n,el)=>[...(el||D).getElementsByTagNameNS("*",n)], g=(n,el)=>{const x=all(n,el)[0];return x?x.textContent.trim():"";}, nd=(n,el)=>all(n,el)[0]||null;
+ const fa=nd("Fa"), cur=g("KodWaluty",fa)||"PLN", m=v=>v===""?"":new Intl.NumberFormat("pl-PL",{minimumFractionDigits:2,maximumFractionDigits:2}).format(+v);
+ const party=(n,h)=>{const p=nd(n);if(!p) return "";const di=nd("DaneIdentyfikacyjne",p),ad=nd("Adres",p);
+  return `<div class="pb"><h4>${h}</h4><b>${E(g("Nazwa",di))}</b><div>${E(g("AdresL1",ad))}</div><div>${E(g("AdresL2",ad))}</div><div>${g("NIP",di)?"NIP: "+E(g("NIP",di)):E(g("NrID",di))}</div></div>`;};
+ const W=all("FaWiersz",fa).map(w=>`<tr><td>${E(g("NrWierszaFa",w))}</td><td class="l">${E(g("P_7",w))}</td><td>${E(g("P_8B",w))} ${E(g("P_8A",w))}</td><td>${m(g("P_9A",w)||g("P_9B",w))}</td><td>${E(g("P_12",w))}${/^\d+$/.test(g("P_12",w))?"%":""}</td><td>${m(g("P_11",w)||g("P_11A",w))}</td></tr>`).join("");
+ const ST=[["1","23%"],["2","8%"],["3","5%"],["4","ryczalt taksowki"],["5","OSS"],["6_1","0% kraj"],["6_2","0% WDT"],["6_3","0% eksport"],["7","zw"],["8","np"],["9","np art.100"],["10","odwrotne obc."],["11","marza"]];
+ const V=ST.map(([k,l])=>{const n=g("P_13_"+k,fa),v=g("P_14_"+k,fa);return n?`<tr><td class="l">${l}</td><td>${m(n)}</td><td>${v?m(v):"–"}</td></tr>`:"";}).join("");
+ const pl=nd("Platnosc",fa), FP={"1":"gotowka","2":"karta","3":"bon","4":"czek","5":"kredyt","6":"przelew","7":"mobilna"};
+ const pay=pl?`<p><b>Platnosc:</b> ${E(FP[g("FormaPlatnosci",pl)]||g("FormaPlatnosci",pl))} ${g("Termin",pl)?"· termin "+E(g("Termin",pl)):""} ${g("Zaplacono",pl)==="1"?"· zaplacono "+E(g("DataZaplaty",pl)):""}${all("NrRB",pl).map(x=>"<br>Rachunek: "+E(x.textContent.trim())).join("")}</p>`:"";
+ const RF={VAT:"Faktura VAT",KOR:"Faktura korygujaca",ZAL:"Faktura zaliczkowa",ROZ:"Faktura rozliczeniowa",UPR:"Faktura uproszczona",KOR_ZAL:"Korekta zaliczkowej",KOR_ROZ:"Korekta rozliczeniowej"};
+ const dod=all("DodatkowyOpis",fa).map(x=>`<div>${E(g("Klucz",x))}: ${E(g("Wartosc",x))}</div>`).join("");
+ return `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>${E(r.no)}</title><style>
+ @page{size:A4;margin:14mm}body{font:11px/1.45 "Segoe UI",Arial,sans-serif;color:#111;margin:0}
+ h1{font-size:20px;margin:0}h4{margin:0 0 4px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#666}
+ .hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:12px}.hd .r{text-align:right}
+ .ps{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px}.pb{border:1px solid #ddd;border-radius:6px;padding:8px 10px}
+ table{width:100%;border-collapse:collapse;margin-bottom:12px}th,td{border-bottom:1px solid #e3e3e3;padding:5px 6px;text-align:right}th{background:#f4f4f4;font-size:10px;text-transform:uppercase}.l{text-align:left}
+ .tot{display:flex;justify-content:flex-end;gap:24px;font-size:14px;margin:8px 0 14px}.tot b{font-size:18px}.ks{color:#666;font-size:9.5px;margin-top:18px;border-top:1px solid #ddd;padding-top:6px}
+ </style></head><body>
+ <div class="hd"><div><h1>${E(RF[g("RodzajFaktury",fa)]||"Faktura")}</h1><div>Nr <b>${E(g("P_2",fa))}</b></div></div>
+ <div class="r">Data wystawienia: <b>${E(g("P_1",fa))}</b>${g("P_1M",fa)?"<br>Miejsce: "+E(g("P_1M",fa)):""}${g("P_6",fa)?"<br>Data dostawy/uslugi: "+E(g("P_6",fa)):""}</div></div>
+ <div class="ps">${party("Podmiot1","Sprzedawca")}${party("Podmiot2","Nabywca")}</div>
+ ${W?`<table><thead><tr><th>Lp</th><th class="l">Nazwa</th><th>Ilosc</th><th>Cena</th><th>VAT</th><th>Wartosc</th></tr></thead><tbody>${W}</tbody></table>`:""}
+ ${V?`<table style="width:55%;margin-left:auto"><thead><tr><th class="l">Stawka</th><th>Netto</th><th>VAT</th></tr></thead><tbody>${V}</tbody></table>`:""}
+ <div class="tot"><span>Razem do zaplaty:</span><b>${m(g("P_15",fa))} ${E(cur)}</b></div>
+ ${pay}${dod}
+ <div class="ks">Numer KSeF: ${E(r.no)} · wizualizacja wygenerowana z pliku XML pobranego z KSeF</div>
+ </body></html>`;}
+async function pdf(r,btn){
+ if(!A) return;btn.disabled=true;
+ try{const h=faHtml(await getXml(r),r), f=document.createElement("iframe");f.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0";document.body.append(f);
+  f.contentDocument.open();f.contentDocument.write(h);f.contentDocument.close();
+  setTimeout(()=>{f.contentWindow.focus();f.contentWindow.print();setTimeout(()=>f.remove(),60e3);},250);
  }catch(e){msg(String(e.message||e).slice(0,300),1);}
  btn.disabled=false;}
 function render(){
@@ -98,7 +139,7 @@ function render(){
   const k=td(inc?(r.bname||r.bn):(r.sname||r.sn),"l k");const s=document.createElement("small");s.textContent=(inc?"":"NIP ")+(inc?r.bn:r.sn)+(r.typ&&r.typ!=="Vat"?" · "+r.typ:"");k.title=k.textContent;k.append(s);
   td(fmt(r.net,r.cur),"hm");td(fmt(r.vat,r.cur),"hm");td(fmt(r.gr,r.cur));
   const a=td("");const w=document.createElement("span");w.className="ac";
-  const bx=document.createElement("button");bx.type="button";bx.textContent="XML";bx.title="Pobierz fakture (XML)";bx.onclick=()=>xml(r,bx);w.append(bx);
+  const bx=document.createElement("button");bx.type="button";bx.textContent="XML";bx.title="Pobierz fakture (XML)";bx.onclick=()=>xml(r,bx);w.append(bx);const bp=document.createElement("button");bp.type="button";bp.textContent="PDF";bp.title="Drukuj / zapisz jako PDF";bp.onclick=()=>pdf(r,bp);w.append(bp);
   if(I[r.no]){const z=document.createElement("span");z.className="bd";z.textContent="w budzecie";z.title=I[r.no].k+" · "+I[r.no].ym;w.append(z);}
   else{const bi=document.createElement("button");bi.type="button";bi.textContent=inc?"Do wplywow":"Do kosztow";bi.onclick=()=>imp(r);w.append(bi);}
   a.append(w);tb.append(tr);});}

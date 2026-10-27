@@ -74,6 +74,7 @@
   .tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
   .filt{display:flex;gap:6px;margin:0 0 6px}
   .filt select{padding:6px 10px}
+  #srtEx{flex:0 0 auto;width:auto;min-width:170px}
   .note{color:var(--muted);font-size:12px;margin:0 0 6px}
   .stat .pd{display:block;margin-top:4px;font-size:12px;color:var(--muted)} .stat .pd b{color:#16a34a;font-weight:600}
   .row.cost .span3{grid-column:5 / 8;display:flex}
@@ -161,7 +162,7 @@
       <div class="filt"><input id="qIn" placeholder="Szukaj..." /><select id="mIn"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option></select></div>
       <div class="note" id="sIn"></div><div class="lst"><div class="lh"><span>Nazwa</span><span>Kwota</span><span></span></div><div id="inList"></div><form class="qa" id="qaIn" autocomplete="off"><i>+</i><input placeholder="Dodaj wplyw…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
     <section><h2 id="hEx">Koszty</h2>
-      <div class="filt"><input id="qEx" placeholder="Szukaj..." /><input id="nEx" placeholder="Uwaga..." /><select id="mEx"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option><option value="paid">Oplacone</option><option value="unpaid">Nieoplacone</option></select><select id="sEx" aria-label="Sortowanie"><option value="">Kolejnosc reczna</option><option value="d-">Data: najnowsze</option><option value="d+">Data: najstarsze</option></select></div>
+      <div class="filt"><input id="qEx" placeholder="Szukaj..." /><input id="nEx" placeholder="Uwaga..." /><select id="mEx"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option><option value="paid">Oplacone</option><option value="unpaid">Nieoplacone</option></select><select id="srtEx" aria-label="Sortowanie"><option value="">Kolejnosc reczna</option><option value="d-">Data: najnowsze</option><option value="d+">Data: najstarsze</option></select></div>
       <div class="note" id="sEx"></div><div class="lst"><div class="lh cost"><span>Nazwa</span><span>Kwota</span><span>VAT</span><span>Data</span><span>Raty</span><span>Zostalo</span><span>Uwaga</span><span>KSeF</span><span></span></div><div id="exList"></div><form class="qa" id="qaEx" autocomplete="off"><i>+</i><input placeholder="Dodaj koszt…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
   </div>
 </div>
@@ -315,7 +316,7 @@ function passes(kind,key,r){
 }
 [["in","qIn","mIn"],["ex","qEx","mEx"]].forEach(([k,q,m])=>{ $(q).oninput=()=>{ flt[k].q=$(q).value; render(); }; $(m).onchange=()=>{ flt[k].m=$(m).value; render(); }; });
 $("nEx").oninput=()=>{ flt.ex.n=$("nEx").value; render(); };
-$("sEx").value=exSort; $("sEx").onchange=()=>{ exSort=$("sEx").value; try{ localStorage.setItem("budget-exsort",exSort); }catch{} render(); };
+$("srtEx").value=exSort; $("srtEx").onchange=()=>{ exSort=$("srtEx").value; try{ localStorage.setItem("budget-exsort",exSort); }catch{} render(); };
 const row = () => state.rows[state.month] || state.rows[0];
 const earned = r => state.incomes.reduce((a,k)=>a+num(r[k]),0);
 const spent = r => state.expenses.reduce((a,k)=>a+num(r[k]),0);

@@ -49,7 +49,7 @@ function chipUi(pr,admin){
 }
 
 // --- synchronizacja
-function schedule(k){if(locked)return;setSt("zapisywanie…");clearTimeout(timers[k]);timers[k]=setTimeout(()=>push(k),800);}
+function schedule(k){if(locked)return;setSt("zapisywanie…");clearTimeout(timers[k]);timers[k]=setTimeout(()=>push(k),5000);}
 let inflight=0;
 const synced={};
 function toast(t){const d=document.createElement("div");d.textContent=t;d.style.cssText="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:10002;background:var(--acc,#1c1915);color:var(--acc-ink,#fff);font:13px 'Segoe UI',sans-serif;padding:10px 16px;border-radius:999px;box-shadow:0 6px 24px #0003;max-width:90vw";document.body.append(d);setTimeout(()=>d.remove(),7000);}

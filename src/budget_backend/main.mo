@@ -64,8 +64,10 @@ persistent actor Budget {
     };
     if (cur != expected) return #err("conflict");
     if (cur == 0 and count >= 20) return #err("Za duzo kluczy");
-    let rest = Array.filter<Rec>(kv, func(r) { not (r.owner == msg.caller and r.key == key) });
-    kv := Array.append(rest, [{ owner = msg.caller; key = key; value = value; rev = cur + 1 }]);
+    let nr : Rec = { owner = msg.caller; key = key; value = value; rev = cur + 1 };
+    if (cur == 0) { kv := Array.append(kv, [nr]) } else {
+      kv := Array.map<Rec, Rec>(kv, func(r) { if (r.owner == msg.caller and r.key == key) nr else r })
+    };
     #ok(cur + 1)
   };
 

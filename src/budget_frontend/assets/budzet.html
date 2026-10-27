@@ -149,7 +149,7 @@
     <div class="stat"><span>Przychod</span><strong id="inc">0 zl</strong><small class="pd" id="pIn"></small></div>
     <div class="stat"><span>Wydatki</span><strong id="out">0 zl</strong><small class="pd" id="pEx"></small></div>
     <div class="stat"><span>W kasie</span><strong id="cash">0 zl</strong><small class="pd" id="pCash"></small></div>
-    <div class="stat"><span>VAT · caly projekt</span><strong id="vatT">0 zl</strong><small class="pd" id="pVat"></small></div>
+    <div class="stat"><span>VAT · caly projekt</span><strong id="vatT">0 zl</strong><small class="pd" id="pVat"></small><button id="vatAdd" type="button" hidden style="margin-top:6px">+ Dodaj pozycje vat</button></div>
   </div>
   <section id="kPrev" hidden><h2>Kredyty</h2><div class="kp" id="kPrevList"></div></section>
   <section id="preview"><h2 id="previewTitle">Podglad</h2>
@@ -478,7 +478,7 @@ function render(){
   const pd=(L,k)=>L.reduce((a,x)=>a+(r.paid&&r.paid[x]&&passes(k,x,r)?num(r[x]):0),0), PI=pd(state.incomes,"in"), PE=pd(state.expenses,"ex");
   $("pIn").innerHTML="Wplynelo <b>"+zl(PI)+"</b> · czeka "+zl(I-PI); $("pEx").innerHTML="Oplacone <b>"+zl(PE)+"</b> · do zaplaty "+zl(E-PE);
   { const vk=state.expenses.filter(k=>ASC(k).trim()==="vat"); let vt=0,vp=0; state.rows.forEach(rr=>vk.forEach(k=>{ const v=num(rr[k]); vt+=v; if(rr.paid&&rr.paid[k]) vp+=v; }));
-  $("vatT").textContent=vk.length?zl(vt):"–"; $("pVat").innerHTML=vk.length?"Oplacone <b>"+zl(vp)+"</b> · do zaplaty "+zl(vt-vp)+" · "+state.rows.length+" mies.":"brak pozycji „vat”"; }
+  $("vatT").textContent=vk.length?zl(vt):"–"; $("pVat").innerHTML=vk.length?"Oplacone <b>"+zl(vp)+"</b> · do zaplaty "+zl(vt-vp)+" · "+state.rows.length+" mies.":""; $("vatAdd").hidden=!!vk.length; }
   $("cash").textContent=zl(PI-PE); $("cash").style.color=PI-PE<0?"var(--neg,#c0392b)":""; $("pCash").innerHTML="Wplynelo − Oplacone · zaplanowane <b>"+zl(Math.min(Math.max(E-PE,0),Math.max(PI-PE,0)))+"</b>";
   $("bal").textContent=zl(I-E); $("inc").textContent=zl(I); $("out").textContent=zl(E);
   if($("preview").className==="open") showPeriod();
@@ -568,6 +568,7 @@ document.getElementById("addEx").onclick=qaEx;
 document.getElementById("showPeriod").onclick=showPeriod;
 document.getElementById("hidePeriod").onclick=()=>document.getElementById("preview").className="";
 $("xlB").onclick=()=>IO.excel("budzet");
+$("vatAdd").onclick=()=>{ if(!state.expenses.some(k=>ASC(k).trim()==="vat")) state.expenses.unshift("vat"); save(); render(); };
 // --- wybor / dodawanie / zmiana nazwy / usuwanie budzetow
 const bName = () => bcur ? bxOf(bcur).name : (R.bname || "Budzet glowny");
 function bMount(){ const el=$("bsel"); el.innerHTML=""; const add=(v,t)=>{ const o=document.createElement("option"); o.value=v; o.textContent=t; el.append(o); };

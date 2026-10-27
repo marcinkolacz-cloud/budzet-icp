@@ -16,7 +16,7 @@
   button, select { border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 12px; cursor:pointer; font:inherit; color:var(--ink); }
   .months button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
   .period { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; color:var(--muted); }
-  .stats { display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr 1fr; gap:12px; }
+  .stats { display:grid; grid-template-columns:1.4fr repeat(5,1fr); gap:12px; }
   .stat { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px 18px; }
   .stat span { color:var(--muted); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
   .stat strong { display:block; margin-top:6px; font-size:30px; letter-spacing:-.04em; }
@@ -76,7 +76,7 @@
   .filt select{padding:6px 10px}
   .note{color:var(--muted);font-size:12px;margin:0 0 6px}
   .stat .pd{display:block;margin-top:4px;font-size:12px;color:var(--muted)} .stat .pd b{color:#16a34a;font-weight:600}
-  .row.cost .span3{grid-column:4 / 7;display:flex}
+  .row.cost .span3{grid-column:5 / 8;display:flex}
   .row input.dt{padding:4px 6px;font-variant-numeric:tabular-nums}.row input.dt.auto{color:var(--muted)}
   .row.cost .span3 button{padding:5px 12px}
   input[readonly]{color:var(--muted);background:transparent;border-color:var(--line)}
@@ -97,7 +97,7 @@
   tfoot td{font-weight:700;border-top:2px solid var(--line)}
   @media (max-width:800px) { .stats,.grid,.plist { grid-template-columns:1fr; } .stat strong { font-size:24px; } }
 .row{padding:2px 0;gap:6px;grid-template-columns:1fr 104px 26px}
-  .row.cost{grid-template-columns:minmax(120px,1.5fr) 92px 124px 60px 92px minmax(70px,1fr) 38px 26px}
+  .row.cost{grid-template-columns:minmax(120px,1.5fr) 92px 140px 124px 60px 92px minmax(70px,1fr) 38px 26px}
   .ksef{display:flex;align-items:center;justify-content:center;cursor:pointer}.ksef input{width:15px;height:15px;margin:0;accent-color:var(--ink);cursor:pointer}
   .row input{padding:4px 8px;font-size:13px;border-radius:8px}
   .row.paid{padding:2px 6px;border-radius:8px}
@@ -111,8 +111,9 @@
   .row summary{padding:2px 6px}
   .lst{max-height:calc(100vh - 230px);min-height:220px;overflow:auto;margin:0 -6px;padding:0 6px}
   .lh{padding-left:16px!important;display:grid;gap:6px;grid-template-columns:1fr 104px 26px;position:sticky;top:0;z-index:2;background:var(--card);padding:4px 0;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-  .lh.cost{grid-template-columns:minmax(120px,1.5fr) 92px 124px 60px 92px minmax(70px,1fr) 38px 26px}
-  .lh.cost span:nth-child(7){text-align:center}
+  .lh.cost{grid-template-columns:minmax(120px,1.5fr) 92px 140px 124px 60px 92px minmax(70px,1fr) 38px 26px}
+  .lh.cost span:nth-child(8){text-align:center}
+  .vc{display:flex;gap:4px;align-items:center}.vc select{padding:3px 2px;border-radius:8px;font-size:12px;width:54px;flex:none}.vc output{flex:1;text-align:right;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
   .lh span:nth-child(2),.lh span:nth-child(4){text-align:right}
   .qa{display:grid;grid-template-columns:22px 1fr 104px 26px;gap:6px;align-items:center;position:sticky;bottom:0;z-index:2;background:var(--card);border-top:1px dashed var(--line);padding:6px 0 4px}
   .qa i{font-style:normal;color:var(--muted);text-align:center;font-size:16px}
@@ -149,7 +150,8 @@
     <div class="stat"><span>Przychod</span><strong id="inc">0 zl</strong><small class="pd" id="pIn"></small></div>
     <div class="stat"><span>Wydatki</span><strong id="out">0 zl</strong><small class="pd" id="pEx"></small></div>
     <div class="stat"><span>W kasie</span><strong id="cash">0 zl</strong><small class="pd" id="pCash"></small></div>
-    <div class="stat"><span>VAT · caly projekt</span><strong id="vatT">0 zl</strong><small class="pd" id="pVat"></small><button id="vatAdd" type="button" hidden style="margin-top:6px">+ Dodaj pozycje vat</button></div>
+    <div class="stat"><span>VAT zaplacone</span><strong id="vatP">0 zl</strong><small class="pd" id="pVatP"></small></div>
+    <div class="stat"><span>VAT niezaplacone</span><strong id="vatU">0 zl</strong><small class="pd" id="pVatU"></small></div>
   </div>
   <section id="kPrev" hidden><h2>Kredyty</h2><div class="kp" id="kPrevList"></div></section>
   <section id="preview"><h2 id="previewTitle">Podglad</h2>
@@ -160,7 +162,7 @@
       <div class="note" id="sIn"></div><div class="lst"><div class="lh"><span>Nazwa</span><span>Kwota</span><span></span></div><div id="inList"></div><form class="qa" id="qaIn" autocomplete="off"><i>+</i><input placeholder="Dodaj wplyw…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
     <section><h2 id="hEx">Koszty</h2>
       <div class="filt"><input id="qEx" placeholder="Szukaj..." /><input id="nEx" placeholder="Uwaga..." /><select id="mEx"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option><option value="paid">Oplacone</option><option value="unpaid">Nieoplacone</option></select></div>
-      <div class="note" id="sEx"></div><div class="lst"><div class="lh cost"><span>Nazwa</span><span>Kwota</span><span>Data</span><span>Raty</span><span>Zostalo</span><span>Uwaga</span><span>KSeF</span><span></span></div><div id="exList"></div><form class="qa" id="qaEx" autocomplete="off"><i>+</i><input placeholder="Dodaj koszt…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
+      <div class="note" id="sEx"></div><div class="lst"><div class="lh cost"><span>Nazwa</span><span>Kwota</span><span>VAT</span><span>Data</span><span>Raty</span><span>Zostalo</span><span>Uwaga</span><span>KSeF</span><span></span></div><div id="exList"></div><form class="qa" id="qaEx" autocomplete="off"><i>+</i><input placeholder="Dodaj koszt…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
   </div>
 </div>
 <div id="viewK" hidden>
@@ -209,6 +211,10 @@ let state = bcur ? bxOf(bcur).b : R;
 const zl = n => new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN",maximumFractionDigits:0}).format(n||0);
 const num = v => { const n = Number(String(v??"").replace(/\s/g,"").replace(",",".")); return Number.isFinite(n)?n:0; };
 const save = () => localStorage.setItem(KEY, JSON.stringify(R));
+// VAT liczony z kwoty brutto; stawka per pozycja dla calego projektu (state.vr); domyslnie 23% w projektach, brak w budzecie glownym
+const VR=["23","8","5","0","-"];
+const vrOf = k => { const v=(state.vr||{})[k]; return v!=null?v:(bcur?"23":"-"); };
+const vatOf = (k,br) => { if(creditByKey(k)||creditByOver(k)) return 0; const t=+vrOf(k); return Number.isFinite(t)&&t>0?Math.round(num(br)*t/(100+t)*100)/100:0; };
 state.credits = state.credits || [];
 const toBin=(type,label,data)=>{const x=bcur?bxOf(bcur):null;(R.bin=R.bin||[]).push({id:Date.now()*1000+Math.floor(Math.random()*1000),ts:Date.now(),type,label:(x?"["+x.name+"] ":"")+label,data:JSON.parse(JSON.stringify(x?{...data,bid:x.id}:data))});};
 const $ = id => document.getElementById(id);
@@ -365,7 +371,12 @@ function line(list, kind, i){
     state.rows.forEach((rr,ix)=>{ if(ix>=state.month){ rr.del=rr.del||{}; rr.del[key]=true; delete rr[key]; if(rr.paid) delete rr.paid[key]; } });
     if(!state.rows.some(rr=>num(rr[key])!==0)){ list.splice(list.indexOf(key),1); state.rows.forEach(rr=>{ delete rr[key]; if(rr.paid) delete rr.paid[key]; if(rr.del) delete rr.del[key]; }); delete state.loans[key]; }
     save(); render(); }]);
-  el.append(name, amt); if(dt) el.append(dt);
+  let vc=null;
+  if(kind==="ex"){ vc=document.createElement("div"); vc.className="vc";
+    if(!cr&&!ov){ const se=document.createElement("select"); se.setAttribute("aria-label","Stawka VAT: "+key); VR.forEach(x=>{ const o=document.createElement("option"); o.value=x; o.textContent=x==="-"?"–":x+"%"; se.append(o); }); se.value=vrOf(key);
+      const out=document.createElement("output"); const upd=()=>{ const v=vatOf(key,amt.value); out.textContent=v?zl2(v):""; }; upd();
+      se.onchange=()=>{ state.vr=state.vr||{}; state.vr[key]=se.value; save(); render(); }; amt.addEventListener("input",upd); vc.append(se,out); } }
+  el.append(name, amt); if(vc) el.append(vc); if(dt) el.append(dt);
   if(ov){
     const sp=document.createElement("div"); sp.className="span3";
     if(num(r[key])>0){ const b=document.createElement("button"); b.type="button"; b.textContent="Import nowego harmonogramu"; b.onclick=()=>pickFile(ov); sp.append(b); }
@@ -477,8 +488,8 @@ function render(){
   $("balLabel").textContent="Zostaje · "+(r.data||"")+(fa?" · filtr":"");
   const pd=(L,k)=>L.reduce((a,x)=>a+(r.paid&&r.paid[x]&&passes(k,x,r)?num(r[x]):0),0), PI=pd(state.incomes,"in"), PE=pd(state.expenses,"ex");
   $("pIn").innerHTML="Wplynelo <b>"+zl(PI)+"</b> · czeka "+zl(I-PI); $("pEx").innerHTML="Oplacone <b>"+zl(PE)+"</b> · do zaplaty "+zl(E-PE);
-  { const vk=state.expenses.filter(k=>ASC(k).trim()==="vat"); let vt=0,vp=0; state.rows.forEach(rr=>vk.forEach(k=>{ const v=num(rr[k]); vt+=v; if(rr.paid&&rr.paid[k]) vp+=v; }));
-  $("vatT").textContent=vk.length?zl(vt):"–"; $("pVat").innerHTML=vk.length?"Oplacone <b>"+zl(vp)+"</b> · do zaplaty "+zl(vt-vp)+" · "+state.rows.length+" mies.":""; $("vatAdd").hidden=!!vk.length; }
+  { let vp=0,vu=0,np=0,nu=0; state.rows.forEach(rr=>state.expenses.forEach(k=>{ const v=vatOf(k,rr[k]); if(!v) return; if(rr.paid&&rr.paid[k]){ vp+=v; np++; } else { vu+=v; nu++; } }));
+  $("vatP").textContent=zl2(vp); $("pVatP").textContent="caly projekt · "+np+" poz."; $("vatU").textContent=zl2(vu); $("pVatU").textContent="caly projekt · "+nu+" poz."; }
   $("cash").textContent=zl(PI-PE); $("cash").style.color=PI-PE<0?"var(--neg,#c0392b)":""; $("pCash").innerHTML="Wplynelo − Oplacone · zaplanowane <b>"+zl(Math.min(Math.max(E-PE,0),Math.max(PI-PE,0)))+"</b>";
   $("bal").textContent=zl(I-E); $("inc").textContent=zl(I); $("out").textContent=zl(E);
   if($("preview").className==="open") showPeriod();
@@ -568,7 +579,6 @@ document.getElementById("addEx").onclick=qaEx;
 document.getElementById("showPeriod").onclick=showPeriod;
 document.getElementById("hidePeriod").onclick=()=>document.getElementById("preview").className="";
 $("xlB").onclick=()=>IO.excel("budzet");
-$("vatAdd").onclick=()=>{ if(!state.expenses.some(k=>ASC(k).trim()==="vat")) state.expenses.unshift("vat"); save(); render(); };
 // --- wybor / dodawanie / zmiana nazwy / usuwanie budzetow
 const bName = () => bcur ? bxOf(bcur).name : (R.bname || "Budzet glowny");
 function bMount(){ const el=$("bsel"); el.innerHTML=""; const add=(v,t)=>{ const o=document.createElement("option"); o.value=v; o.textContent=t; el.append(o); };

@@ -76,6 +76,8 @@
   .filt select{padding:6px 10px}
   #srtEx{flex:0 0 auto;width:auto;min-width:170px}
   #odEx,#doEx{flex:0 0 auto;width:150px}
+  .row.foot{border-top:1px solid var(--line,#e6e0d6);margin-top:4px;padding:8px 0 4px 14px;font-weight:600;font-variant-numeric:tabular-nums;align-items:center}
+  .row.foot .r{text-align:right}.row.foot .m{grid-column:4/-1;color:var(--muted,#7a736a);font-weight:500}
   .note{color:var(--muted);font-size:12px;margin:0 0 6px}
   .stat .pd{display:block;margin-top:4px;font-size:12px;color:var(--muted)} .stat .pd b{color:#16a34a;font-weight:600}
   .row.cost .span3{grid-column:5 / 8;display:flex}
@@ -164,7 +166,7 @@
       <div class="note" id="sIn"></div><div class="lst"><div class="lh"><span>Nazwa</span><span>Kwota</span><span></span></div><div id="inList"></div><form class="qa" id="qaIn" autocomplete="off"><i>+</i><input placeholder="Dodaj wplyw…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
     <section><h2 id="hEx">Koszty</h2>
       <div class="filt"><input id="qEx" placeholder="Szukaj..." /><input id="nEx" placeholder="Uwaga..." /><select id="mEx"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option><option value="paid">Oplacone</option><option value="unpaid">Nieoplacone</option></select><input id="odEx" type="date" title="Data od" aria-label="Data od" /><input id="doEx" type="date" title="Data do" aria-label="Data do" /><select id="srtEx" aria-label="Sortowanie"><option value="">Kolejnosc reczna</option><option value="d-">Data: najnowsze</option><option value="d+">Data: najstarsze</option></select></div>
-      <div class="note" id="sEx"></div><div class="lst"><div class="lh cost"><span>Nazwa</span><span>Kwota</span><span>VAT</span><span>Data</span><span>Raty</span><span>Zostalo</span><span>Uwaga</span><span>KSeF</span><span></span></div><div id="exList"></div><form class="qa" id="qaEx" autocomplete="off"><i>+</i><input placeholder="Dodaj koszt…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
+      <div class="note" id="sEx"></div><div class="lst"><div class="lh cost"><span>Nazwa</span><span>Kwota</span><span>VAT</span><span>Data</span><span>Raty</span><span>Zostalo</span><span>Uwaga</span><span>KSeF</span><span></span></div><div id="exList"></div><div class="row cost foot" id="exFoot"></div><form class="qa" id="qaEx" autocomplete="off"><i>+</i><input placeholder="Dodaj koszt…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
   </div>
 </div>
 <div id="viewK" hidden>
@@ -488,7 +490,8 @@ function render(){
   state.incomes.forEach((k,i)=>{ if(!passes("in",k,r)) return; shown.in++; sums.in+=num(r[k]); document.getElementById("inList").append(line(state.incomes,"in",i)); });
   document.getElementById("exList").innerHTML="";
   const exOrd=state.expenses.map((k,i)=>i); if(exSort){ const dd=r.dt||{}, sg=exSort==="d+"?1:-1; exOrd.sort((a,b)=>{ const x=dd[state.expenses[a]]||"", y=dd[state.expenses[b]]||""; if(!x||!y) return (!x)-(!y)||a-b; return x<y?-sg:x>y?sg:a-b; }); }
-  exOrd.forEach(i=>{ const k=state.expenses[i]; if(!passes("ex",k,r)) return; shown.ex++; sums.ex+=num(r[k]); document.getElementById("exList").append(line(state.expenses,"ex",i)); });
+  let fV=0,fP=0; exOrd.forEach(i=>{ const k=state.expenses[i]; if(!passes("ex",k,r)) return; shown.ex++; sums.ex+=num(r[k]); fV+=vatOf(k,r[k]); if(r.paid&&r.paid[k]) fP+=num(r[k]); document.getElementById("exList").append(line(state.expenses,"ex",i)); });
+  { const ft=$("exFoot"), c=(t,cl)=>{ const e=document.createElement("span"); if(cl) e.className=cl; e.textContent=t; return e; }; ft.replaceChildren(c("Suma ("+shown.ex+")"),c(zl(sums.ex),"r"),c(zl(fV),"r"),c("Oplacone "+zl(fP)+" · Nieoplacone "+zl(sums.ex-fP),"m")); ft.hidden=!shown.ex; }
   $("hIn").textContent="Wplywy ("+shown.in+"/"+state.incomes.length+")"; $("hEx").textContent="Koszty ("+shown.ex+"/"+state.expenses.length+")";
   const act=k=>flt[k].q||flt[k].m||flt[k].n||flt[k].od||flt[k].do, fa=act("in")||act("ex"), I=act("in")?sums.in:earned(r), E=act("ex")?sums.ex:spent(r);
   $("sIn").textContent=act("in")?"Suma widocznych: "+zl(sums.in):""; $("sEx").textContent=act("ex")?"Suma widocznych: "+zl(sums.ex):"";

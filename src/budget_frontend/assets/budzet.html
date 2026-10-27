@@ -161,7 +161,7 @@
       <div class="filt"><input id="qIn" placeholder="Szukaj..." /><select id="mIn"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option></select></div>
       <div class="note" id="sIn"></div><div class="lst"><div class="lh"><span>Nazwa</span><span>Kwota</span><span></span></div><div id="inList"></div><form class="qa" id="qaIn" autocomplete="off"><i>+</i><input placeholder="Dodaj wplyw…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
     <section><h2 id="hEx">Koszty</h2>
-      <div class="filt"><input id="qEx" placeholder="Szukaj..." /><input id="nEx" placeholder="Uwaga..." /><select id="mEx"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option><option value="paid">Oplacone</option><option value="unpaid">Nieoplacone</option></select></div>
+      <div class="filt"><input id="qEx" placeholder="Szukaj..." /><input id="nEx" placeholder="Uwaga..." /><select id="mEx"><option value="">Wszystkie</option><option value="val">Z kwota</option><option value="zero">Puste</option><option value="paid">Oplacone</option><option value="unpaid">Nieoplacone</option></select><select id="sEx" aria-label="Sortowanie"><option value="">Kolejnosc reczna</option><option value="d-">Data: najnowsze</option><option value="d+">Data: najstarsze</option></select></div>
       <div class="note" id="sEx"></div><div class="lst"><div class="lh cost"><span>Nazwa</span><span>Kwota</span><span>VAT</span><span>Data</span><span>Raty</span><span>Zostalo</span><span>Uwaga</span><span>KSeF</span><span></span></div><div id="exList"></div><form class="qa" id="qaEx" autocomplete="off"><i>+</i><input placeholder="Dodaj koszt…" /><input class="amt" placeholder="kwota" inputmode="decimal" /><button type="submit" title="Dodaj (Enter)">+</button></form></div></section>
   </div>
 </div>
@@ -305,6 +305,7 @@ $("kFile").onchange=async()=>{ const f=$("kFile").files[0]; if(!f) return;
 $("addCredit").onclick=()=>pickFile(null);
 // --- filtry
 const flt={in:{q:"",m:""},ex:{q:"",m:"",n:""}};
+let exSort=""; try{ exSort=localStorage.getItem("budget-exsort")||""; }catch{}
 function passes(kind,key,r){
   if(r.del&&r.del[key]) return false;
   const f=flt[kind]; if(f.q&&!ASC(key).includes(ASC(f.q))) return false;
@@ -314,6 +315,7 @@ function passes(kind,key,r){
 }
 [["in","qIn","mIn"],["ex","qEx","mEx"]].forEach(([k,q,m])=>{ $(q).oninput=()=>{ flt[k].q=$(q).value; render(); }; $(m).onchange=()=>{ flt[k].m=$(m).value; render(); }; });
 $("nEx").oninput=()=>{ flt.ex.n=$("nEx").value; render(); };
+$("sEx").value=exSort; $("sEx").onchange=()=>{ exSort=$("sEx").value; try{ localStorage.setItem("budget-exsort",exSort); }catch{} render(); };
 const row = () => state.rows[state.month] || state.rows[0];
 const earned = r => state.incomes.reduce((a,k)=>a+num(r[k]),0);
 const spent = r => state.expenses.reduce((a,k)=>a+num(r[k]),0);
@@ -393,7 +395,7 @@ function line(list, kind, i){
     el.append(raty, calosc, uwaga, kl);
   }
   el.dataset.k=key; const gp=document.createElement("span"); gp.className="grip"; gp.textContent="⋮⋮"; gp.title="Zlap i przesun"; gp.setAttribute("aria-hidden","true");
-  gp.onpointerdown=e=>dragRow(e,el,list,key); el.prepend(gp);
+  if(kind==="ex"&&exSort) gp.style.display="none"; else gp.onpointerdown=e=>dragRow(e,el,list,key); el.prepend(gp);
   el.append(menu(items)); return el;
 }
 // okres: miesiace budzetu + przyszle/przeszle miesiace z harmonogramow kredytow (wirtualne, tylko raty)
@@ -481,7 +483,8 @@ function render(){
   const shown={in:0,ex:0}, sums={in:0,ex:0};
   state.incomes.forEach((k,i)=>{ if(!passes("in",k,r)) return; shown.in++; sums.in+=num(r[k]); document.getElementById("inList").append(line(state.incomes,"in",i)); });
   document.getElementById("exList").innerHTML="";
-  state.expenses.forEach((k,i)=>{ if(!passes("ex",k,r)) return; shown.ex++; sums.ex+=num(r[k]); document.getElementById("exList").append(line(state.expenses,"ex",i)); });
+  const exOrd=state.expenses.map((k,i)=>i); if(exSort){ const dd=r.dt||{}, sg=exSort==="d+"?1:-1; exOrd.sort((a,b)=>{ const x=dd[state.expenses[a]]||"", y=dd[state.expenses[b]]||""; if(!x||!y) return (!x)-(!y)||a-b; return x<y?-sg:x>y?sg:a-b; }); }
+  exOrd.forEach(i=>{ const k=state.expenses[i]; if(!passes("ex",k,r)) return; shown.ex++; sums.ex+=num(r[k]); document.getElementById("exList").append(line(state.expenses,"ex",i)); });
   $("hIn").textContent="Wplywy ("+shown.in+"/"+state.incomes.length+")"; $("hEx").textContent="Koszty ("+shown.ex+"/"+state.expenses.length+")";
   const act=k=>flt[k].q||flt[k].m||flt[k].n, fa=act("in")||act("ex"), I=act("in")?sums.in:earned(r), E=act("ex")?sums.ex:spent(r);
   $("sIn").textContent=act("in")?"Suma widocznych: "+zl(sums.in):""; $("sEx").textContent=act("ex")?"Suma widocznych: "+zl(sums.ex):"";

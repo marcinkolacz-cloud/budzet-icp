@@ -4,7 +4,7 @@ import {IDL} from "@icp-sdk/core/candid";
 import {Principal} from "@icp-sdk/core/principal";
 
 const CANISTER="tj3o4-rqaaa-aaaac-bgdmq-cai";
-const SYNC=["gielda-v2","gielda-snaps","budzet-app-v3","krypto-v1","krypto-snaps","signals-v1"];           // synchronizowane z kontem (backend)
+const SYNC=["gielda-v2","gielda-snaps","budzet-app-v3","krypto-v1","krypto-snaps","signals-v1","kalendarz-v1"];           // synchronizowane z kontem (backend)
 const MANAGED=new Set([...SYNC,"gielda-v1","gielda-backup","staking-sum","staking-cur"]);       // izolowane lokalnie per konto
 const LS=localStorage,gi=Storage.prototype.getItem,si=Storage.prototype.setItem,ri=Storage.prototype.removeItem;
 let NS="",actor=null,client=null,locked=false;

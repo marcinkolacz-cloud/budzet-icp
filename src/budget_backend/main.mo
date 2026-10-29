@@ -511,6 +511,13 @@ persistent actor Budget {
     if (sec >= s and sec < e) 7_200 else 3_600
   };
   func secsToNext0800() : Nat { secsToNextAt(8 * 3_600) };
+  // stala godzina UTC (niezalezna od zmiany czasu): 16:02 UTC = 17:02 zima / 18:02 lato w PL
+  func secsToNextUtc(at : Int) : Nat {
+    let now = Time.now() / 1_000_000_000;
+    var diff : Int = at - now % 86_400;
+    if (diff <= 60) diff += 86_400;
+    Int.abs(diff)
+  };
   func secsToNextAt(at : Int) : Nat {
     let now = Time.now() / 1_000_000_000;
     let local = (now + warsawOffset(now)) % 86_400;
@@ -786,14 +793,24 @@ persistent actor Budget {
       [{ chain; day; staked; pending; reward; usd; pln; at = now }]);
   };
 
-  func stRun() : async () {
-    stLastRun := Time.now();
+  // ceny ICP/NEAR/INJ (CoinGecko, zapas: worker) -> stPrices; zwraca (log, cena NEAR, cena INJ)
+  func stPricesFetch() : async (Text, (Float, Float), (Float, Float)) {
     var log = "";
-    // neurony: osobny timer 18:02 (stNTick) + recznie stSyncNeurons
     var nearP = (0.0, 0.0); var injP = (0.0, 0.0);
     try {
       let hdr = if (stCgKey == "") [] else [{ name = "x-cg-demo-api-key"; value = stCgKey }];
-      let b = await httpGetRequestBounded("https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,near,injective-protocol&vs_currencies=usd,pln", hdr, null);
+      // CoinGecko czasem zwraca 5xx (np. 504) - 2 proby, potem worker; kolejne outcalle tylko przy bledzie
+      var b = ""; var tries = 0; var lastErr = "";
+      label cg while (tries < 2) {
+        tries += 1;
+        try { b := await httpGetRequestBounded("https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,near,injective-protocol&vs_currencies=usd,pln", hdr, null); break cg }
+        catch (e) { lastErr := Error.message(e) };
+      };
+      // zapas: te same ceny przez worker gielda-quote (Cloudflare)
+      if (b == "" and sgKey != "") {
+        try { b := await httpGetRequestBounded(SG_URL # "/cgp", sgHdr(), null) } catch (e) { lastErr #= " / worker: " # Error.message(e) };
+      };
+      if (b == "") throw Error.reject(lastErr);
       let h = Iter.toArray(b.chars());
       let icp = cgPrice(h, "internet-computer");
       nearP := cgPrice(h, "near"); injP := cgPrice(h, "injective-protocol");
@@ -803,6 +820,16 @@ persistent actor Budget {
           [{ day; icpUsd = icp.0; icpPln = icp.1; nearUsd = nearP.0; nearPln = nearP.1; injUsd = injP.0; injPln = injP.1 }]);
       } else log #= "ceny: brak danych; ";
     } catch (e) { log #= "ceny: " # Error.message(e) # "; " };
+    (log, nearP, injP)
+  };
+
+  func stRun() : async () {
+    stLastRun := Time.now();
+    var log = "";
+    // neurony: osobny timer 18:02 (stNTick) + recznie stSyncNeurons
+    var nearP = (0.0, 0.0); var injP = (0.0, 0.0);
+    let (pl, np, ip) = await stPricesFetch();
+    log #= pl; nearP := np; injP := ip;
     var near = 0; var nearOk = 0;
     for (pool in NEAR_POOLS.vals()) {
       let body = "{\"jsonrpc\":\"2.0\",\"id\":\"1\",\"method\":\"query\",\"params\":{\"request_type\":\"call_function\",\"finality\":\"final\",\"account_id\":\"" # pool # "\",\"method_name\":\"get_account_total_balance\",\"args_base64\":\"" # NEAR_ARGS # "\"}}";
@@ -860,10 +887,10 @@ persistent actor Budget {
     stArm<system>();
     await stRun();
   };
-  // auto sync neuronow codziennie 18:02 Europe/Warsaw (NNS Governance, bez outcalli)
+  // auto sync neuronow codziennie 16:02 UTC (17:02 zima / 18:02 lato) (NNS Governance, bez outcalli)
   func stNArm<system>() {
     switch (stNTimer) { case (?t) Timer.cancelTimer(t); case null {} };
-    stNTimer := ?Timer.setTimer<system>(#seconds (secsToNextAt(18 * 3_600 + 120)), stNTick);
+    stNTimer := ?Timer.setTimer<system>(#seconds (secsToNextUtc(16 * 3_600 + 120)), stNTick);
   };
   func stNTick() : async () {
     stNArm<system>();
@@ -906,6 +933,20 @@ persistent actor Budget {
     stFixMerges(stNeuronAt);
     let bad = Array.filter<StSync>(stSync, func(x) { not x.ok }).size();
     #ok(Nat.toText(stNeurons.size() - bad) # "/" # Nat.toText(stNeurons.size()) # " OK")
+  };
+
+  // tylko ceny (bez NEAR/INJ i neuronow) - nie rusza okresu nagrod 8:00-8:00
+  transient var stPriceAt : Int = 0;
+  public shared (msg) func stSyncPrices() : async Result.Result<Text, Text> {
+    if (not stCan(msg.caller)) return #err("Brak dostepu");
+    if (Time.now() - stPriceAt < 120_000_000_000) return #err("Odczekaj 2 min");
+    stPriceAt := Time.now();
+    let (pl, _, _) = await stPricesFetch();
+    if (pl != "") return #err(pl);
+    var keep = "";
+    for (p in Text.split(stLog, #text "; ")) { if (p != "" and not Text.startsWith(p, #text "ceny:") and p != "OK") keep #= p # "; " };
+    stLog := if (keep == "") "OK" else keep;
+    #ok("Ceny zapisane")
   };
 
   public shared (msg) func stSyncNow() : async Result.Result<Text, Text> {
@@ -1530,6 +1571,7 @@ persistent actor Budget {
       #stInjWdHeightGet : () -> ();
       #stSetKey : () -> Text;
       #stSyncNow : () -> ();
+      #stSyncPrices : () -> ();
       #stSyncNeurons : () -> ();
       #stTransform : () -> { response : HttpResp; context : Blob };
       #stWtnCloseDelete : () -> Nat;
@@ -1565,7 +1607,7 @@ persistent actor Budget {
       case (#sgAll _ or #sgPosDelete _ or #sgRunNow _ or #sgSetMail _ or #sgTestMail _) { stCan(caller) };
       case (#stTransform _) { false };
       case (#stRewardsImport _ or #stWtnPut _ or #stExtImport _) { stCan(caller) and arg.size() <= 1_900_000 };
-      case (#stAll _ or #stNeuronPut _ or #stNeuronRemove _ or #stRewardDelete _ or #stRewardToggleMerge _ or #stWtnDelete _ or #stWtnCloses _ or #stWtnClosePut _ or #stWtnCloseDelete _ or #stWtnPosPut _ or #stWtnPosRemove _ or #stSyncNow _ or #stSyncNeurons _) { stCan(caller) };
+      case (#stAll _ or #stNeuronPut _ or #stNeuronRemove _ or #stRewardDelete _ or #stRewardToggleMerge _ or #stWtnDelete _ or #stWtnCloses _ or #stWtnClosePut _ or #stWtnCloseDelete _ or #stWtnPosPut _ or #stWtnPosRemove _ or #stSyncNow _ or #stSyncPrices _ or #stSyncNeurons _) { stCan(caller) };
       case (_) { true };
     }
   };

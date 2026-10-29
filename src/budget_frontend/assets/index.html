@@ -40,6 +40,10 @@ const TILES=[
  let rem=0;C.forEach(c=>{const p=(K.S.prices[c.t]||{}).p||0,L=[...c.lv].sort((a,b)=>a.p-b.p);let q=0;L.forEach(l=>{if(p>0&&p>=l.p)q=l.q;});
   const k=c.cy==="d"?td:mon(td),s=c.sales.filter(x=>(c.cy==="d"?x.d:mon(x.d))===k).reduce((a,x)=>a+x.q,0);let r=Math.max(0,q-s);if(c.tot>0)r=Math.min(r,Math.max(0,c.tot-c.sales.reduce((a,x)=>a+x.q,0)));rem+=r*p;});
  return [K.money(rem,"USD",0),"do sprzedania w biezacym cyklu",rem>0?"pos":""];}},
+{title:"Kalendarz",href:"kalendarz.html",val(){
+ if(!window.CAL) return ["–","otworz kalendarz"]; const u=CAL.upcoming(7),t=CAL.today(),nx=u.up.find(x=>x.d===t&&x.e.k!=="t"&&!x.e.ad&&x.e.s)||u.up.find(x=>x.e.k!=="t")||u.up[0];
+ if(!nx&&!u.od.length) return ["0","nic w ciagu 7 dni"];
+ return [String(u.up.length),(nx?CAL.dayLabel(nx.d)+(nx.e.s&&!nx.e.ad?" "+nx.e.s:"")+" · "+nx.e.t:"")+(u.od.length?" · zalegle: "+u.od.length:""),u.od.length?"neg":""];}},
 {title:"Trading Signals",href:"signals.html",val(){return ["4 altcoiny","EMA200 + rezim BTC · alert e-mail",""];}}
 ];
 const host=document.getElementById("tiles");

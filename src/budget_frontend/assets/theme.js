@@ -49,6 +49,6 @@ function menus(){document.querySelectorAll(".mnu").forEach(function(m){var b=m.q
  p.addEventListener("click",function(e){if(e.target.closest("button"))cl()});
  document.addEventListener("click",function(e){if(!m.contains(e.target)&&!p.contains(e.target))cl()});
  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!p.hidden){cl();b.focus()}});addEventListener("resize",cl);addEventListener("scroll",function(e){if(!p.contains(e.target))cl()},true);});}
-function boot(){mount();menus()}
+function boot(){mount();menus();if(!window.CAL&&!document.querySelector('script[src="cal.js"]')){var cs=document.createElement("script");cs.src="cal.js";document.head.append(cs)}}
 document.readyState==="loading"?document.addEventListener("DOMContentLoaded",boot):boot();
 })();

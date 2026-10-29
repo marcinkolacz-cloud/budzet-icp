@@ -125,6 +125,9 @@
   .qa button{padding:0;width:26px;height:26px;border-radius:8px}
   .qa:focus-within{border-top-color:var(--ink)}
   @media (max-width:800px){.lst{max-height:none}.row.cost,.lh.cost{grid-template-columns:1fr 84px 26px}.row.cost>input:nth-child(n+3){grid-column:span 1}.lh.cost span:nth-child(n+3){display:none}}
+  .tip{position:fixed;z-index:10002;max-width:min(420px,calc(100vw - 24px));padding:6px 10px;border-radius:8px;background:var(--ink);color:var(--card);font-size:12.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word;box-shadow:0 6px 20px rgba(0,0,0,.18);pointer-events:none;opacity:0;transform:translateY(2px);transition:opacity .12s,transform .12s}
+  .tip.on{opacity:1;transform:none}
+  .row input.cut{text-overflow:ellipsis}
 </style>
 <link rel="stylesheet" href="theme.css"><script src="theme.js"></script>
 </head>
@@ -578,7 +581,7 @@ function nextName(name){
   return text;
 }
 document.getElementById("delMonth").onclick=()=>{ const r=row(); if(!confirm("Przeniesc do kosza miesiac "+(r.data||"")+"?")) return; toBin("b-month","Miesiac "+(r.data||""),{idx:state.month,row:r}); state.rows.splice(state.month,1); state.month=Math.max(0,state.month-1); save(); render(); };
-function addItem(list,n){ n=n.trim(); if(!n) return; if(list.includes(n)){ state.rows.forEach((rr,ix)=>{ if(ix>=state.month&&rr.del) delete rr.del[n]; }); } else list.push(n); save(); render(); }
+function addItem(list,n){ n=n.trim(); if(!n) return; if(list.includes(n)){ state.rows.forEach((rr,ix)=>{ if(ix>=state.month&&rr.del) delete rr.del[n]; }); } else { list.push(n); if(list===state.incomes) state.rows.forEach((rr,ix)=>{ if(ix<state.month){ rr.del=rr.del||{}; rr.del[n]=true; } }); } save(); render(); }
 function qaBind(id,get){ const f=$(id), [n,a]=f.querySelectorAll("input"), box=f.parentElement;
   f.onsubmit=e=>{ e.preventDefault(); const name=n.value.trim(); if(!name) return n.focus(); const v=a.value.trim(); if(v){ const rr=row(); rr[name]=v; if(id==="qaEx"){ rr.dt=rr.dt||{}; rr.dt[name]=todayIso(); } } n.value=""; a.value=""; addItem(get(),name); n.focus(); box.scrollTop=box.scrollHeight; };
   n.onkeydown=e=>{ if(e.key==="Enter"&&n.value.trim()&&!a.value){ e.preventDefault(); a.focus(); } };
@@ -611,6 +614,12 @@ render();
 if(location.hash==="#kredyty") setTab("K");
 
 })();
+(()=>{ const tip=Object.assign(document.createElement("div"),{className:"tip",role:"tooltip"}); document.body.append(tip); let cur=null;
+  const sel=".row input:not([type=date]):not([type=checkbox])", hide=()=>{ tip.classList.remove("on"); cur=null; };
+  document.addEventListener("pointerover",e=>{ const t=e.target.closest&&e.target.closest(sel); if(!t||t===cur) return; if(!t.value||t.scrollWidth<=t.clientWidth+1||document.activeElement===t){ hide(); return; }
+    cur=t; t.classList.add("cut"); tip.textContent=t.value; const r=t.getBoundingClientRect(); tip.style.left=Math.max(12,Math.min(r.left,innerWidth-tip.offsetWidth-12))+"px";
+    const below=r.bottom+6+tip.offsetHeight<innerHeight; tip.style.top=(below?r.bottom+6:r.top-6-tip.offsetHeight)+"px"; tip.classList.add("on"); });
+  document.addEventListener("pointerout",e=>{ if(cur&&e.target===cur) hide(); }); document.addEventListener("focusin",hide); addEventListener("scroll",hide,true); })();
 </script>
 </body>
 </html>

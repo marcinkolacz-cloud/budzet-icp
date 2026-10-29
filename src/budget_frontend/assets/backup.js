@@ -1,6 +1,6 @@
 /* Pelny backup calej aplikacji: dane przegladarki (synchronizowane) + backend (staking, signals, terminal) */
 ;(function(){
-const LSK=["budzet-app-v3","gielda-v2","gielda-snaps","krypto-v1","krypto-snaps","signals-v1"];
+const LSK=["budzet-app-v3","gielda-v2","gielda-snaps","krypto-v1","krypto-snaps","signals-v1","kalendarz-v1"];
 const PREF=["budzet-theme","budzet-accent","budzet-priv","budzet-cur","krypto-cur","staking-cur"];
 const idl=({IDL})=>{
  const N=IDL.Record({id:IDL.Nat64,name:IDL.Text,start:IDL.Int,dissolve:IDL.Nat64,initStake:IDL.Nat64,stake:IDL.Nat64});
@@ -61,7 +61,7 @@ async function batches(rows,n,f){let s=0;for(let i=0;i<rows.length;i+=n){const r
 async function imp(file){
  let o;try{o=parse(await file.text())}catch(e){return alert(e.message)}
  const L=o.ls||{},st=o.staking,sg=o.signals,tb=o.terminal;
- const what=[L["budzet-app-v3"]&&"Budzet",L["gielda-v2"]&&"Gielda",L["krypto-v1"]&&"Krypto + Terminal",L["signals-v1"]&&"Signals (demo)",st&&"Staking",sg&&"Signals (pozycje)",tb&&"plany auto-sprzedazy"].filter(Boolean);
+ const what=[L["budzet-app-v3"]&&"Budzet",L["gielda-v2"]&&"Gielda",L["krypto-v1"]&&"Krypto + Terminal",L["signals-v1"]&&"Signals (demo)",L["kalendarz-v1"]&&"Kalendarz",st&&"Staking",sg&&"Signals (pozycje)",tb&&"plany auto-sprzedazy"].filter(Boolean);
  if(!what.length)return alert("Plik nie zawiera danych.");
  if(!confirm("Przywrocic z backupu:\n• "+what.join("\n• ")+"\n\nBudzet/Gielda/Krypto zostana ZASTAPIONE (obecne zachowane w kopii w przegladarce). Staking i Signals sa dopisywane bez duplikatow. Boty nie sa przywracane, auto-sprzedaz wraca WYLACZONA."))return;
  const er=[];

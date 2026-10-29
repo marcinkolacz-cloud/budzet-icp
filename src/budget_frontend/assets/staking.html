@@ -20,7 +20,7 @@ dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
 <body><div class="app">
 <nav class="topnav"><a href="index.html">Dashboard</a><a href="budzet.html">Budget</a><a href="gielda.html">Gielda</a><a href="krypto.html">Krypto</a><a href="staking.html" class="on">Staking</a><a href="signals.html">Signals</a><a href="kosz.html">Kosz</a></nav>
 <header><div><h1>Staking</h1><div class="sub" id="st">Wczytywanie…</div></div>
-<div class="form"><select id="cur" aria-label="Waluta"><option>PLN</option><option>USD</option></select><button id="bs" class="dark" type="button">Synchronizuj ceny, NEAR, INJ</button><div class="mnu"><button type="button" class="mnb" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>Wiecej</button><div class="mnp" role="menu" hidden><b>Synchronizacja</b><button id="bn" type="button">Synchronizuj neurony</button><b>Dane</b><button id="bi" type="button">Import kopii Rewards</button></div></div></div></header>
+<div class="form"><select id="cur" aria-label="Waluta"><option>PLN</option><option>USD</option></select><button id="bs" class="dark" type="button">Synchronizuj ceny, NEAR, INJ</button><div class="mnu"><button type="button" class="mnb" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>Wiecej</button><div class="mnp" role="menu" hidden><b>Synchronizacja</b><button id="bn" type="button">Synchronizuj neurony</button><button id="bp" type="button">Tylko ceny (bez NEAR/INJ)</button><b>Dane</b><button id="bi" type="button">Import kopii Rewards</button></div></div></div></header>
 <div class="ctrl"><div class="chips" id="chips"></div></div>
 <p class="note" id="prog"></p>
 <div class="stats">
@@ -85,7 +85,7 @@ const idl=({IDL})=>{
   stWtnPosPut:IDL.Func([IDL.Nat,IDL.Text,IDL.Int],[RN],[]),stWtnPosRemove:IDL.Func([IDL.Nat],[RT],[]),
   stWtnPut:IDL.Func([IDL.Vec(W)],[RN],[]),stWtnDelete:IDL.Func([IDL.Nat,IDL.Int],[RT],[]),
   stWtnCloses:IDL.Func([],[IDL.Vec(WC)],["query"]),stWtnClosePut:IDL.Func([WC],[RT],[]),stWtnCloseDelete:IDL.Func([IDL.Nat],[RT],[]),
-  stExtImport:IDL.Func([IDL.Vec(E)],[RN],[]),stSyncNow:IDL.Func([],[RT],[]),stSyncNeurons:IDL.Func([],[RT],[])});
+  stExtImport:IDL.Func([IDL.Vec(E)],[RN],[]),stSyncNow:IDL.Func([],[RT],[]),stSyncPrices:IDL.Func([],[RT],[]),stSyncNeurons:IDL.Func([],[RT],[])});
 };
 const A=Auth.mk(idl);
 let D=null,live={},tab="all",H={p:"30",g:"d",a:"",b:""};try{Object.assign(H,JSON.parse(localStorage.getItem("stHist")||"{}"));}catch(e){}
@@ -211,7 +211,7 @@ function render(){
  renderHist(dm,N,W);
  // status
  const nx=Number(D.nextRunSec),h=Math.floor(nx/3600),mi=Math.floor(nx%3600/60);
- $("st").innerHTML=`Ostatni sync: <b>${D.lastRun?new Date(Number(D.lastRun/1000000n)).toLocaleString("pl-PL",{timeZone:TZ}):"–"}</b> · auto 08:00 ceny/NEAR/INJ (za ${h} h ${mi} min) · neurony auto 18:02`;
+ $("st").innerHTML=`Ostatni sync: <b>${D.lastRun?new Date(Number(D.lastRun/1000000n)).toLocaleString("pl-PL",{timeZone:TZ}):"–"}</b> · auto 08:00 ceny/NEAR/INJ (za ${h} h ${mi} min) · neurony auto ${(()=>{const d=new Date();d.setUTCHours(16,2,0,0);return d.toLocaleTimeString("pl-PL",{timeZone:TZ,hour:"2-digit",minute:"2-digit"});})()}`;
  $("chips").innerHTML=(D.hasKey?"":'<span class="bad">Brak klucza CoinGecko (stSetKey)</span>')+(D.log?`<span class="${D.log==="OK"?"ok":"bad"}">${esc(D.log)}</span>`:"")+(live.icp?`<span>ICP ${zl2(live.icp[K()])}</span><span>NEAR ${zl2(near.px)}</span><span>INJ ${zl2(inj.px)}</span>`:"");
 }
 function hRange(){
@@ -315,6 +315,7 @@ document.addEventListener("click",e=>{
  else if(ds.dw&&confirm("Usunac odczyt?")){const [a,c]=ds.dw.split("|");act(async()=>unwrap(await A.stWtnDelete(BigInt(a),BigInt(c))));}
 });
 $("bs").onclick=async()=>{$("bs").disabled=true;try{prog("Synchronizacja (CoinGecko, NEAR, INJ)…");const r=await A.stSyncNow();prog("err" in r?r.err:"Sync: "+r.ok);await load();}catch(e){prog("Blad: "+(e&&e.message||e));}$("bs").disabled=false;};
+$("bp").onclick=async()=>{try{prog("Pobieranie cen…");const r=await A.stSyncPrices();prog("err" in r?"Ceny: "+r.err:r.ok);await load();}catch(e){prog("Blad: "+(e&&e.message||e));}};
 $("bn").onclick=async()=>{$("bn").disabled=true;try{prog("Synchronizacja neuronow (NNS)…");const r=await A.stSyncNeurons();prog("err" in r?r.err:"Neurony: "+r.ok);await load();}catch(e){prog("Blad: "+(e&&e.message||e));}$("bn").disabled=false;};
 
 // --- import kopii NeuronRewardsTracker (rewards-backup-*.json) lub wlasnego eksportu

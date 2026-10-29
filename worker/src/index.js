@@ -251,6 +251,10 @@ async function canister(req, env, u) {
     const S = await series(), L = S.t.length - 1;
     return T(["D|" + S.t[L], ...SG.filter(s => s !== "BTC").map(s => [s, S[s].on[L], S[s].w[L], P6(S[s].c[L]), S[s].e[L] ?? 0, S[s].er[L] ?? 0].join("|"))].join("\n"));
   }
+  if (u.pathname === "/cgp") {
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,near,injective-protocol&vs_currencies=usd,pln", { headers: { accept: "application/json", "user-agent": "budzet-icp" } });
+    return T(await r.text(), r.ok ? 200 : 502);
+  }
   if (u.pathname === "/notify" && req.method === "POST") {
     if (!env.RESEND_KEY || !env.MAIL_TO) return T("ERR config", 500);
     return T(await sendMail(env, (await req.text()).slice(0, 5000)));

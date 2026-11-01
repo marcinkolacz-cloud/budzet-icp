@@ -133,3 +133,27 @@ html .ctrl .chips{margin:0;flex:1 1 auto}
 html .ctrl #ps{min-width:160px;max-width:240px}
 html .ctrl:has(>.chips:only-child:empty){display:none}
 @media (max-width:760px){html .ctrl #ps{flex:1 1 auto;max-width:none}}
+
+/* === Aurora: tlo + szklane karty (cala aplikacja) === */
+html.aur-on{background:var(--bg)}
+html.aur-on body{background:transparent!important}
+.aur{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.aur i{position:absolute;width:60vmax;height:60vmax;border-radius:50%;filter:blur(90px);opacity:.34;will-change:transform;animation:aur 26s ease-in-out infinite alternate}
+.aur i:nth-child(1){background:#6d5dfc;left:-18vmax;top:-22vmax}
+.aur i:nth-child(2){background:#00c2a8;right:-20vmax;top:6vmax;animation-delay:-8s;animation-duration:32s}
+.aur i:nth-child(3){background:#ff7a59;left:20vmax;bottom:-30vmax;animation-delay:-16s;opacity:.24}
+html[data-theme=dark] .aur i{opacity:.2}html[data-theme=dark] .aur i:nth-child(3){opacity:.13}
+.aur::after{content:"";position:absolute;inset:0;background-image:radial-gradient(color-mix(in srgb,var(--ink) 13%,transparent) 1px,transparent 1px);background-size:22px 22px;-webkit-mask-image:linear-gradient(#000,transparent 70%);mask-image:linear-gradient(#000,transparent 70%)}
+@keyframes aur{50%{transform:translate(8vmax,6vmax) scale(1.15)}100%{transform:translate(-6vmax,10vmax) scale(.95)}}
+html.aur-on section,html.aur-on .tile,html.aur-on .stat,html.aur-on .ctrl,html.aur-on .kc{background:color-mix(in srgb,var(--card) 84%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.35);backdrop-filter:blur(16px) saturate(1.35);border-color:color-mix(in srgb,var(--ink) 9%,transparent);box-shadow:0 1px 0 color-mix(in srgb,#fff 45%,transparent) inset,0 10px 30px -18px #0004}
+html.aur-on section,html.aur-on .tile,html.aur-on .stat{border-radius:22px}
+html.aur-on section{background:color-mix(in srgb,var(--card) 96%,transparent);-webkit-backdrop-filter:none;backdrop-filter:none}
+/* duze karty bez backdrop-filter: w Chromium powodowal niedorysowane prostokaty przy przewijaniu */
+.aur{contain:strict}.aur i{backface-visibility:hidden}
+html[data-theme=dark].aur-on section,html[data-theme=dark].aur-on .tile,html[data-theme=dark].aur-on .stat,html[data-theme=dark].aur-on .ctrl,html[data-theme=dark].aur-on .kc{box-shadow:0 1px 0 #ffffff0d inset,0 10px 30px -18px #000}
+html.aur-on .topnav{background:color-mix(in srgb,var(--bg) 55%,transparent)}
+html.aur-on h1{letter-spacing:-.045em}
+@media (max-width:640px){.aur i{filter:blur(70px)}}
+@media (prefers-reduced-motion:reduce){.aur i{animation:none}}
+html.aur-on .stat.bal{background:linear-gradient(135deg,#6d5dfc 0%,#3b82f6 50%,#00c2a8 100%);color:#fff;border-color:transparent;box-shadow:0 14px 34px -16px #6d5dfcaa}
+html.aur-on .stat.bal span,html.aur-on .stat.bal small{color:#fff;opacity:.8}

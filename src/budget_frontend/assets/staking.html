@@ -128,7 +128,9 @@ function neuronStats(n){
 function wtnStats(p){
  const s=D.wtn.filter(x=>x.pid===p.id).sort((a,b)=>Number(a.date-b.date));let earned=0,todayR=0;const ev=[];
  s.forEach((x,i)=>{const pv=s[i-1];const t=!pv?"firstReading":x.nicp>pv.nicp?"capitalAdded":x.nicp<pv.nicp?"withdrawal":"organicGrowth";ev.push(t);
-  if(t==="organicGrowth"){const g=x.red-pv.red;earned+=g;if(day(x.date)===today)todayR+=g;}});
+  // zysk: wzrost wartosci (organiczny) + roznica kursowa przy wplacie (wartosc ponad wplacone ICP)
+  const g=t==="organicGrowth"?x.red-pv.red:t==="firstReading"?x.red-x.paid:t==="capitalAdded"?(x.red-pv.red)-(x.paid-pv.paid):0;
+  earned+=g;if(day(x.date)===today)todayR+=g;});
  let apy=0;
  if(s.length>=2&&(Number(s[s.length-1].date-s[0].date)/864e11)>=30){
   const w0=Number(s[s.length-1].date)-30*864e11;let sum=0,c=0;
@@ -255,7 +257,13 @@ function renderHist(dm,N,W){
  $("hh").innerHTML=head;$("hb").innerHTML=rows||'<tr><td colspan="7" class="note">Brak danych.</td></tr>';$("hn").textContent=note;
 }
 
-async function load(){D=await A.stAll();try{D.close=await A.stWtnCloses();}catch(e){D.close=[];}render();}
+// merge w dniu scalenia: nagroda neuronu zrodlowego z tego dnia pokazywana przy neuronie docelowym (suma bez zmian)
+function moveMergeRewards(R){const drop=new Set(),W=15n*60n*1000000000n;
+ R.filter(m=>m.ev==="mergeOut").forEach(m=>{const d=day(m.ts),ab=x=>x<0n?-x:x;
+  const t=R.filter(r=>r.nid!==m.nid&&day(r.ts)===d&&r.delta>0n&&ab(r.ts-m.ts)<=W).sort((x,y)=>(ab(x.ts-m.ts)<ab(y.ts-m.ts)?-1:1))[0];if(!t)return;
+  R.forEach((r,i)=>{if(r.nid===m.nid&&day(r.ts)===d&&isRew(r)&&r.ts<m.ts){t.delta+=r.delta;drop.add(i);}});});
+ return R.filter((_,i)=>!drop.has(i));}
+async function load(){D=await A.stAll();D.rewards=moveMergeRewards(D.rewards);try{D.close=await A.stWtnCloses();}catch(e){D.close=[];}render();}
 async function livePrices(){
  try{const r=await fetch("https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,near,injective-protocol&vs_currencies=usd,pln&include_24hr_change=true");const j=await r.json();
   live={icp:j["internet-computer"],near:j.near,inj:j["injective-protocol"]};if(D)render();}catch{}

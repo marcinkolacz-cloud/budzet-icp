@@ -49,6 +49,7 @@ function menus(){document.querySelectorAll(".mnu").forEach(function(m){var b=m.q
  p.addEventListener("click",function(e){if(e.target.closest("button"))cl()});
  document.addEventListener("click",function(e){if(!m.contains(e.target)&&!p.contains(e.target))cl()});
  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!p.hidden){cl();b.focus()}});addEventListener("resize",cl);addEventListener("scroll",function(e){if(!p.contains(e.target))cl()},true);});}
-function boot(){mount();menus();if(!window.CAL&&!document.querySelector('script[src="cal.js"]')){var cs=document.createElement("script");cs.src="cal.js";document.head.append(cs)}}
+function aurora(){document.documentElement.classList.add("aur-on");if(document.querySelector(".aur"))return;var a=document.createElement("div");a.className="aur";a.setAttribute("aria-hidden","true");a.innerHTML="<i></i><i></i><i></i>";document.body.prepend(a);}
+function boot(){aurora();mount();menus();if(!window.CAL&&!document.querySelector('script[src="cal.js"]')){var cs=document.createElement("script");cs.src="cal.js";document.head.append(cs)}}
 document.readyState==="loading"?document.addEventListener("DOMContentLoaded",boot):boot();
 })();

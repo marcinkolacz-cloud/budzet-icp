@@ -126,11 +126,11 @@ function neuronStats(n){
  return {h,cap:Number(n.stake)===0?0:cap/1e8,rew:rew/1e8,avg:dd>=1?w30/dd/1e8:(cnt?rew/cnt/1e8:0),today:todayR/1e8,mat:mat/1e8,stake:e8(n.stake),apy};
 }
 function wtnStats(p){
- const s=D.wtn.filter(x=>x.pid===p.id).sort((a,b)=>Number(a.date-b.date));let earned=0,todayR=0;const ev=[];
- s.forEach((x,i)=>{const pv=s[i-1];const t=!pv?"firstReading":x.nicp>pv.nicp?"capitalAdded":x.nicp<pv.nicp?"withdrawal":"organicGrowth";ev.push(t);
+ const s=D.wtn.filter(x=>x.pid===p.id).sort((a,b)=>Number(a.date-b.date));let earned=0,todayR=0;const ev=[],gs=[];
+ s.forEach((x,i)=>{const pv=s[i-1];const t=!pv?"firstReading":x.nicp>pv.nicp?"capitalAdded":x.nicp<pv.nicp?"withdrawal":"organicGrowth";ev.push(t);gs.push(0);
   // zysk: wzrost wartosci (organiczny) + roznica kursowa przy wplacie (wartosc ponad wplacone ICP)
   const g=t==="organicGrowth"?x.red-pv.red:t==="firstReading"?x.red-x.paid:t==="capitalAdded"?(x.red-pv.red)-(x.paid-pv.paid):0;
-  earned+=g;if(day(x.date)===today)todayR+=g;});
+  gs[i]=g;earned+=g;if(day(x.date)===today)todayR+=g;});
  let apy=0;
  if(s.length>=2&&(Number(s[s.length-1].date-s[0].date)/864e11)>=30){
   const w0=Number(s[s.length-1].date)-30*864e11;let sum=0,c=0;
@@ -138,7 +138,7 @@ function wtnStats(p){
   if(c)apy=(Math.pow(1+sum/c,365)-1)*100;
  }
  const l=s[s.length-1]||{nicp:0,paid:0,red:0};
- return {s,ev,earned,today:todayR,nicp:l.nicp,paid:l.paid,red:l.red,ret:l.paid?earned/l.paid*100:0,apy};
+ return {s,ev,gs,earned,today:todayR,nicp:l.nicp,paid:l.paid,red:l.red,ret:l.paid?earned/l.paid*100:0,apy};
 }
 function extStats(chain){
  const dec=chain==="near"?1e24:1e18,rows=D.ext.filter(x=>x.chain===chain).sort((a,b)=>a.day<b.day?-1:1);
@@ -155,7 +155,7 @@ function icpPx(){return live.icp?.[K()]||(D.prices.length?D.prices[D.prices.leng
 function dailyMap(){
  const m=new Map(),at=d=>{if(!m.has(d))m.set(d,{icp:0,nicp:0,near:0,inj:0,v:0});return m.get(d);},ip=icpPx();
  for(const r of D.rewards)if(isRew(r)){const d=day(r.ts),v=e8(r.delta),o=at(d);o.icp+=v;o.v+=v*(priceOn(d,KI())||ip);}
- for(const p of D.wtnPos){const w=wtnStats(p);w.s.forEach((x,i)=>{if(i&&w.ev[i]==="organicGrowth"){const g=x.red-w.s[i-1].red;if(g>0){const d=day(x.date),o=at(d);o.nicp+=g;o.v+=g*(priceOn(d,KI())||ip);}}});}
+ for(const p of D.wtnPos){const w=wtnStats(p);w.s.forEach((x,i)=>{const g=w.gs[i];if(g){const d=day(x.date),o=at(d);o.nicp+=g;o.v+=g*(priceOn(d,KI())||ip);}});}
  for(const c of ["near","inj"]){const e=extStats(c);for(const x of e.rows){const v=e.r(x),o=at(x.day);o[c]+=v;o.v+=v*(x[K()]||e.px);}}
  return m;
 }
@@ -300,8 +300,10 @@ async function editWtn(p){
 }
 $("as").onclick=async()=>{
  if(!D.wtnPos.length){prog("Najpierw dodaj pozycje WaterNeuron.");return;}
- const ok=await dlg("ds",()=>{$("spid").innerHTML=D.wtnPos.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("");$("sdt").value=today;["sn","sp","sr"].forEach(k=>$(k).value="");
-  const l=D.wtn.filter(x=>x.pid===D.wtnPos[0].id).slice(-1)[0];if(l){$("sn").value=l.nicp;$("sp").value=l.paid;}});
+ const ok=await dlg("ds",()=>{const ps=[...D.wtnPos].sort((a,b)=>!!wtnCl(a)-!!wtnCl(b)||Number(b.start-a.start)||Number(b.id-a.id));
+  $("spid").innerHTML=ps.map(p=>`<option value="${p.id}">${esc(p.name)}${wtnCl(p)?" (zamknieta)":""}</option>`).join("");$("spid").value=String(ps[0].id);$("sdt").value=today;
+  const fill=()=>{["sn","sp","sr"].forEach(k=>$(k).value="");const l=D.wtn.filter(x=>String(x.pid)===$("spid").value).sort((a,b)=>Number(a.date-b.date)).slice(-1)[0];if(l){$("sn").value=l.nicp;$("sp").value=l.paid;}};
+  $("spid").onchange=fill;fill();});
  if(!ok)return;const n=v=>Number(String(v).replace(/\s/g,"").replace(",","."));
  const r={pid:BigInt($("spid").value),date:nsOf($("sdt").value),nicp:n($("sn").value),paid:n($("sp").value),red:n($("sr").value)};
  if(![r.nicp,r.paid,r.red].every(Number.isFinite)){prog("Nieprawidlowe liczby");return;}

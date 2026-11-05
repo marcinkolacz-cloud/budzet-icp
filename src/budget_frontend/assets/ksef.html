@@ -9,6 +9,8 @@ table.kt td.k small{display:block;color:var(--muted);font-size:11px}table.kt td.
 .bd{display:inline-block;padding:2px 9px;border-radius:999px;background:var(--field);color:var(--pos);font-size:11px;letter-spacing:.04em}
 .empty{padding:28px 0;text-align:center;color:var(--muted)}
 #msg{min-height:18px}#msg.e{color:var(--neg)}
+.f2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 0}.f2 input[type=search]{flex:1 1 220px;min-width:0}
+td.zk{text-align:center}td.zk input{width:17px;height:17px;accent-color:var(--ink);cursor:pointer}tr.zks td{opacity:.62}tr.zks td.zk,tr.zks td:last-child{opacity:1}
 @media (max-width:760px){table.kt .hm{display:none}}
 </style></head>
 <body><div class="app">
@@ -24,9 +26,13 @@ table.kt td.k small{display:block;color:var(--muted);font-size:11px}table.kt td.
  <select id="bud" aria-label="Budzet docelowy"></select>
  <select id="kw" aria-label="Kwota"><option value="g">brutto</option><option value="n">netto</option></select>
 </div>
+<div class="f2"><input id="q" type="search" placeholder="Szukaj: kontrahent, numer, NIP…" aria-label="Szukaj">
+ <select id="fz" aria-label="Ksiegowanie"><option value="">Wszystkie</option><option value="n">Niezaksiegowane</option><option value="t">Zaksiegowane</option></select>
+ <select id="fb" aria-label="Budzet"><option value="">W budzecie i poza</option><option value="n">Nie w budzecie</option><option value="t">W budzecie</option></select>
+ <input id="kmin" type="number" inputmode="decimal" placeholder="Brutto od" style="width:120px" aria-label="Brutto od"><input id="kmax" type="number" inputmode="decimal" placeholder="do" style="width:100px" aria-label="Brutto do"></div>
 <div id="msg" class="note"></div>
 <div class="stats" id="sum"></div>
-<div style="overflow-x:auto;margin-top:12px"><table class="kt"><thead><tr><th class="l">Data</th><th class="l">Numer</th><th class="l">Kontrahent</th><th class="hm">Netto</th><th class="hm">VAT</th><th>Brutto</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+<div style="overflow-x:auto;margin-top:12px"><table class="kt"><thead><tr><th class="l">Data</th><th class="l">Numer</th><th class="l">Kontrahent</th><th class="hm">Netto</th><th class="hm">VAT</th><th>Brutto</th><th title="Faktura zaksiegowana">Zaksieg.</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
 </section>
 </div>
 <script src="auth.js"></script>
@@ -79,6 +85,8 @@ function imp(r){
  row[k]=Math.round(($("kw").value==="n"?r.net:r.gr)*100)/100;
  if(!inc){row.dt=row.dt||{};row.dt[k]=r.dt;}
  sv(BK,R);const I=ld(IK,{});I[r.no]={b:bid,ym,k,at:Date.now()};sv(IK,I);msg("Dodano „"+k+"” do "+(inc?"wplywow":"kosztow")+" ("+ym+")");render();}
+const ZK=()=>{const R=ld(BK,null);return (R&&R.ksz)||{};};
+function setZk(no,on){const R=ld(BK,null);if(!R) return msg("Brak danych budzetu",1);R.ksz=R.ksz||{};if(on) R.ksz[no]=Date.now(); else delete R.ksz[no];sv(BK,R);}
 const XC={};
 async function getXml(r){if(XC[r.no]) return XC[r.no];const x=await A.ksefXml(r.no);if("err" in x) throw new Error(x.err);return XC[r.no]=x.ok;}
 async function xml(r,btn){
@@ -128,22 +136,26 @@ async function pdf(r,btn){
  btn.disabled=false;}
 function render(){
  mountB();const c=ld(CK,{})[key()], tb=$("tb"), I=ld(IK,{}), inc=$("typ").value==="Subject1";tb.innerHTML="";$("sum").innerHTML="";
- if(!c){tb.innerHTML='<tr><td colspan="7" class="empty">Wybierz miesiac i kliknij „Pobierz z KSeF”</td></tr>';return;}
- if(!c.rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">Brak faktur w tym miesiacu</td></tr>';}
- const pln=c.rows.filter(r=>r.cur==="PLN");
- [["Faktur",String(c.rows.length)],["Netto PLN",fmt(pln.reduce((a,r)=>a+r.net,0))],["VAT PLN",fmt(pln.reduce((a,r)=>a+r.vat,0))],["Brutto PLN",fmt(pln.reduce((a,r)=>a+r.gr,0))],["Pobrano",new Date(c.at).toLocaleString("pl-PL",{dateStyle:"short",timeStyle:"short"})]]
+ if(!c){tb.innerHTML='<tr><td colspan="8" class="empty">Wybierz miesiac i kliknij „Pobierz z KSeF”</td></tr>';return;}
+ if(!c.rows.length){tb.innerHTML='<tr><td colspan="8" class="empty">Brak faktur w tym miesiacu</td></tr>';}
+ const Z=ZK(),q=ASC($("q").value.trim()),fz=$("fz").value,fb=$("fb").value,mn=parseFloat($("kmin").value),mx=parseFloat($("kmax").value);
+ const rows=c.rows.filter(r=>(!q||ASC([r.num,r.no,r.sn,r.sname,r.bn,r.bname].join(" ")).includes(q))&&(!fz||(fz==="t")===!!Z[r.no])&&(!fb||(fb==="t")===!!I[r.no])&&(isNaN(mn)||r.gr>=mn)&&(isNaN(mx)||r.gr<=mx));
+ if(c.rows.length&&!rows.length) tb.innerHTML='<tr><td colspan="8" class="empty">Brak faktur dla wybranych filtrow</td></tr>';
+ const pln=rows.filter(r=>r.cur==="PLN"),zn=rows.filter(r=>!Z[r.no]).length;
+ [["Faktur",rows.length+(rows.length!==c.rows.length?" / "+c.rows.length:"")],["Niezaksiegowane",String(zn)],["Netto PLN",fmt(pln.reduce((a,r)=>a+r.net,0))],["VAT PLN",fmt(pln.reduce((a,r)=>a+r.vat,0))],["Brutto PLN",fmt(pln.reduce((a,r)=>a+r.gr,0))],["Pobrano",new Date(c.at).toLocaleString("pl-PL",{dateStyle:"short",timeStyle:"short"})]]
   .forEach(([l,v])=>{const s=document.createElement("div");s.className="stat";const a=document.createElement("span");a.textContent=l;const b=document.createElement("strong");b.textContent=v;s.append(a,b);$("sum").append(s);});
- c.rows.slice().sort((a,b)=>b.dt.localeCompare(a.dt)).forEach(r=>{
+ rows.slice().sort((a,b)=>b.dt.localeCompare(a.dt)).forEach(r=>{
   const tr=document.createElement("tr"), td=(t,cl)=>{const e=document.createElement("td");if(cl) e.className=cl;e.textContent=t;tr.append(e);return e;};
   td(r.dt.split("-").reverse().join("."),"l");td(r.num,"l");
   const k=td(inc?(r.bname||r.bn):(r.sname||r.sn),"l k");const s=document.createElement("small");s.textContent=(inc?"":"NIP ")+(inc?r.bn:r.sn)+(r.typ&&r.typ!=="Vat"?" · "+r.typ:"");k.title=k.textContent;k.append(s);
   td(fmt(r.net,r.cur),"hm");td(fmt(r.vat,r.cur),"hm");td(fmt(r.gr,r.cur));
+  const zc=td("","zk"),zi=document.createElement("input");zi.type="checkbox";zi.checked=!!Z[r.no];zi.title="Faktura zaksiegowana";zi.setAttribute("aria-label","Zaksiegowana: "+r.num);zi.onchange=()=>{setZk(r.no,zi.checked);render();};zc.append(zi);if(Z[r.no]) tr.className="zks";
   const a=td("");const w=document.createElement("span");w.className="ac";
   const bx=document.createElement("button");bx.type="button";bx.textContent="XML";bx.title="Pobierz fakture (XML)";bx.onclick=()=>xml(r,bx);w.append(bx);const bp=document.createElement("button");bp.type="button";bp.textContent="PDF";bp.title="Drukuj / zapisz jako PDF";bp.onclick=()=>pdf(r,bp);w.append(bp);
   if(I[r.no]){const z=document.createElement("span");z.className="bd";z.textContent="w budzecie";z.title=I[r.no].k+" · "+I[r.no].ym;w.append(z);}
   else{const bi=document.createElement("button");bi.type="button";bi.textContent=inc?"Do wplywow":"Do kosztow";bi.onclick=()=>imp(r);w.append(bi);}
   a.append(w);tb.append(tr);});}
-$("get").onclick=fetchAll;$("typ").onchange=render;$("mies").onchange=render;
+$("get").onclick=fetchAll;$("typ").onchange=render;$("mies").onchange=render;["q","fz","fb","kmin","kmax"].forEach(i=>$(i).addEventListener("input",render));
 render();
 })();
 </script></body></html>
